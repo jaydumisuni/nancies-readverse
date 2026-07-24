@@ -6,16 +6,7 @@ interface Env {
   AI: Ai;
   APP_NAME: string;
   AI_MODEL: string;
-  SESSION_TTL_SECONDS: string;
-  INVITE_CODE?: string;
 }
-
-type SessionRecord = {
-  createdAt: string;
-  userAgent: string;
-};
-
-const SESSION_COOKIE = "nrv_session";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -25,16 +16,8 @@ export default {
       return handleHealth(env);
     }
 
-    if (url.pathname === "/api/session") {
-      return handleSession(request, env);
-    }
-
     if (url.pathname === "/api/gogo/help") {
       return handleGogoHelp(request, env, ctx);
-    }
-
-    if (url.pathname.startsWith("/dev-")) {
-      return claimInvite(request, env, url);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -65,63 +48,8 @@ async function handleHealth(env: Env): Promise<Response> {
       r2: "configured",
       ai: "configured",
     },
-    inviteConfigured: Boolean(env.INVITE_CODE),
     timestamp: new Date().toISOString(),
   });
-}
-
-async function handleSession(request: Request, env: Env): Promise<Response> {
-  const session = await readSession(request, env);
-
-  if (!session) {
-    return json({ authenticated: false }, 401);
-  }
-
-  return json({
-    authenticated: true,
-    app: env.APP_NAME,
-    createdAt: session.createdAt,
-  });
-}
-
-async function claimInvite(request: Request, env: Env, url: URL): Promise<Response> {
-  if (request.method !== "GET") {
-    return json({ ok: false, error: "Method not allowed" }, 405);
-  }
-
-  const suppliedCode = url.pathname.slice(1);
-  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  const valid = isLocal
-    ? suppliedCode.startsWith("dev-")
-    : Boolean(env.INVITE_CODE) && (await secureEqual(suppliedCode, env.INVITE_CODE ?? ""));
-
-  if (!valid) {
-    return new Response("This ReadVerse invitation is invalid or has expired.", {
-      status: env.INVITE_CODE || isLocal ? 404 : 503,
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    });
-  }
-
-  const token = createSessionToken();
-  const sessionKey = `session:${await sha256(token)}`;
-  const ttl = normaliseTtl(env.SESSION_TTL_SECONDS);
-  const record: SessionRecord = {
-    createdAt: new Date().toISOString(),
-    userAgent: request.headers.get("user-agent") ?? "unknown",
-  };
-
-  await env.SESSION_KV.put(sessionKey, JSON.stringify(record), {
-    expirationTtl: ttl,
-  });
-
-  const secure = url.protocol === "https:" ? "Secure; " : "";
-  const headers = new Headers({ location: "/" });
-  headers.append(
-    "set-cookie",
-    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; ${secure}SameSite=Strict; Max-Age=${ttl}`,
-  );
-
-  return new Response(null, { status: 302, headers });
 }
 
 async function handleGogoHelp(
@@ -131,11 +59,6 @@ async function handleGogoHelp(
 ): Promise<Response> {
   if (request.method !== "POST") {
     return json({ ok: false, error: "Method not allowed" }, 405);
-  }
-
-  const session = await readSession(request, env);
-  if (!session) {
-    return json({ ok: false, error: "Private session required" }, 401);
   }
 
   let question = "";
@@ -178,20 +101,6 @@ async function handleGogoHelp(
   }
 }
 
-async function readSession(request: Request, env: Env): Promise<SessionRecord | null> {
-  const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
-  if (!token) return null;
-
-  const value = await env.SESSION_KV.get(`session:${await sha256(token)}`);
-  if (!value) return null;
-
-  try {
-    return JSON.parse(value) as SessionRecord;
-  } catch {
-    return null;
-  }
-}
-
 function fallbackHelp(question: string): string {
   const value = question.toLowerCase();
 
@@ -220,46 +129,6 @@ function extractAiText(result: unknown): string {
   if (typeof record.response === "string") return record.response.trim();
   if (typeof record.text === "string") return record.text.trim();
   return "";
-}
-
-function readCookie(header: string | null, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === name) return rest.join("=");
-  }
-  return null;
-}
-
-function createSessionToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  const random = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${crypto.randomUUID()}.${random}`;
-}
-
-async function secureEqual(left: string, right: string): Promise<boolean> {
-  const [a, b] = await Promise.all([sha256Bytes(left), sha256Bytes(right)]);
-  if (a.length !== b.length) return false;
-  let difference = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    difference |= a[index] ^ b[index];
-  }
-  return difference === 0;
-}
-
-async function sha256(value: string): Promise<string> {
-  const bytes = await sha256Bytes(value);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256Bytes(value: string): Promise<Uint8Array> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return new Uint8Array(digest);
-}
-
-function normaliseTtl(value: string): number {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed >= 3600 ? parsed : 2_592_000;
 }
 
 function json(body: unknown, status = 200): Response {
