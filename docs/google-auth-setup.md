@@ -54,12 +54,6 @@ GOOGLE_AUTH_ENABLED=false
 
 `GOOGLE_ALLOWED_EMAILS` is required. An empty allowlist keeps every account blocked even if the enable flag is changed accidentally.
 
-The feature is activated later by changing only:
-
-```text
-GOOGLE_AUTH_ENABLED=true
-```
-
 ## Prepared Worker routes
 
 ```text
@@ -70,7 +64,22 @@ GET  /api/auth/session
 POST /api/auth/logout
 ```
 
-While `GOOGLE_AUTH_ENABLED` is absent or `false`, `/api/auth/google/start` returns `GOOGLE_AUTH_DISABLED`, and the existing direct ReadVerse interface remains unchanged.
+While `GOOGLE_AUTH_ENABLED` is absent or `false`, `/api/auth/google/start` returns `GOOGLE_AUTH_DISABLED`, the frontend uses direct mode, and the current ReadVerse experience remains unchanged.
+
+## Activation sequence
+
+After all other ReadVerse testing is complete:
+
+1. Merge the staged Google-auth pull request.
+2. Apply the remote D1 migration with `npx wrangler d1 migrations apply DB --remote` from the separate ReadVerse Cloudflare account, or deploy with `npm run deploy`.
+3. Confirm `/api/auth/google/status` reports `configured: true` and `enabled: false`.
+4. Change only the Worker secret below:
+
+```text
+GOOGLE_AUTH_ENABLED=true
+```
+
+The frontend will then replace direct mode with the Google sign-in gate automatically. No additional UI commit is required.
 
 ## Storage
 
