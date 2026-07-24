@@ -1,10 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-
-type SessionResponse = {
-  authenticated: boolean;
-  app?: string;
-  createdAt?: string;
-};
+import { FormEvent, useMemo, useState } from "react";
 
 type ChatMessage = {
   role: "gogo" | "nancy";
@@ -19,29 +13,10 @@ const starterMessages: ChatMessage[] = [
 ];
 
 export default function App() {
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  const [sessionError, setSessionError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
-
-  useEffect(() => {
-    let active = true;
-
-    fetch("/api/session", { credentials: "include" })
-      .then(async (response) => {
-        const body = (await response.json()) as SessionResponse;
-        if (active) setSession(body);
-      })
-      .catch(() => {
-        if (active) setSessionError("ReadVerse could not verify this device.");
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -62,7 +37,6 @@ export default function App() {
     try {
       const response = await fetch("/api/gogo/help", {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ question: cleanQuestion }),
       });
@@ -81,34 +55,6 @@ export default function App() {
     } finally {
       setSending(false);
     }
-  }
-
-  if (!session && !sessionError) {
-    return (
-      <main className="gate-screen">
-        <div className="gate-orbit" />
-        <section className="gate-card" aria-live="polite">
-          <span className="eyebrow">Nancy's private universe</span>
-          <h1>Opening ReadVerse</h1>
-          <p>Checking this device and preparing your shelves.</p>
-          <div className="loading-line"><span /></div>
-        </section>
-      </main>
-    );
-  }
-
-  if (sessionError || !session?.authenticated) {
-    return (
-      <main className="gate-screen">
-        <div className="gate-orbit" />
-        <section className="gate-card locked-card">
-          <span className="eyebrow">Private shelf</span>
-          <h1>ReadVerse is locked</h1>
-          <p>{sessionError || "Open the private dev link created for this device."}</p>
-          <small>No account or password is required.</small>
-        </section>
-      </main>
-    );
   }
 
   return (
