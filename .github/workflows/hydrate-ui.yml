@@ -1,0 +1,68 @@
+name: Hydrate ReadVerse UI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - ".bootstrap/**"
+      - ".github/workflows/hydrate-ui.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readverse-ui-hydration
+  cancel-in-progress: true
+
+jobs:
+  hydrate-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out development branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Rebuild source payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/payload.* | base64 --decode > /tmp/readverse-ui.tar.gz
+          tar -xzf /tmp/readverse-ui.tar.gz -C .
+          test -s src/App.tsx
+          test -s src/styles.css
+          test -s worker/index.ts
+          test -s migrations/0002_profiles.sql
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type-check code
+        run: npm run check
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Commit verified visual build
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ReadVerse Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx src/styles.css worker/index.ts migrations/0002_profiles.sql
+          if git diff --cached --quiet; then
+            echo "ReadVerse UI is already hydrated."
+          else
+            git commit -m "Build complete ReadVerse visual experience"
+            git push origin HEAD:dev
+          fi
