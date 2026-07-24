@@ -1,0 +1,11 @@
+{
+  "name": "Nancy's ReadVerse",
+  "short_name": "ReadVerse",
+  "description": "Nancy's private universe for comics, manga, novels, and books.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050408",
+  "theme_color": "#050408",
+  "orientation": "any",
+  "categories": ["books", "entertainment", "lifestyle"]
+}
