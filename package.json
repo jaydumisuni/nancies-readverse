@@ -1,15 +1,16 @@
 {
   "name": "nancies-readverse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "hydrate": "node scripts/hydrate-ui.mjs",
+    "dev": "npm run hydrate && vite",
+    "build": "npm run hydrate && tsc --noEmit && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy && wrangler d1 migrations apply DB --remote",
     "deploy:preview": "npm run build && wrangler versions upload",
-    "check": "tsc --noEmit",
+    "check": "npm run hydrate && tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
