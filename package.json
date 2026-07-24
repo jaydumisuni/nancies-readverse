@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy && wrangler d1 migrations apply DB --remote",
+    "deploy:preview": "npm run build && wrangler versions upload",
     "check": "tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
