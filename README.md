@@ -53,9 +53,19 @@ Local development accepts a temporary invite path. Production requires the `INVI
 ## Cloudflare deployment
 
 1. Change this repository to Private.
-2. In Cloudflare, open **Workers & Pages** and import this GitHub repository.
-3. Use `npm run deploy` as the deploy command.
-4. Add the Worker secret:
+2. In Cloudflare, open **Workers & Pages**, create an application, and import this GitHub repository.
+3. Use these Workers Builds settings:
+
+```text
+Worker name: nancies-readverse
+Production branch: main
+Build command: npm run build
+Deploy command: npx wrangler deploy
+Non-production branch deploy command: npx wrangler versions upload
+Root directory: /
+```
+
+4. Add the Worker secret after the first Worker exists:
 
 ```bash
 npx wrangler secret put INVITE_CODE
