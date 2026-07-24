@@ -31,16 +31,25 @@ jobs:
           npm run check > typecheck.log 2>&1
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
-      - name: Upload type-check diagnostics
+      - name: Build Worker and frontend
+        id: buildapp
+        continue-on-error: true
+        run: |
+          npm run build > build.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: typecheck-diagnostics
-          path: typecheck.log
+          name: readverse-diagnostics
+          path: |
+            typecheck.log
+            build.log
 
-      - name: Fail on type errors
-        if: steps.typecheck.outputs.exit_code != '0'
-        run: cat typecheck.log && exit 1
-
-      - name: Build Worker and frontend
-        run: npm run build
+      - name: Fail on validation errors
+        if: steps.typecheck.outputs.exit_code != '0' || steps.buildapp.outputs.exit_code != '0'
+        run: |
+          cat typecheck.log
+          cat build.log
+          exit 1
