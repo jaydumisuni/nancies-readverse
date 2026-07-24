@@ -7,7 +7,7 @@
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/dev-*"]
+    "run_worker_first": ["/api/*"]
   },
   "observability": {
     "enabled": true
@@ -33,7 +33,6 @@
   ],
   "vars": {
     "APP_NAME": "Nancy's ReadVerse",
-    "AI_MODEL": "@cf/ibm-granite/granite-4.0-h-micro",
-    "SESSION_TTL_SECONDS": "2592000"
+    "AI_MODEL": "@cf/ibm-granite/granite-4.0-h-micro"
   }
 }
