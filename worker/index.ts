@@ -8,6 +8,44 @@ interface Env {
   AI_MODEL: string;
 }
 
+type CompanionRequest = {
+  question?: unknown;
+  profileName?: unknown;
+  companion?: {
+    id?: unknown;
+    name?: unknown;
+    traits?: unknown;
+    delivery?: unknown;
+  };
+};
+
+const COMPANION_GUIDES: Record<string, string> = {
+  gojo:
+    "Playful, quick-witted, shamelessly confident, gently teasing, protective, and humorous. Never arrogant toward the user.",
+  itachi:
+    "Calm, observant, emotionally restrained, quietly protective, precise, and subtly funny.",
+  naruto:
+    "Warm, energetic, loyal, encouraging, optimistic, and cheerfully chaotic without becoming loud or repetitive.",
+  kakashi:
+    "Relaxed, clever, mature, dryly funny, concise, and apparently unbothered while still being dependable.",
+  megumi:
+    "Reserved, thoughtful, direct, quietly caring, practical, and unintentionally funny.",
+  sasuke:
+    "Intense, guarded, decisive, attentive, direct, and restrained. Never cruel or dismissive.",
+  maki:
+    "Strong, blunt, practical, protective, determined, and dryly funny.",
+  nobara:
+    "Bold, stylish, expressive, sassy, fearless, funny, and supportive.",
+  hinata:
+    "Gentle, warm, supportive, softly encouraging, attentive, and quietly brave.",
+  sakura:
+    "Caring, practical, confident, lively, direct, and no-nonsense with warm humour.",
+  temari:
+    "Strategic, composed, sharp, efficient, confident, and sarcastically funny.",
+  meiMei:
+    "Elegant, calm, observant, calculating, polished, and subtly mischievous.",
+};
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -16,8 +54,11 @@ export default {
       return handleHealth(env);
     }
 
-    if (url.pathname === "/api/gogo/help") {
-      return handleGogoHelp(request, env, ctx);
+    if (
+      url.pathname === "/api/companion/help" ||
+      url.pathname === "/api/gogo/help"
+    ) {
+      return handleCompanionHelp(request, env, ctx);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -41,7 +82,7 @@ async function handleHealth(env: Env): Promise<Response> {
   return json({
     ok: true,
     app: env.APP_NAME,
-    status: "phase-0-open",
+    status: "phase-1-visual",
     access: "direct",
     bindings: {
       d1: database,
@@ -53,7 +94,7 @@ async function handleHealth(env: Env): Promise<Response> {
   });
 }
 
-async function handleGogoHelp(
+async function handleCompanionHelp(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
@@ -62,19 +103,35 @@ async function handleGogoHelp(
     return json({ ok: false, error: "Method not allowed" }, 405);
   }
 
-  let question = "";
+  let body: CompanionRequest;
   try {
-    const body = (await request.json()) as { question?: unknown };
-    question = typeof body.question === "string" ? body.question.trim() : "";
+    body = (await request.json()) as CompanionRequest;
   } catch {
     return json({ ok: false, error: "Invalid JSON body" }, 400);
   }
 
+  const question = typeof body.question === "string" ? body.question.trim() : "";
   if (!question || question.length > 1000) {
-    return json({ ok: false, error: "Question must be between 1 and 1000 characters" }, 400);
+    return json(
+      { ok: false, error: "Question must be between 1 and 1000 characters" },
+      400,
+    );
   }
 
-  const fallback = fallbackHelp(question);
+  const companionId =
+    typeof body.companion?.id === "string" ? body.companion.id : "gojo";
+  const companionName =
+    typeof body.companion?.name === "string" ? body.companion.name : "Gojo";
+  const profileName =
+    typeof body.profileName === "string" && body.profileName.trim()
+      ? body.profileName.trim()
+      : "reader";
+  const customDelivery =
+    typeof body.companion?.delivery === "string"
+      ? body.companion.delivery.slice(0, 500)
+      : "";
+  const guide = COMPANION_GUIDES[companionId] ?? COMPANION_GUIDES.gojo;
+  const fallback = fallbackHelp(question, companionId, companionName);
 
   try {
     const aiResult = await env.AI.run(env.AI_MODEL as keyof AiModels, {
@@ -82,46 +139,97 @@ async function handleGogoHelp(
         {
           role: "system",
           content:
-            "You are Gogo, Nancy's mature anime-style reading companion inside Nancy's ReadVerse. " +
-            "Be sweet, warm, playful, lightly flirty, concise, and never sexual or possessive. " +
-            "Help with using ReadVerse, reading formats, sources, favourites, library records, temporary reading, saved files, and spoiler-safe navigation. " +
-            "Never claim an app action happened unless the application result explicitly confirms it. " +
-            "This endpoint provides guidance only; do not invent search results or links.",
+            `You are ${companionName}, the selected reading companion inside Nancy's ReadVerse. ` +
+            `Speak to ${profileName}. Your delivery is: ${guide} ${customDelivery}. ` +
+            "Keep the same dependable ReadVerse core: helpful, sweet, concise, humorous, spoiler-aware, lightly playful or flirty only when appropriate, never sexual, never possessive, and never manipulative. " +
+            "Help with manga, comics, novels, PDFs, EPUBs, CBZ files, source management, favourites, temporary reading, offline storage, reader settings, notes, highlights, and the difference between Add to Library and saving a full file. " +
+            "Do not imitate copyrighted dialogue or claim to be the canonical fictional character. Use only broad personality traits. " +
+            "Never claim an app action happened unless the application explicitly returned a successful tool result. " +
+            "Do not invent search results, links, files, quotes, or availability. " +
+            "Google sign-in and Drive saving are planned for the final integration phase, so describe them as upcoming when relevant. " +
+            "Answer in no more than 120 words unless the user explicitly requests detail.",
         },
         { role: "user", content: question },
       ],
-      max_tokens: 220,
-      temperature: 0.65,
+      max_tokens: 240,
+      temperature: 0.68,
     });
 
     const answer = extractAiText(aiResult) || fallback;
-    return json({ ok: true, answer, mode: "workers-ai" });
+    return json({ ok: true, answer, mode: "workers-ai", companion: companionId });
   } catch (error) {
     ctx.waitUntil(Promise.resolve(console.warn("Workers AI fallback", error)));
-    return json({ ok: true, answer: fallback, mode: "rules" });
+    return json({
+      ok: true,
+      answer: fallback,
+      mode: "rules",
+      companion: companionId,
+    });
   }
 }
 
-function fallbackHelp(question: string): string {
+function fallbackHelp(
+  question: string,
+  companionId: string,
+  companionName: string,
+): string {
   const value = question.toLowerCase();
+  let core: string;
 
   if (value.includes("source")) {
-    return "Paste the source into my chat and tell me what it carries, such as manga or novels. I’ll inspect it, show what it can do, and ask before remembering it.";
-  }
-  if (value.includes("save") || value.includes("keep")) {
-    return "Use Save File only when you want the full book kept in ReadVerse. Add to Library keeps its record and progress without storing the whole file.";
-  }
-  if (value.includes("favourite") || value.includes("favorite")) {
-    return "Tap the heart or ask me to favourite it. I’ll keep the title, cover, source, and your progress even when the file itself stays temporary.";
-  }
-  if (value.includes("manga") || value.includes("right-to-left")) {
-    return "Open Reader settings and choose Right-to-left or Vertical manga. I’ll remember the choice for that series, pretty reader.";
-  }
-  if (value.includes("library")) {
-    return "Add to Library remembers the title, edition, source, progress, and notes. The actual file stays temporary unless you separately choose Save File.";
+    core =
+      "Paste the source into chat and describe what it carries. ReadVerse will inspect its search, formats and reliability, then ask before remembering it.";
+  } else if (
+    value.includes("save") ||
+    value.includes("drive") ||
+    value.includes("library")
+  ) {
+    core =
+      "Read Now stays temporary. Add to Library keeps the title, source and progress. Keep Offline stores it on the device. Save to Drive will keep the full file after Google is connected.";
+  } else if (
+    value.includes("pdf") ||
+    value.includes("epub") ||
+    value.includes("cbz") ||
+    value.includes("upload")
+  ) {
+    core =
+      "Use the paperclip to attach a PDF, EPUB or CBZ. ReadVerse will inspect it and show Read Now, Add to Library, Keep Offline and Save to Drive as separate choices.";
+  } else if (
+    value.includes("theme") ||
+    value.includes("colour") ||
+    value.includes("color") ||
+    value.includes("ring")
+  ) {
+    core =
+      "The site theme and companion ring are independent. Change the world colour under Appearance, then give each companion a separate ring colour under Companion.";
+  } else if (
+    value.includes("note") ||
+    value.includes("highlight") ||
+    value.includes("passage")
+  ) {
+    core =
+      "Select a passage to colour it or attach a note. The floating notepad has its own close button and autosaves locally; Drive sync joins in the final Google phase.";
+  } else {
+    core =
+      "I can help with reading files, source search, themes, companion settings, notes, highlights, favourites and reader controls.";
   }
 
-  return "I can help you add sources, inspect a book link, continue reading, manage favourites, or explain the reader. Tell me what you’re trying to do and I’ll point you there.";
+  const endings: Record<string, string> = {
+    gojo: "Naturally, I made the complicated part look easy.",
+    itachi: "Quietly and correctly.",
+    naruto: "That is already one step closer to the next chapter.",
+    kakashi: "Try to look surprised.",
+    megumi: "It is the sensible option.",
+    sasuke: "Do not overcomplicate it.",
+    maki: "Simple.",
+    nobara: "Good taste remains protected.",
+    hinata: "We can take it one page at a time.",
+    sakura: "And yes, it will be checked properly.",
+    temari: "Efficient. As it should be.",
+    meiMei: "A worthwhile use of our time.",
+  };
+
+  return `${core} ${endings[companionId] ?? `${companionName} has it handled.`}`;
 }
 
 function extractAiText(result: unknown): string {
