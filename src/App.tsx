@@ -1,8 +1,36 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type ChatMessage = {
   role: "gogo" | "nancy";
   text: string;
+};
+
+type AuthMode =
+  | "checking"
+  | "direct"
+  | "signed-out"
+  | "signed-in"
+  | "misconfigured"
+  | "unavailable";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+};
+
+type GoogleAuthStatus = {
+  ok: boolean;
+  enabled: boolean;
+  configured: boolean;
+};
+
+type AuthSessionResponse = {
+  ok: boolean;
+  authenticated: boolean;
+  authEnabled: boolean;
+  user?: AuthUser;
 };
 
 const starterMessages: ChatMessage[] = [
@@ -13,16 +41,75 @@ const starterMessages: ChatMessage[] = [
 ];
 
 export default function App() {
+  const [authMode, setAuthMode] = useState<AuthMode>("checking");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAuth() {
+      try {
+        const statusResponse = await fetch("/api/auth/google/status", {
+          headers: { accept: "application/json" },
+        });
+
+        if (!statusResponse.ok) {
+          if (active) setAuthMode("unavailable");
+          return;
+        }
+
+        const status = (await statusResponse.json()) as GoogleAuthStatus;
+        if (!status.enabled) {
+          if (active) setAuthMode("direct");
+          return;
+        }
+
+        if (!status.configured) {
+          if (active) setAuthMode("misconfigured");
+          return;
+        }
+
+        const sessionResponse = await fetch("/api/auth/session", {
+          credentials: "include",
+          headers: { accept: "application/json" },
+        });
+        const session = (await sessionResponse.json()) as AuthSessionResponse;
+
+        if (!active) return;
+        if (sessionResponse.ok && session.authenticated && session.user) {
+          setAuthUser(session.user);
+          setAuthMode("signed-in");
+        } else {
+          setAuthMode("signed-out");
+        }
+      } catch {
+        if (active) setAuthMode("unavailable");
+      }
+    }
+
+    void loadAuth();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning, Nancy";
     if (hour < 18) return "Good afternoon, Nancy";
     return "Good evening, Nancy";
+  }, []);
+
+  const authError = useMemo(() => {
+    const code = new URLSearchParams(window.location.search).get("auth_error");
+    if (!code) return "";
+    if (code === "account_not_allowed") return "That Google account is not approved for this ReadVerse.";
+    if (code === "access_denied") return "Google sign-in was cancelled.";
+    return "Google sign-in did not finish. Please try again.";
   }, []);
 
   async function askGogo(event: FormEvent<HTMLFormElement>) {
@@ -57,6 +144,66 @@ export default function App() {
     }
   }
 
+  async function signOut() {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      window.location.reload();
+    }
+  }
+
+  if (authMode === "checking") {
+    return (
+      <main className="gate-screen">
+        <div className="gate-orbit" />
+        <section className="gate-card" aria-live="polite">
+          <span className="eyebrow">Nancy's private universe</span>
+          <h1>Opening ReadVerse</h1>
+          <p>Checking this device and preparing your shelves.</p>
+          <div className="loading-line"><span /></div>
+        </section>
+      </main>
+    );
+  }
+
+  if (authMode === "signed-out") {
+    return (
+      <main className="gate-screen">
+        <div className="gate-orbit" />
+        <section className="gate-card locked-card">
+          <span className="eyebrow">Nancy's private universe</span>
+          <h1>Enter ReadVerse</h1>
+          <p>Continue with an approved Google account to open your shelves and sync your reading profile.</p>
+          <a className="primary-action google-auth-button" href="/api/auth/google/start?returnTo=/">
+            Continue with Google
+          </a>
+          {authError && <small className="auth-error">{authError}</small>}
+        </section>
+      </main>
+    );
+  }
+
+  if (authMode === "misconfigured" || authMode === "unavailable") {
+    return (
+      <main className="gate-screen">
+        <div className="gate-orbit" />
+        <section className="gate-card locked-card">
+          <span className="eyebrow">Protected shelf</span>
+          <h1>Sign-in is not ready</h1>
+          <p>
+            {authMode === "misconfigured"
+              ? "The Google connection is switched on, but its Cloudflare settings are incomplete."
+              : "ReadVerse could not verify the sign-in service."}
+          </p>
+          <small>Direct access stays blocked while Google sign-in is enabled.</small>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="app-shell">
       <div className="ambient ambient-one" />
@@ -72,9 +219,16 @@ export default function App() {
           <a href="#discover">Discover</a>
           <a href="#sources">Sources</a>
         </nav>
-        <button className="profile-button" type="button" onClick={() => setChatOpen(true)}>
-          Ask Gogo
-        </button>
+        <div className="topbar-actions">
+          <button className="profile-button" type="button" onClick={() => setChatOpen(true)}>
+            Ask Gogo
+          </button>
+          {authUser && (
+            <button className="profile-button quiet-button" type="button" onClick={signOut}>
+              Sign out
+            </button>
+          )}
+        </div>
       </header>
 
       <main id="top">
