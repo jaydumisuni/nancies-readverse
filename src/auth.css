@@ -1,0 +1,37 @@
+.google-auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220px;
+  margin-top: 4px;
+}
+
+.auth-error {
+  display: block;
+  margin-top: 18px;
+  color: #ff9fbd !important;
+  line-height: 1.5;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.quiet-button {
+  color: #aaa2b7;
+  background: transparent;
+}
+
+@media (max-width: 760px) {
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .topbar-actions .profile-button {
+    flex: 1;
+  }
+}
