@@ -41,7 +41,8 @@ async function handleHealth(env: Env): Promise<Response> {
   return json({
     ok: true,
     app: env.APP_NAME,
-    status: "phase-0",
+    status: "phase-0-open",
+    access: "direct",
     bindings: {
       d1: database,
       kv: "configured",
