@@ -6,6 +6,12 @@ Google signup is implemented as a server-side OAuth 2.0 flow in the ReadVerse Wo
 
 Use a dedicated OAuth client for `jaydumisuni/nancies-readverse` and store its values only in the separate Cloudflare account that owns the `nancies-readverse` Worker. Do not reuse Hunter's Google client ID, client secret, callback URLs, sessions, or Cloudflare account.
 
+## Current deployed origin
+
+```text
+https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
+```
+
 ## Google OAuth client
 
 Create a **Web application** OAuth client named `Nancy's ReadVerse Web`.
@@ -20,19 +26,15 @@ Do not add Google Drive scopes to the signup client flow. Drive access will be c
 
 ### Authorized JavaScript origins
 
-Add the deployed ReadVerse origin and the local development origin, for example:
-
 ```text
-https://<readverse-domain>
+https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
 http://localhost:5173
 ```
 
 ### Authorized redirect URIs
 
-The callback path is fixed:
-
 ```text
-https://<readverse-domain>/api/auth/google/callback
+https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/api/auth/google/callback
 http://localhost:5173/api/auth/google/callback
 ```
 
@@ -45,7 +47,7 @@ Store these values on the `nancies-readverse` Worker in its own Cloudflare accou
 ```text
 GOOGLE_CLIENT_ID=<Google web client ID>
 GOOGLE_CLIENT_SECRET=<Google web client secret>
-GOOGLE_REDIRECT_URI=https://<readverse-domain>/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/api/auth/google/callback
 GOOGLE_ALLOWED_EMAILS=<comma-separated approved Google accounts>
 GOOGLE_AUTH_ENABLED=false
 ```
