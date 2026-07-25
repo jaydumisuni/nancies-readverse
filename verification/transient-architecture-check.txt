@@ -1,1 +1,0 @@
-Canonical transient-storage verification trigger.
