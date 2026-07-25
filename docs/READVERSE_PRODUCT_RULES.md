@@ -1,6 +1,7 @@
 # Nancy’s ReadVerse — Canonical Product Rules
 
 Recovery baseline: 2026-07-25
+Canonical architecture: transient-reader-v1
 
 This file is the recovery point and source of truth for future ReadVerse work.
 
