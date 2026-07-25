@@ -1,0 +1,84 @@
+name: Assemble approved Mei Mei portrait
+
+on:
+  push:
+    branches: [rebuild-approved-ui]
+    paths:
+      - .github/workflows/assemble-approved-meimei.yml
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild-approved-ui
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Assemble and verify approved portrait
+        shell: bash
+        run: |
+          set -euo pipefail
+          for part in .tmp/meimei/part{00..07}; do
+            test -s "$part"
+          done
+
+          mkdir -p public/avatars
+          cat .tmp/meimei/part{00..07} | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
+
+          node <<'NODE'
+          const crypto = require('crypto');
+          const fs = require('fs');
+
+          const portraitPath = 'public/avatars/meimei.webp';
+          const bytes = fs.readFileSync(portraitPath);
+          const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+          const expectedSize = 47814;
+          const expectedSha256 = '04bdb67840daa2d8bb93879aa2f14da13b8f4e89bb9738a6e3fae53c605ea521';
+
+          if (bytes.length !== expectedSize) {
+            throw new Error(`Unexpected Mei Mei portrait size: ${bytes.length}`);
+          }
+          if (bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') {
+            throw new Error('Approved Mei Mei portrait is not a valid WebP');
+          }
+          if (sha256 !== expectedSha256) {
+            throw new Error(`Approved Mei Mei portrait checksum mismatch: ${sha256}`);
+          }
+
+          const avatarsPath = 'src/avatars.ts';
+          let source = fs.readFileSync(avatarsPath, 'utf8');
+          const before = source;
+          source = source.replace(/mei:\s*groupD\.meimei,?/, 'mei: "/avatars/meimei.webp",');
+          source = source.replace(/mei:\s*"\/avatars\/meimei\.(?:png|webp)",?/, 'mei: "/avatars/meimei.webp",');
+          if (!source.includes('mei: "/avatars/meimei.webp",')) {
+            throw new Error('Canonical Mei Mei avatar mapping was not written');
+          }
+          if (source === before && !before.includes('mei: "/avatars/meimei.webp",')) {
+            throw new Error('No Mei Mei mapping was replaced');
+          }
+          fs.writeFileSync(avatarsPath, source);
+          console.log(`Verified approved Mei Mei portrait: ${bytes.length} bytes, ${sha256}`);
+          NODE
+
+      - name: Remove temporary recovery files and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .tmp/meimei
+          rmdir .tmp 2>/dev/null || true
+          rm -f .github/workflows/install-approved-meimei.yml
+          rm -f .github/workflows/assemble-approved-meimei.yml
+
+          git config user.name "ReadVerse UI Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Use the approved Mei Mei portrait"
+          git push origin HEAD:rebuild-approved-ui
