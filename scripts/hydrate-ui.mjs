@@ -54,4 +54,14 @@ for (let offset = 0; offset + 512 <= archive.length; ) {
   offset = dataStart + Math.ceil(size / 512) * 512;
 }
 
-console.log(`Hydrated ReadVerse UI from ${parts.length} payload parts.`);
+// Keep the archived UI compatible with the current React 19 type definitions.
+const appPath = resolve(root, "src/App.tsx");
+const appSource = await readFile(appPath, "utf8");
+await writeFile(appPath, appSource.replace(/:\s*JSX\.Element/g, ""));
+
+// The generated avatar-data key is `meimei`; normalize the hydrated alias.
+const avatarsPath = resolve(root, "src/avatars.ts");
+const avatarsSource = await readFile(avatarsPath, "utf8");
+await writeFile(avatarsPath, avatarsSource.replace(/avatarData\.meiMei/g, "avatarData.meimei"));
+
+console.log(`Hydrated ReadVerse UI from ${parts.length} payload parts and applied compatibility fixes.`);
