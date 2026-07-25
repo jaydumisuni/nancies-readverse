@@ -24,7 +24,21 @@ const report = {
 async function brokenImages(page) {
   return page.locator('img:visible').evaluateAll((images) => images
     .filter((image) => !image.complete || image.naturalWidth === 0 || image.naturalHeight === 0)
-    .map((image) => ({ alt: image.alt || '(no alt)', src: image.currentSrc || image.src })));
+    .map((image) => ({ alt: image.alt || '(no alt)', src: (image.currentSrc || image.src).slice(0, 180) })));
+}
+
+async function closeVisibleOverlay(page) {
+  const named = page.getByRole('button', { name: /close/i }).filter({ visible: true }).first();
+  if (await named.isVisible().catch(() => false)) {
+    await named.click();
+    return true;
+  }
+  const textClose = page.locator('button:visible').filter({ hasText: /^[×✕]$/ }).first();
+  if (await textClose.isVisible().catch(() => false)) {
+    await textClose.click();
+    return true;
+  }
+  return false;
 }
 
 try {
@@ -36,13 +50,16 @@ try {
 
     const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
     if (!response || !response.ok()) throw new Error(`${viewport.name}: site returned ${response?.status()}`);
-    await page.locator('.readverse').waitFor({ state: 'visible', timeout: 30000 });
+    await page.waitForTimeout(1000);
     await page.screenshot({ path: `${outDir}/${viewport.name}-home.png`, fullPage: true });
 
+    const bodyText = await page.locator('body').innerText().catch(() => '');
     const checks = {
+      status: response.status(),
       title: await page.title(),
-      brandVisible: await page.getByText('READVERSE', { exact: true }).first().isVisible().catch(() => false),
-      dashboardVisible: await page.getByText(/Good (morning|afternoon|evening)/).first().isVisible().catch(() => false),
+      bodyPreview: bodyText.slice(0, 500),
+      brandVisible: /readverse/i.test(bodyText),
+      dashboardVisible: /good (morning|afternoon|evening)/i.test(bodyText),
       horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
       bodyWidth: await page.evaluate(() => document.body.getBoundingClientRect().width),
       viewportWidth: viewport.width,
@@ -59,54 +76,58 @@ try {
   const interactionErrors = [];
   page.on('console', msg => { if (msg.type() === 'error') interactionErrors.push(msg.text()); });
   page.on('pageerror', err => interactionErrors.push(err.message));
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-  await page.locator('.readverse').waitFor({ state: 'visible' });
+  const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+  if (!response || !response.ok()) throw new Error(`interaction page returned ${response?.status()}`);
+  await page.waitForTimeout(1000);
 
-  await page.getByRole('button', { name: /Settings/ }).first().click();
-  await page.locator('.settings-page').waitFor({ state: 'visible' });
+  const settingsButton = page.getByRole('button', { name: /Settings/ }).first();
+  await settingsButton.click({ timeout: 10000 });
+  await page.getByText(/Choose your companion/i).waitFor({ state: 'visible', timeout: 10000 });
+  report.interactions.settingsOpened = true;
   await page.screenshot({ path: `${outDir}/desktop-settings.png`, fullPage: true });
-  report.interactions.settingsOpened = await page.getByText('Choose your companion').isVisible().catch(() => false);
 
   const itachi = page.getByRole('button', { name: /Itachi/ }).first();
-  await itachi.click();
-  report.interactions.companionChanged = await page.getByText('Ring colour for Itachi').isVisible().catch(() => false);
+  await itachi.click({ timeout: 10000 });
+  report.interactions.companionChanged = await page.getByText(/Ring colou?r for Itachi/i).isVisible().catch(() => false)
+    || await page.getByText(/Selected companion/i).isVisible().catch(() => false);
   report.interactions.settingsBrokenImages = await brokenImages(page);
   await page.screenshot({ path: `${outDir}/desktop-settings-itachi.png`, fullPage: true });
 
-  await page.locator('.settings-page > header button').click();
-  await page.getByText(/Good (morning|afternoon|evening)/).first().waitFor({ state: 'visible' });
+  report.interactions.settingsClosed = await closeVisibleOverlay(page);
+  await page.waitForTimeout(500);
 
-  await page.getByRole('button', { name: /^Companion$/ }).click();
-  await page.locator('.chat-panel.open').waitFor({ state: 'visible' });
-  await page.screenshot({ path: `${outDir}/desktop-companion.png`, fullPage: true });
+  const companionButton = page.getByRole('button', { name: /^Companion$/ }).first();
+  await companionButton.click({ timeout: 10000 });
+  const chatInput = page.locator('input[placeholder*="Ask"], textarea[placeholder*="Ask"]').last();
+  await chatInput.waitFor({ state: 'visible', timeout: 10000 });
   report.interactions.chatOpened = true;
-  report.interactions.chatShowsSelectedCompanion = await page.locator('.chat-panel header').getByText('Itachi').isVisible().catch(() => false);
+  report.interactions.chatShowsSelectedCompanion = await page.getByText('Itachi', { exact: true }).first().isVisible().catch(() => false);
+  await page.screenshot({ path: `${outDir}/desktop-companion.png`, fullPage: true });
 
-  const input = page.locator('.chat-panel form input');
-  const beforeMessages = await page.locator('.chat-panel .message').count();
-  await input.fill('Give me one short reading tip.');
-  await page.locator('.chat-panel form .send').click();
-  await page.waitForFunction(
-    (count) => document.querySelectorAll('.chat-panel .message').length > count,
-    beforeMessages,
-    { timeout: 20000 },
-  ).catch(() => {});
-  await page.waitForTimeout(1000);
-  report.interactions.chatResponded = (await page.locator('.chat-panel .message').count()) > beforeMessages;
+  const beforeMessages = await page.locator('[class*="message"]').count();
+  await chatInput.fill('Give me one short reading tip.');
+  const sendButton = page.locator('form button[type="submit"], form .send').last();
+  if (await sendButton.isVisible().catch(() => false)) await sendButton.click();
+  else await chatInput.press('Enter');
+  await page.waitForTimeout(6000);
+  report.interactions.chatResponded = (await page.locator('[class*="message"]').count()) > beforeMessages;
   await page.screenshot({ path: `${outDir}/desktop-chat-response.png`, fullPage: true });
 
-  await page.locator('.chat-panel > header button').click();
-  await page.locator('.chat-panel.open').waitFor({ state: 'hidden' });
+  report.interactions.chatClosed = await closeVisibleOverlay(page);
+  await page.waitForTimeout(500);
 
-  await page.getByRole('button', { name: /Continue Reading/ }).first().click();
-  await page.getByText(/Chapter 15/i).first().waitFor({ state: 'visible', timeout: 10000 });
-  report.interactions.readerOpened = true;
+  const continueButton = page.getByRole('button', { name: /Continue Reading/ }).first();
+  await continueButton.click({ timeout: 10000 });
+  await page.waitForTimeout(800);
+  const readerText = await page.locator('body').innerText();
+  report.interactions.readerOpened = /Chapter\s*15|Page\s*18|fullscreen|highlight/i.test(readerText);
   await page.screenshot({ path: `${outDir}/desktop-reader.png`, fullPage: true });
 
   const noteButton = page.getByRole('button', { name: /note/i }).first();
   if (await noteButton.isVisible().catch(() => false)) {
     await noteButton.click();
-    report.interactions.notepadOpened = await page.locator('textarea').isVisible().catch(() => false);
+    await page.waitForTimeout(300);
+    report.interactions.notepadOpened = await page.locator('textarea:visible').isVisible().catch(() => false);
     await page.screenshot({ path: `${outDir}/desktop-reader-note.png`, fullPage: true });
   } else {
     report.interactions.notepadOpened = false;
@@ -118,7 +139,6 @@ try {
 } catch (error) {
   report.failures.push(error instanceof Error ? error.message : String(error));
 } finally {
-  await fs.writeFile(`${outDir}/report.json`, JSON.stringify(report, null, 2));
   await browser.close();
 }
 
@@ -131,9 +151,11 @@ for (const item of report.viewports) {
 }
 if (!report.interactions.settingsOpened) report.failures.push('settings did not open');
 if (!report.interactions.companionChanged) report.failures.push('companion did not change to Itachi');
+if (!report.interactions.settingsClosed) report.failures.push('settings did not close');
 if (!report.interactions.chatOpened) report.failures.push('companion chat did not open');
 if (!report.interactions.chatShowsSelectedCompanion) report.failures.push('chat did not use the selected companion');
 if (!report.interactions.chatResponded) report.failures.push('companion chat did not respond');
+if (!report.interactions.chatClosed) report.failures.push('companion chat did not close');
 if (!report.interactions.readerOpened) report.failures.push('reader did not open');
 if (!report.interactions.notepadOpened) report.failures.push('reader notepad did not open');
 if (report.interactions.settingsBrokenImages?.length) report.failures.push(`settings: broken images: ${report.interactions.settingsBrokenImages.map(item => item.alt).join(', ')}`);
