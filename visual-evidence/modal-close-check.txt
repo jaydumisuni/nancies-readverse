@@ -1,0 +1,1 @@
+Verification trigger for the visible settings header close button and full companion/reader flow.
