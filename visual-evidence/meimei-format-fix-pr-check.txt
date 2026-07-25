@@ -1,0 +1,1 @@
+Verification rerun after replacing the invalid WebP-only check with correct PNG/WebP signature handling.
