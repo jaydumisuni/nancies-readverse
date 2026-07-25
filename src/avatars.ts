@@ -8,7 +8,7 @@ export const avatarImages = {
   ...groupB,
   ...groupC,
   ...groupD,
-  mei: groupD.meiMei,
+  mei: groupD.meimei,
 } as const;
 
 export type AvatarId = keyof typeof avatarImages;
