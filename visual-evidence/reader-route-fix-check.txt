@@ -1,0 +1,1 @@
+Verification trigger for sidebar reader routing, page flip reader, and floating notepad.
