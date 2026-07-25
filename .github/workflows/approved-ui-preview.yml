@@ -15,7 +15,8 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
-      - run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - run: npm install --no-save playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
       - name: Capture desktop, mobile and settings
         shell: bash
         run: |
