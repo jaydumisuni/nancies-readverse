@@ -1,11 +1,8 @@
-name: Approved UI preview
+name: Approved UI verification
 
 on:
   pull_request:
     branches: [main]
-
-permissions:
-  contents: write
 
 jobs:
   verify:
@@ -21,47 +18,18 @@ jobs:
         with:
           node-version: 22
 
-      - name: Assemble and verify approved Mei Mei portrait
-        shell: bash
+      - name: Verify approved Mei Mei asset
         run: |
-          set -euo pipefail
-          if [ ! -f public/avatars/meimei.webp ]; then
-            for part in .tmp/meimei/part{00..07}; do
-              test -s "$part"
-            done
-            mkdir -p public/avatars
-            {
-              head -c 8000 .tmp/meimei/part00
-              cat .tmp/meimei/part01 .tmp/meimei/part02 .tmp/meimei/part03
-              head -c 2907 .tmp/meimei/part04
-              tail -c +2909 .tmp/meimei/part04
-              cat .tmp/meimei/part05 .tmp/meimei/part06 .tmp/meimei/part07
-            } | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
-          fi
-
           node <<'NODE'
+          const assert = require('assert/strict');
           const crypto = require('crypto');
           const fs = require('fs');
-
-          const portraitPath = 'public/avatars/meimei.webp';
-          const bytes = fs.readFileSync(portraitPath);
-          const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
-          const expectedSize = 47814;
-          const expectedSha256 = '04bdb67840daa2d8bb93879aa2f14da13b8f4e89bb9738a6e3fae53c605ea521';
-
-          if (bytes.length !== expectedSize) throw new Error(`Unexpected Mei Mei portrait size: ${bytes.length}`);
-          if (bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') {
-            throw new Error('Approved Mei Mei portrait is not a valid WebP');
-          }
-          if (sha256 !== expectedSha256) throw new Error(`Approved Mei Mei portrait checksum mismatch: ${sha256}`);
-
-          const avatarsPath = 'src/avatars.ts';
-          let source = fs.readFileSync(avatarsPath, 'utf8');
-          source = source.replace(/mei:\s*groupD\.meimei,?/, 'mei: "/avatars/meimei.webp",');
-          source = source.replace(/mei:\s*"\/avatars\/meimei\.(?:png|webp)",?/, 'mei: "/avatars/meimei.webp",');
-          if (!source.includes('mei: "/avatars/meimei.webp",')) throw new Error('Approved Mei Mei mapping was not written');
-          fs.writeFileSync(avatarsPath, source);
-          console.log(`Verified approved Mei Mei portrait: ${bytes.length} bytes, ${sha256}`);
+          const bytes = fs.readFileSync('public/avatars/meimei.webp');
+          assert.equal(bytes.length, 47814);
+          assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF');
+          assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WEBP');
+          assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), '04bdb67840daa2d8bb93879aa2f14da13b8f4e89bb9738a6e3fae53c605ea521');
+          assert.match(fs.readFileSync('src/avatars.ts', 'utf8'), /mei:\s*"\/avatars\/meimei\.webp"/);
           NODE
 
       - run: npm install --no-audit --no-fund
@@ -69,7 +37,7 @@ jobs:
       - run: npm install --no-save playwright@1.55.0
       - run: npx playwright install --with-deps chromium
 
-      - name: Capture desktop, mobile and settings
+      - name: Ten-front functional and visual gate
         shell: bash
         run: |
           set -euo pipefail
@@ -84,57 +52,125 @@ jobs:
           if [ "$ready" != "1" ]; then cat ui-preview/server.log; exit 1; fi
 
           node <<'NODE'
-          const { chromium } = require('playwright');
+          const assert = require('assert/strict');
           const fs = require('fs');
+          const { chromium } = require('playwright');
+
+          const results = [];
+          const pass = (name, detail = 'passed') => results.push({ name, status: 'passed', detail });
+
           (async () => {
             const browser = await chromium.launch({ headless: true });
-            const targets = [
-              { name: 'desktop', width: 1440, height: 1100, mobile: false, fullPage: true },
-              { name: 'mobile', width: 390, height: 844, mobile: true, fullPage: false },
-              { name: 'settings-mobile', width: 390, height: 844, mobile: true, settings: true, fullPage: false },
-            ];
-            for (const item of targets) {
-              const context = await browser.newContext({ viewport: { width: item.width, height: item.height }, isMobile: item.mobile, deviceScaleFactor: 1 });
-              const page = await context.newPage();
-              const errors = [];
-              page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-              page.on('pageerror', error => errors.push(String(error)));
-              await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
-              if (item.settings) {
-                await page.locator('.bottom-nav button').last().click();
-                await page.locator('.modal.open').waitFor({ state: 'visible', timeout: 10000 });
-              }
-              await page.screenshot({ path: `ui-preview/${item.name}.png`, fullPage: item.fullPage });
-              fs.writeFileSync(`ui-preview/${item.name}.json`, JSON.stringify({ errors, url: page.url() }, null, 2));
-              await context.close();
-            }
+
+            const desktop = await browser.newContext({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
+            const page = await desktop.newPage();
+            const desktopErrors = [];
+            page.on('console', message => { if (message.type() === 'error') desktopErrors.push(message.text()); });
+            page.on('pageerror', error => desktopErrors.push(String(error)));
+            await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+
+            assert.equal(await page.locator('.brand .nancy').textContent(), 'Nancy’s');
+            assert.equal(await page.locator('.brand .readverse').textContent(), 'READVERSE');
+            pass('1. Branding and desktop shell');
+
+            assert.equal(await page.locator('.book-card').count(), 5);
+            assert.equal(await page.locator('.mood-row button').count(), 5);
+            pass('2. Dashboard shelf, features and moods');
+
+            await page.locator('.sidebar nav button').filter({ hasText: 'Settings' }).click();
+            await page.locator('.modal.open').waitFor({ state: 'visible' });
+            assert.equal(await page.locator('.companion-option').count(), 12);
+            pass('3. Twelve-companion settings grid');
+
+            await page.locator('.companion-option').filter({ hasText: 'Itachi' }).click();
+            await page.locator('.color-dot').nth(3).click();
+            await page.locator('.companion-option').filter({ hasText: 'Gojo' }).click();
+            await page.locator('.companion-option').filter({ hasText: 'Itachi' }).click();
+            const ringColour = await page.locator('.selected-portrait').evaluate(element => getComputedStyle(element).borderTopColor);
+            assert.equal(ringColour, 'rgb(88, 184, 255)');
+            pass('4. Companion switching and independent ring memory');
+
+            await page.locator('.settings-tabs button').filter({ hasText: 'Appearance' }).click();
+            await page.locator('.theme-tile').filter({ hasText: 'Midnight Violet' }).click();
+            await page.locator('.settings-head .icon-btn').click();
+            await page.locator('.modal').waitFor({ state: 'hidden' });
+            assert.equal(await page.locator('.companion-card .mini strong').textContent(), 'Itachi');
+            assert.equal(await page.locator('.rv-app').evaluate(element => element.style.getPropertyValue('--accent')), '#9b6dff');
+            pass('5. Theme selection without changing companion ring');
+
+            await page.locator('.companion-card .btn.primary').click();
+            await page.locator('.chat-panel.open').waitFor({ state: 'visible' });
+            await page.locator('.chat-form input').fill('Recommend something dark but clever');
+            await page.locator('.chat-form .send').click();
+            assert.equal(await page.locator('.message.user').count(), 1);
+            assert.ok((await page.locator('.message.companion').count()) >= 2);
+            pass('6. Companion chat interaction');
+
+            await page.locator('.chat-head .icon-btn').click();
+            const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
+            await page.locator('input[type="file"]').setInputFiles({ name: 'nancy-test.pdf', mimeType: 'application/pdf', buffer: pdf });
+            await page.locator('.file-pill.show').waitFor({ state: 'visible' });
+            await page.locator('.chat-form .send').click();
+            await page.locator('.reader-overlay.open').waitFor({ state: 'visible' });
+            const pdfSource = await page.locator('.pdf-frame').getAttribute('src');
+            assert.ok(pdfSource && pdfSource.startsWith('blob:'));
+            pass('7. Temporary PDF upload opens in the reader');
+
+            assert.equal(await page.locator('.reader-toolbar button').filter({ hasText: 'Fullscreen' }).count(), 1);
+            await page.locator('.reader-toolbar button').filter({ hasText: 'Notes' }).click();
+            await page.locator('.notepad.open').waitFor({ state: 'visible' });
+            assert.ok((await page.locator('.notepad textarea').inputValue()).length > 0);
+            pass('8. Reader fullscreen control and notepad');
+
+            await page.locator('.notepad header button').click();
+            await page.locator('.reader-toolbar > button').first().click();
+            await page.locator('.sidebar nav button').filter({ hasText: 'Sources' }).click();
+            await page.locator('.source-dialog.open').waitFor({ state: 'visible' });
+            await page.locator('.source-card input').fill('https://example.com/reader/book');
+            await page.locator('.source-card .btn.primary').click();
+            await page.locator('.chat-panel.open').waitFor({ state: 'visible' });
+            assert.ok((await page.locator('.message.user').last().textContent()).includes('https://example.com/reader/book'));
+            pass('9. Source-link handoff into temporary session');
+
+            await page.locator('.chat-head .icon-btn').click();
+            await page.screenshot({ path: 'ui-preview/desktop.png', fullPage: true });
+            fs.writeFileSync('ui-preview/desktop.json', JSON.stringify({ errors: desktopErrors }, null, 2));
+            await desktop.close();
+
+            const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 1 });
+            const mobilePage = await mobile.newPage();
+            const mobileErrors = [];
+            mobilePage.on('console', message => { if (message.type() === 'error') mobileErrors.push(message.text()); });
+            mobilePage.on('pageerror', error => mobileErrors.push(String(error)));
+            await mobilePage.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+            assert.equal(await mobilePage.locator('.mobile-brand .nancy').textContent(), 'Nancy’s');
+            assert.equal(await mobilePage.locator('.mobile-brand .readverse').textContent(), 'READVERSE');
+            assert.equal(await mobilePage.locator('.bottom-nav button').count(), 5);
+            assert.equal(await mobilePage.locator('.hero-character').evaluate(element => getComputedStyle(element).display), 'none');
+            await mobilePage.screenshot({ path: 'ui-preview/mobile.png', fullPage: false });
+            await mobilePage.locator('.bottom-nav button').last().click();
+            await mobilePage.locator('.modal.open').waitFor({ state: 'visible' });
+            assert.equal(await mobilePage.locator('.companion-option').count(), 12);
+            const overflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+            assert.ok(overflow <= 1, `Mobile horizontal overflow: ${overflow}px`);
+            await mobilePage.screenshot({ path: 'ui-preview/settings-mobile.png', fullPage: false });
+            fs.writeFileSync('ui-preview/mobile.json', JSON.stringify({ errors: mobileErrors }, null, 2));
+            pass('10. Responsive mobile dashboard, navigation and settings');
+            await mobile.close();
+
+            fs.writeFileSync('ui-preview/functional-results.json', JSON.stringify({ status: 'passed', checks: results }, null, 2));
             await browser.close();
-          })().catch(error => { console.error(error); process.exit(1); });
+          })().catch(error => {
+            fs.writeFileSync('ui-preview/functional-results.json', JSON.stringify({ status: 'failed', checks: results, error: String(error), stack: error.stack }, null, 2));
+            console.error(error);
+            process.exit(1);
+          });
           NODE
           kill "$SERVER_PID" || true
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: approved-ui-preview
+          name: approved-ui-verification
           path: ui-preview
           if-no-files-found: error
-
-      - name: Commit approved portrait and remove temporary recovery files
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .tmp/meimei
-          rmdir .tmp 2>/dev/null || true
-          rm -f .github/workflows/install-approved-meimei.yml
-          rm -f .github/workflows/assemble-approved-meimei.yml
-          rm -f .github/workflows/meimei-diagnostics.yml
-
-          git config user.name "ReadVerse UI Recovery"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Use the approved Mei Mei portrait"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
