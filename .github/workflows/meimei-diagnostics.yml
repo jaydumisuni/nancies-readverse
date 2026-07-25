@@ -1,0 +1,33 @@
+name: Mei Mei assembly diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Assemble and report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p meimei-diagnostics
+          wc -c .tmp/meimei/part{00..07} > meimei-diagnostics/part-sizes.txt
+          cat .tmp/meimei/part{00..07} | tr -d '\r\n' > meimei-diagnostics/portrait.base64
+          base64 -d meimei-diagnostics/portrait.base64 > meimei-diagnostics/meimei.webp
+          {
+            wc -c meimei-diagnostics/portrait.base64
+            wc -c meimei-diagnostics/meimei.webp
+            sha256sum meimei-diagnostics/meimei.webp
+            xxd -l 16 meimei-diagnostics/meimei.webp
+          } > meimei-diagnostics/result.txt
+          cat meimei-diagnostics/part-sizes.txt
+          cat meimei-diagnostics/result.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meimei-assembly-diagnostics
+          path: meimei-diagnostics
