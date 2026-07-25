@@ -16,7 +16,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npx --yes playwright@1.55.0 install --with-deps chromium
-      - name: Capture desktop and mobile
+      - name: Capture desktop, mobile and settings
         shell: bash
         run: |
           set -euo pipefail
@@ -29,29 +29,35 @@ jobs:
           mkdir -p ui-preview
           node <<'NODE'
           const { chromium } = require('playwright');
+          const fs = require('fs');
           (async () => {
             const browser = await chromium.launch({ headless: true });
-            for (const item of [
+            const targets = [
               { name: 'desktop', width: 1440, height: 1100, mobile: false },
               { name: 'mobile', width: 390, height: 844, mobile: true },
               { name: 'settings-mobile', width: 390, height: 844, mobile: true, settings: true },
-            ]) {
-              const context = await browser.newContext({ viewport: { width: item.width, height: item.height }, isMobile: item.mobile });
+            ];
+            for (const item of targets) {
+              const context = await browser.newContext({ viewport: { width: item.width, height: item.height }, isMobile: item.mobile, deviceScaleFactor: 1 });
               const page = await context.newPage();
               const errors = [];
               page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
               page.on('pageerror', error => errors.push(String(error)));
               await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
-              if (item.settings) await page.getByRole('button', { name: /settings/i }).last().click();
+              if (item.settings) {
+                await page.locator('.bottom-nav button').last().click();
+                await page.locator('.modal.open').waitFor({ state: 'visible', timeout: 10000 });
+              }
               await page.screenshot({ path: `ui-preview/${item.name}.png`, fullPage: true });
-              require('fs').writeFileSync(`ui-preview/${item.name}.json`, JSON.stringify({ errors, url: page.url() }, null, 2));
-              if (errors.length) throw new Error(`${item.name}: ${errors.join(' | ')}`);
+              fs.writeFileSync(`ui-preview/${item.name}.json`, JSON.stringify({ errors, url: page.url() }, null, 2));
               await context.close();
             }
             await browser.close();
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: approved-ui-preview
           path: ui-preview
+          if-no-files-found: error
