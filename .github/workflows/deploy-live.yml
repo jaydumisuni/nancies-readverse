@@ -3,6 +3,8 @@ name: Deploy ReadVerse live
 on:
   push:
     branches: [visual-verification]
+  pull_request:
+    branches: [main]
 
 jobs:
   deploy:
