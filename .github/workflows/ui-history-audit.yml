@@ -8,7 +8,7 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -16,33 +16,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install Playwright Chromium
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
-      - name: Capture historical UIs
+      - name: Prepare screenshot runner
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ui-history
-          COMMITS=(
-            "b6fa29d06ea272b4068690912aedc756c575d9a6"
-            "47949f95d7aad7e5da321e043c8f78b81b51358f"
-            "507906f4efd2d423277f9fe5868edff590553be8"
-            "0ed6ee6de84f1e41587cf3d54f715154da452ee8"
-            "87a873e149bd7ad39095e2319cfda374f5b839e9"
-          )
-          for SHA in "${COMMITS[@]}"; do
-            SHORT="${SHA:0:7}"
-            DIR="/tmp/readverse-$SHORT"
-            git worktree add --detach "$DIR" "$SHA"
-            pushd "$DIR"
-            npm install --no-audit --no-fund
-            npm run build
-            (npx vite preview --host 127.0.0.1 --port 4173 >"/tmp/$SHORT-vite.log" 2>&1 & echo $! >"/tmp/$SHORT-vite.pid")
-            for i in {1..60}; do
-              if curl -fsS http://127.0.0.1:4173 >/dev/null; then break; fi
-              sleep 1
-            done
-            node - "$SHORT" "$GITHUB_WORKSPACE/ui-history" <<'NODE'
+          mkdir -p "$RUNNER_TEMP/ui-audit"
+          cd "$RUNNER_TEMP/ui-audit"
+          npm init -y >/dev/null
+          npm install playwright@1.55.0 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          cat > capture.cjs <<'NODE'
           const { chromium } = require('playwright');
           const fs = require('fs');
           const short = process.argv[2];
@@ -67,8 +50,52 @@ jobs:
             await browser.close();
           })().catch(err => { console.error(err); process.exit(1); });
           NODE
-            kill "$(cat /tmp/$SHORT-vite.pid)" || true
-            popd
+      - name: Capture historical UIs
+        shell: bash
+        run: |
+          set -u
+          mkdir -p ui-history
+          : > ui-history/status.txt
+          COMMITS=(
+            "b6fa29d06ea272b4068690912aedc756c575d9a6"
+            "47949f95d7aad7e5da321e043c8f78b81b51358f"
+            "507906f4efd2d423277f9fe5868edff590553be8"
+            "0ed6ee6de84f1e41587cf3d54f715154da452ee8"
+            "87a873e149bd7ad39095e2319cfda374f5b839e9"
+          )
+          for SHA in "${COMMITS[@]}"; do
+            SHORT="${SHA:0:7}"
+            DIR="/tmp/readverse-$SHORT"
+            echo "=== $SHA ===" | tee -a ui-history/status.txt
+            git worktree add --detach "$DIR" "$SHA" || { echo "worktree failed" | tee -a ui-history/status.txt; continue; }
+            pushd "$DIR" >/dev/null
+            if ! npm install --no-audit --no-fund >"$GITHUB_WORKSPACE/ui-history/$SHORT-install.log" 2>&1; then
+              echo "install failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+              popd >/dev/null
+              git worktree remove --force "$DIR"
+              continue
+            fi
+            if ! npm run build >"$GITHUB_WORKSPACE/ui-history/$SHORT-build.log" 2>&1; then
+              echo "build failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+              popd >/dev/null
+              git worktree remove --force "$DIR"
+              continue
+            fi
+            (npx vite preview --host 127.0.0.1 --port 4173 >"$GITHUB_WORKSPACE/ui-history/$SHORT-vite.log" 2>&1 & echo $! >"/tmp/$SHORT-vite.pid")
+            READY=0
+            for i in {1..60}; do
+              if curl -fsS http://127.0.0.1:4173 >/dev/null; then READY=1; break; fi
+              sleep 1
+            done
+            if [ "$READY" -ne 1 ]; then
+              echo "preview failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+            elif node "$RUNNER_TEMP/ui-audit/capture.cjs" "$SHORT" "$GITHUB_WORKSPACE/ui-history"; then
+              echo "captured" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+            else
+              echo "capture failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+            fi
+            if [ -f "/tmp/$SHORT-vite.pid" ]; then kill "$(cat /tmp/$SHORT-vite.pid)" || true; fi
+            popd >/dev/null
             git worktree remove --force "$DIR"
           done
       - uses: actions/upload-artifact@v4
