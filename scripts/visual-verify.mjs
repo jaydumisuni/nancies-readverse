@@ -27,15 +27,25 @@ async function brokenImages(page) {
     .map((image) => ({ alt: image.alt || '(no alt)', src: (image.currentSrc || image.src).slice(0, 180) })));
 }
 
-async function closeVisibleOverlay(page) {
-  const named = page.getByRole('button', { name: /close/i }).filter({ visible: true }).first();
+async function closeSettings(page) {
+  const modal = page.locator('.modal-backdrop:visible');
+  if (!await modal.isVisible().catch(() => false)) return false;
+  const named = modal.getByRole('button', { name: /close/i }).first();
+  if (await named.isVisible().catch(() => false)) await named.click();
+  else await modal.locator('button').last().click();
+  await modal.waitFor({ state: 'hidden', timeout: 10000 });
+  return true;
+}
+
+async function closeChat(page) {
+  const named = page.getByRole('button', { name: /close chat/i }).first();
   if (await named.isVisible().catch(() => false)) {
     await named.click();
     return true;
   }
-  const textClose = page.locator('button:visible').filter({ hasText: /^[×✕]$/ }).first();
-  if (await textClose.isVisible().catch(() => false)) {
-    await textClose.click();
+  const panelClose = page.locator('[class*="chat"] button').filter({ hasText: /^[×✕]$/ }).first();
+  if (await panelClose.isVisible().catch(() => false)) {
+    await panelClose.click();
     return true;
   }
   return false;
@@ -93,7 +103,7 @@ try {
   report.interactions.settingsBrokenImages = await brokenImages(page);
   await page.screenshot({ path: `${outDir}/desktop-settings-itachi.png`, fullPage: true });
 
-  report.interactions.settingsClosed = await closeVisibleOverlay(page);
+  report.interactions.settingsClosed = await closeSettings(page);
   await page.waitForTimeout(500);
 
   const companionButton = page.getByRole('button', { name: /^Companion$/ }).first();
@@ -113,7 +123,7 @@ try {
   report.interactions.chatResponded = (await page.locator('[class*="message"]').count()) > beforeMessages;
   await page.screenshot({ path: `${outDir}/desktop-chat-response.png`, fullPage: true });
 
-  report.interactions.chatClosed = await closeVisibleOverlay(page);
+  report.interactions.chatClosed = await closeChat(page);
   await page.waitForTimeout(500);
 
   const continueButton = page.getByRole('button', { name: /Continue Reading/ }).first();
