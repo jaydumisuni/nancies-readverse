@@ -15,22 +15,6 @@
   "ai": {
     "binding": "AI"
   },
-  "kv_namespaces": [
-    {
-      "binding": "SESSION_KV"
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "LIBRARY_FILES"
-    }
-  ],
   "vars": {
     "APP_NAME": "Nancy's ReadVerse",
     "AI_MODEL": "@cf/ibm-granite/granite-4.0-h-micro"
