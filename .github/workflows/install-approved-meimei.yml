@@ -1,0 +1,56 @@
+name: Install approved Mei Mei portrait
+
+on:
+  push:
+    branches: [rebuild-approved-ui]
+    paths:
+      - .github/workflows/install-approved-meimei.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild-approved-ui
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Recover the approved portrait and wire the canonical key
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0:scripts/patch-hydrated-ui.mjs > /tmp/approved-meimei-source.mjs
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const source = fs.readFileSync('/tmp/approved-meimei-source.mjs', 'utf8');
+          const match = source.match(/const meiPortraitBase64 = "([A-Za-z0-9+/=]+)";/);
+          if (!match) throw new Error('Approved Mei Mei portrait payload was not found');
+          const bytes = Buffer.from(match[1], 'base64');
+          if (bytes.length < 30000 || bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') {
+            throw new Error('Recovered Mei Mei portrait is not a valid WebP');
+          }
+          const portrait = path.resolve('public/avatars/meimei.webp');
+          fs.mkdirSync(path.dirname(portrait), { recursive: true });
+          fs.writeFileSync(portrait, bytes);
+          const avatarsPath = path.resolve('src/avatars.ts');
+          let avatars = fs.readFileSync(avatarsPath, 'utf8');
+          const before = avatars;
+          avatars = avatars.replace(/mei:\s*groupD\.meimei,?/, 'mei: "/avatars/meimei.webp",');
+          if (avatars === before) throw new Error('Canonical Mei Mei avatar mapping was not replaced');
+          fs.writeFileSync(avatarsPath, avatars);
+          console.log(`Installed approved ${bytes.length}-byte Mei Mei WebP`);
+          NODE
+      - name: Commit portrait and remove temporary installer
+        run: |
+          rm .github/workflows/install-approved-meimei.yml
+          git config user.name "ReadVerse UI Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/avatars/meimei.webp src/avatars.ts .github/workflows/install-approved-meimei.yml
+          git commit -m "Use the approved Mei Mei portrait"
+          git push origin HEAD:rebuild-approved-ui
