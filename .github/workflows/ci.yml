@@ -38,7 +38,7 @@ jobs:
           npm run build > build.log 2>&1
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
-      - name: Upload diagnostics
+      - name: Upload diagnostics and hydrated source evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -46,6 +46,11 @@ jobs:
           path: |
             typecheck.log
             build.log
+            src/App.tsx
+            src/styles.css
+            src/avatars.ts
+            src/avatarsD.ts
+            public/avatars/meimei.svg
 
       - name: Fail on validation errors
         if: steps.typecheck.outputs.exit_code != '0' || steps.buildapp.outputs.exit_code != '0'
