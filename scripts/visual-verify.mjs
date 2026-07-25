@@ -30,9 +30,20 @@ async function brokenImages(page) {
 async function closeSettings(page) {
   const modal = page.locator('.modal-backdrop:visible');
   if (!await modal.isVisible().catch(() => false)) return false;
-  const named = modal.getByRole('button', { name: /close/i }).first();
-  if (await named.isVisible().catch(() => false)) await named.click();
-  else await modal.locator('button').last().click();
+
+  const headerClose = modal.locator('header button').last();
+  if (await headerClose.isVisible().catch(() => false)) {
+    await headerClose.click();
+  } else {
+    const exactX = modal.locator('button').filter({ hasText: /^[×✕]$/ }).first();
+    if (await exactX.isVisible().catch(() => false)) await exactX.click();
+    else {
+      const named = modal.getByRole('button', { name: /close settings/i }).first();
+      if (!await named.isVisible().catch(() => false)) return false;
+      await named.click();
+    }
+  }
+
   await modal.waitFor({ state: 'hidden', timeout: 10000 });
   return true;
 }
