@@ -117,7 +117,7 @@ try {
   report.interactions.settingsClosed = await closeSettings(page);
   await page.waitForTimeout(500);
 
-  const companionButton = page.getByRole('button', { name: /^Companion$/ }).first();
+  const companionButton = page.getByRole('button', { name: /Chat now/i }).first();
   await companionButton.click({ timeout: 10000 });
   const chatInput = page.locator('input[placeholder*="Ask"], textarea[placeholder*="Ask"]').last();
   await chatInput.waitFor({ state: 'visible', timeout: 10000 });
