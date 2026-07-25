@@ -33,7 +33,8 @@ jobs:
             {
               head -c 8000 .tmp/meimei/part00
               cat .tmp/meimei/part01 .tmp/meimei/part02 .tmp/meimei/part03
-              head -c 8000 .tmp/meimei/part04
+              head -c 2907 .tmp/meimei/part04
+              tail -c +2909 .tmp/meimei/part04
               cat .tmp/meimei/part05 .tmp/meimei/part06 .tmp/meimei/part07
             } | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
           fi
