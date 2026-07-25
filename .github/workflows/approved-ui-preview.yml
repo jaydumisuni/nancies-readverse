@@ -20,13 +20,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/readverse-preview.log 2>&1 &
-          echo $! > /tmp/readverse-preview.pid
+          mkdir -p ui-preview
+          npx vite --host 127.0.0.1 --port 4173 > ui-preview/server.log 2>&1 &
+          SERVER_PID=$!
+          ready=0
           for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:4173 >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then ready=1; break; fi
             sleep 1
           done
-          mkdir -p ui-preview
+          if [ "$ready" != "1" ]; then
+            cat ui-preview/server.log
+            exit 1
+          fi
           node <<'NODE'
           const { chromium } = require('playwright');
           const fs = require('fs');
@@ -55,6 +60,7 @@ jobs:
             await browser.close();
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
+          kill "$SERVER_PID" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
