@@ -1,0 +1,1 @@
+Comprehensive live verification trigger for themes, PDF chat upload, page turn, fullscreen, notepad, and mobile swipe.
