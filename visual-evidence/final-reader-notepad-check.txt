@@ -1,0 +1,1 @@
+Final verification trigger for the live reader toolbar notepad and complete ReadVerse flow.
