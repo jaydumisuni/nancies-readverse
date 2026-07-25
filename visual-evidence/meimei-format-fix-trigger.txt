@@ -1,0 +1,1 @@
+Final trigger after correcting the approved portrait format validation and hydration path.
