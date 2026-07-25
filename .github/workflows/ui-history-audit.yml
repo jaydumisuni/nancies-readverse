@@ -75,26 +75,26 @@ jobs:
               git worktree remove --force "$DIR"
               continue
             fi
-            if ! npm run build >"$GITHUB_WORKSPACE/ui-history/$SHORT-build.log" 2>&1; then
-              echo "build failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+            if ! npx vite build >"$GITHUB_WORKSPACE/ui-history/$SHORT-build.log" 2>&1; then
+              echo "vite build failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
               popd >/dev/null
               git worktree remove --force "$DIR"
               continue
             fi
-            (npx vite preview --host 127.0.0.1 --port 4173 >"$GITHUB_WORKSPACE/ui-history/$SHORT-vite.log" 2>&1 & echo $! >"/tmp/$SHORT-vite.pid")
+            (python3 -m http.server 4173 --directory dist/client >"$GITHUB_WORKSPACE/ui-history/$SHORT-server.log" 2>&1 & echo $! >"/tmp/$SHORT-server.pid")
             READY=0
             for i in {1..60}; do
               if curl -fsS http://127.0.0.1:4173 >/dev/null; then READY=1; break; fi
               sleep 1
             done
             if [ "$READY" -ne 1 ]; then
-              echo "preview failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
+              echo "server failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
             elif node "$RUNNER_TEMP/ui-audit/capture.cjs" "$SHORT" "$GITHUB_WORKSPACE/ui-history"; then
               echo "captured" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
             else
               echo "capture failed" | tee -a "$GITHUB_WORKSPACE/ui-history/status.txt"
             fi
-            if [ -f "/tmp/$SHORT-vite.pid" ]; then kill "$(cat /tmp/$SHORT-vite.pid)" || true; fi
+            if [ -f "/tmp/$SHORT-server.pid" ]; then kill "$(cat /tmp/$SHORT-server.pid)" || true; fi
             popd >/dev/null
             git worktree remove --force "$DIR"
           done
