@@ -1,0 +1,57 @@
+name: Approved UI preview
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - name: Capture desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/readverse-preview.log 2>&1 &
+          echo $! > /tmp/readverse-preview.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then break; fi
+            sleep 1
+          done
+          mkdir -p ui-preview
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            for (const item of [
+              { name: 'desktop', width: 1440, height: 1100, mobile: false },
+              { name: 'mobile', width: 390, height: 844, mobile: true },
+              { name: 'settings-mobile', width: 390, height: 844, mobile: true, settings: true },
+            ]) {
+              const context = await browser.newContext({ viewport: { width: item.width, height: item.height }, isMobile: item.mobile });
+              const page = await context.newPage();
+              const errors = [];
+              page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+              page.on('pageerror', error => errors.push(String(error)));
+              await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+              if (item.settings) await page.getByRole('button', { name: /settings/i }).last().click();
+              await page.screenshot({ path: `ui-preview/${item.name}.png`, fullPage: true });
+              require('fs').writeFileSync(`ui-preview/${item.name}.json`, JSON.stringify({ errors, url: page.url() }, null, 2));
+              if (errors.length) throw new Error(`${item.name}: ${errors.join(' | ')}`);
+              await context.close();
+            }
+            await browser.close();
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: approved-ui-preview
+          path: ui-preview
