@@ -1,0 +1,1 @@
+Verification trigger for Chat now, selected companion chat, reader, and notepad.
