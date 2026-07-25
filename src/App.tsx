@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState, type CSSProperties } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { avatarImages, type AvatarId } from "./avatars";
 
 type ThemeId = "pink" | "violet" | "blue" | "emerald" | "orange" | "rose";
@@ -75,6 +75,8 @@ export default function App() {
   const [page, setPage] = useState(186);
   const [note, setNote] = useState("Reminder to self: this passage matters. Come back later. ✨");
   const [highlighted, setHighlighted] = useState(true);
+  const [readerUrl, setReaderUrl] = useState<string | null>(null);
+  const [readerTitle, setReaderTitle] = useState("Thorny Crown");
   const fileRef = useRef<HTMLInputElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +84,8 @@ export default function App() {
   const theme = themes[themeId];
   const ring = ringColors[companion.id] ?? companion.ring;
   const appStyle = { "--accent": theme.accent, "--accent2": theme.accent2, "--ring": ring } as CSSProperties;
+
+  useEffect(() => () => { if (readerUrl) URL.revokeObjectURL(readerUrl); }, [readerUrl]);
 
   function openSettings(tab: SettingsTab = "companion") {
     setSettingsTab(tab);
@@ -96,9 +100,14 @@ export default function App() {
     setMessages((current) => [...current, outgoing]);
     setQuestion("");
     if (attachedFile) {
-      const name = attachedFile.name;
+      const file = attachedFile;
+      const name = file.name;
+      const nextUrl = URL.createObjectURL(file);
+      setReaderUrl((current) => { if (current) URL.revokeObjectURL(current); return nextUrl; });
+      setReaderTitle(name);
       setAttachedFile(null);
-      setMessages((current) => [...current, { role: "companion", text: `${name} is ready for this reading session. Open it now, then decide whether it deserves a permanent place in Drive.` }]);
+      setReaderOpen(true);
+      setMessages((current) => [...current, { role: "companion", text: `${name} is open in a temporary reading session. No copy was uploaded to Cloudflare. Google Drive is not connected yet, so it will disappear when this session ends unless you choose to save it later.` }]);
       return;
     }
     setMessages((current) => [...current, { role: "companion", text: companion.greeting }]);
@@ -178,7 +187,7 @@ export default function App() {
 
       <ChatPanel open={chatOpen} companion={companion} ring={ring} messages={messages} question={question} file={attachedFile} onClose={() => setChatOpen(false)} onQuestion={setQuestion} onSubmit={submitMessage} onAttach={() => fileRef.current?.click()} onClearFile={() => setAttachedFile(null)} />
       <SettingsModal open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} companions={companions} selected={companion} ring={ring} ringColors={ringColors} themeId={themeId} onClose={() => setSettingsOpen(false)} onCompanion={(id) => { setCompanionId(id); setMessages([]); }} onRing={(color) => setRingColors((current) => ({ ...current, [companion.id]: color }))} onTheme={setThemeId} />
-      <ReaderOverlay open={readerOpen} refEl={readerRef} page={page} note={note} notesOpen={notesOpen} highlighted={highlighted} onClose={() => setReaderOpen(false)} onTurn={(direction) => setPage((current) => Math.max(1, current + direction * 2))} onFullscreen={toggleFullscreen} onNotes={() => setNotesOpen(true)} onCloseNotes={() => setNotesOpen(false)} onNote={setNote} onHighlight={() => setHighlighted((current) => !current)} />
+      <ReaderOverlay open={readerOpen} refEl={readerRef} sourceUrl={readerUrl} title={readerTitle} page={page} note={note} notesOpen={notesOpen} highlighted={highlighted} onClose={() => setReaderOpen(false)} onTurn={(direction) => setPage((current) => Math.max(1, current + direction * 2))} onFullscreen={toggleFullscreen} onNotes={() => setNotesOpen(true)} onCloseNotes={() => setNotesOpen(false)} onNote={setNote} onHighlight={() => setHighlighted((current) => !current)} />
       <SourceDialog open={sourceOpen} value={sourceUrl} onValue={setSourceUrl} onSubmit={useSource} onClose={() => setSourceOpen(false)} />
 
       <input ref={fileRef} hidden type="file" accept="application/pdf,.pdf,.epub,.cbz,.txt" onChange={(event) => attachFile(event.target.files?.[0] ?? null)} />
@@ -285,10 +294,11 @@ function SimpleSettings({ eyebrow, title, text }: { eyebrow: string; title: stri
   return <section className="settings-panel active"><div className="simple-settings"><small>{eyebrow}</small><h3>{title}</h3><p>{text}</p><div className="placeholder-lines"><i /><i /><i /></div></div></section>;
 }
 
-function ReaderOverlay({ open, refEl, page, note, notesOpen, highlighted, onClose, onTurn, onFullscreen, onNotes, onCloseNotes, onNote, onHighlight }: { open: boolean; refEl: React.RefObject<HTMLDivElement | null>; page: number; note: string; notesOpen: boolean; highlighted: boolean; onClose: () => void; onTurn: (direction: 1 | -1) => void; onFullscreen: () => void; onNotes: () => void; onCloseNotes: () => void; onNote: (value: string) => void; onHighlight: () => void }) {
+function ReaderOverlay({ open, refEl, sourceUrl, title, page, note, notesOpen, highlighted, onClose, onTurn, onFullscreen, onNotes, onCloseNotes, onNote, onHighlight }: { open: boolean; refEl: React.RefObject<HTMLDivElement | null>; sourceUrl: string | null; title: string; page: number; note: string; notesOpen: boolean; highlighted: boolean; onClose: () => void; onTurn: (direction: 1 | -1) => void; onFullscreen: () => void; onNotes: () => void; onCloseNotes: () => void; onNote: (value: string) => void; onHighlight: () => void }) {
   return <section className={`reader-overlay ${open ? "open" : ""}`} ref={refEl}>
-    <header className="reader-toolbar"><button onClick={onClose}>×</button><div className="title"><strong>Thorny Crown</strong><small>Chapter 15 · Faint Light in the Rain</small></div><nav><button onClick={onNotes}>✎ Notes</button><button onClick={onFullscreen}>⛶ Fullscreen</button></nav></header>
-    <div className="reader-window"><div className="book-spread"><button className="page-edge prev" onClick={() => onTurn(-1)} /><article className="page left"><small>CHAPTER 15</small><h2>Faint Light in the Rain</h2><p>The rain had not stopped since the evening before. It drummed against the windows of the old dormitory, like fingers tapping out a restless song.</p><p className={highlighted ? "highlight" : ""} onClick={onHighlight}>Strength is not just what you have. It is what you choose to protect when no one is watching.</p><p>Yuji thought about that as he walked the empty hallways, the words echoing louder than the rain.</p><b>{page}</b></article><article className="page right"><p>Outside, somewhere beyond the glass, the city glowed faintly—uncaring, relentless.</p><p>But inside, even in the darkest moments, a choice could still be made.</p><hr /><p className="center">End of Chapter 15</p><b>{page + 1}</b></article><button className="page-edge next" onClick={() => onTurn(1)} /></div></div>
+    <header className="reader-toolbar"><button onClick={onClose}>×</button><div className="title"><strong>{title}</strong><small>{sourceUrl ? "Temporary local reading session" : "Chapter 15 · Faint Light in the Rain"}</small></div><nav><button onClick={onNotes}>✎ Notes</button><button onClick={onFullscreen}>⛶ Fullscreen</button></nav></header>
+    <div className="reader-window">{sourceUrl ? <iframe className="pdf-frame" src={sourceUrl} title={title} /> : <div className="book-spread"><button className="page-edge prev" onClick={() => onTurn(-1)} /><article className="page left"><small>CHAPTER 15</small><h2>Faint Light in the Rain</h2><p>The rain had not stopped since the evening before. It drummed against the windows of the old dormitory, like fingers tapping out a restless song.</p><p className={highlighted ? "highlight" : ""} onClick={onHighlight}>Strength is not just what you have. It is what you choose to protect when no one is watching.</p><p>Yuji thought about that as he walked the empty hallways, the words echoing louder than the rain.</p><b>{page}</b></article><article className="page right"><p>Outside, somewhere beyond the glass, the city glowed faintly—uncaring, relentless.</p><p>But inside, even in the darkest moments, a choice could still be made.</p><hr /><p className="center">End of Chapter 15</p><b>{page + 1}</b></article><button className="page-edge next" onClick={() => onTurn(1)} /></div>}
+    </div>
     <footer className="reader-footer"><button onClick={() => onTurn(-1)}>←</button><span>{page} / 240</span><button onClick={() => onTurn(1)}>→</button></footer>
     <aside className={`notepad ${notesOpen ? "open" : ""}`}><header><strong>My Note</strong><button onClick={onCloseNotes}>×</button></header><textarea value={note} onChange={(event) => onNote(event.target.value)} /><small>Linked to page {page}</small></aside>
   </section>;
