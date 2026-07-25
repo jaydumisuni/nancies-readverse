@@ -1,0 +1,38 @@
+name: Deploy and verify ReadVerse live
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Deploy Worker and frontend assets
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for deployment propagation
+        run: sleep 15
+      - name: Verify deployed website visually
+        run: node scripts/visual-verify.mjs
+        env:
+          READVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: readverse-live-visual-evidence
+          path: visual-evidence
+          if-no-files-found: warn
