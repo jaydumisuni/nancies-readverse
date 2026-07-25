@@ -30,7 +30,12 @@ jobs:
               test -s "$part"
             done
             mkdir -p public/avatars
-            cat .tmp/meimei/part{00..07} | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
+            {
+              head -c 8000 .tmp/meimei/part00
+              cat .tmp/meimei/part01 .tmp/meimei/part02 .tmp/meimei/part03
+              head -c 8000 .tmp/meimei/part04
+              cat .tmp/meimei/part05 .tmp/meimei/part06 .tmp/meimei/part07
+            } | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
           fi
 
           node <<'NODE'
@@ -123,6 +128,7 @@ jobs:
           rmdir .tmp 2>/dev/null || true
           rm -f .github/workflows/install-approved-meimei.yml
           rm -f .github/workflows/assemble-approved-meimei.yml
+          rm -f .github/workflows/meimei-diagnostics.yml
 
           git config user.name "ReadVerse UI Recovery"
           git config user.email "actions@users.noreply.github.com"
