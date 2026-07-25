@@ -54,14 +54,29 @@ for (let offset = 0; offset + 512 <= archive.length; ) {
   offset = dataStart + Math.ceil(size / 512) * 512;
 }
 
-// Keep the archived UI compatible with the current React 19 type definitions.
+// Normalize archived UI tokens that are incompatible with the current build.
 const appPath = resolve(root, "src/App.tsx");
-const appSource = await readFile(appPath, "utf8");
-await writeFile(appPath, appSource.replace(/:\s*JSX\.Element/g, ""));
+let appSource = await readFile(appPath, "utf8");
+const jsxMatchesBefore = appSource.match(/\bJSX\.Element\b/g)?.length ?? 0;
+appSource = appSource.split("JSX.Element").join("React.ReactElement");
+await writeFile(appPath, appSource, "utf8");
 
-// The generated avatar-data key is `meimei`; normalize the hydrated alias.
 const avatarsPath = resolve(root, "src/avatars.ts");
-const avatarsSource = await readFile(avatarsPath, "utf8");
-await writeFile(avatarsPath, avatarsSource.replace(/avatarData\.meiMei/g, "avatarData.meimei"));
+let avatarsSource = await readFile(avatarsPath, "utf8");
+const meiMatchesBefore = avatarsSource.match(/meiMei/g)?.length ?? 0;
+avatarsSource = avatarsSource.split("meiMei").join("meimei");
+await writeFile(avatarsPath, avatarsSource, "utf8");
 
-console.log(`Hydrated ReadVerse UI from ${parts.length} payload parts and applied compatibility fixes.`);
+// Re-read the written files so the build cannot continue with a silent no-op.
+const verifiedApp = await readFile(appPath, "utf8");
+const verifiedAvatars = await readFile(avatarsPath, "utf8");
+if (verifiedApp.includes("JSX.Element")) {
+  throw new Error("Hydration compatibility fix failed: JSX.Element remains in src/App.tsx");
+}
+if (verifiedAvatars.includes("meiMei")) {
+  throw new Error("Hydration compatibility fix failed: meiMei remains in src/avatars.ts");
+}
+
+console.log(
+  `Hydrated ReadVerse UI from ${parts.length} payload parts; normalized ${jsxMatchesBefore} JSX type reference(s) and ${meiMatchesBefore} Mei Mei alias(es).`,
+);
