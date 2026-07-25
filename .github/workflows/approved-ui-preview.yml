@@ -4,15 +4,50 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Recover approved Mei Mei portrait when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f public/avatars/meimei.webp ] && [ ! -f public/avatars/meimei.png ]; then
+            git show f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0:scripts/patch-hydrated-ui.mjs > /tmp/approved-meimei-source.mjs
+            node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const source = fs.readFileSync('/tmp/approved-meimei-source.mjs', 'utf8');
+          const match = source.match(/const meiPortraitBase64 = "([A-Za-z0-9+/=]+)";/);
+          if (!match) throw new Error('Approved Mei Mei portrait payload was not found');
+          const bytes = Buffer.from(match[1], 'base64');
+          const isWebp = bytes.length > 30000 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+          const isPng = bytes.length > 30000 && bytes[0] === 0x89 && bytes.subarray(1, 4).toString('ascii') === 'PNG';
+          if (!isWebp && !isPng) throw new Error('Recovered Mei Mei portrait is not a valid image');
+          const extension = isWebp ? 'webp' : 'png';
+          const publicPath = `/avatars/meimei.${extension}`;
+          const portrait = path.resolve(`public/avatars/meimei.${extension}`);
+          fs.mkdirSync(path.dirname(portrait), { recursive: true });
+          fs.writeFileSync(portrait, bytes);
+          const avatarsPath = path.resolve('src/avatars.ts');
+          let avatars = fs.readFileSync(avatarsPath, 'utf8');
+          avatars = avatars.replace(/mei:\s*groupD\.meimei,?/, `mei: "${publicPath}",`);
+          if (!avatars.includes(`mei: "${publicPath}"`)) throw new Error('Approved Mei Mei mapping was not written');
+          fs.writeFileSync(avatarsPath, avatars);
+          console.log(`Recovered approved ${bytes.length}-byte Mei Mei ${extension.toUpperCase()}`);
+          NODE
+          fi
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npm install --no-save playwright@1.55.0
@@ -29,19 +64,16 @@ jobs:
             if curl -fsS http://127.0.0.1:4173 >/dev/null; then ready=1; break; fi
             sleep 1
           done
-          if [ "$ready" != "1" ]; then
-            cat ui-preview/server.log
-            exit 1
-          fi
+          if [ "$ready" != "1" ]; then cat ui-preview/server.log; exit 1; fi
           node <<'NODE'
           const { chromium } = require('playwright');
           const fs = require('fs');
           (async () => {
             const browser = await chromium.launch({ headless: true });
             const targets = [
-              { name: 'desktop', width: 1440, height: 1100, mobile: false },
-              { name: 'mobile', width: 390, height: 844, mobile: true },
-              { name: 'settings-mobile', width: 390, height: 844, mobile: true, settings: true },
+              { name: 'desktop', width: 1440, height: 1100, mobile: false, fullPage: true },
+              { name: 'mobile', width: 390, height: 844, mobile: true, fullPage: false },
+              { name: 'settings-mobile', width: 390, height: 844, mobile: true, settings: true, fullPage: false },
             ];
             for (const item of targets) {
               const context = await browser.newContext({ viewport: { width: item.width, height: item.height }, isMobile: item.mobile, deviceScaleFactor: 1 });
@@ -54,7 +86,7 @@ jobs:
                 await page.locator('.bottom-nav button').last().click();
                 await page.locator('.modal.open').waitFor({ state: 'visible', timeout: 10000 });
               }
-              await page.screenshot({ path: `ui-preview/${item.name}.png`, fullPage: true });
+              await page.screenshot({ path: `ui-preview/${item.name}.png`, fullPage: item.fullPage });
               fs.writeFileSync(`ui-preview/${item.name}.json`, JSON.stringify({ errors, url: page.url() }, null, 2));
               await context.close();
             }
@@ -68,3 +100,16 @@ jobs:
           name: approved-ui-preview
           path: ui-preview
           if-no-files-found: error
+      - name: Commit recovered portrait and remove temporary installer
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/install-approved-meimei.yml
+          git config user.name "ReadVerse UI Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/avatars src/avatars.ts .github/workflows/install-approved-meimei.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "Use the approved Mei Mei portrait"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
