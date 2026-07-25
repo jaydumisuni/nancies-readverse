@@ -20,12 +20,17 @@ jobs:
         with:
           node-version: 22
       - name: Recover approved Mei Mei portrait when missing
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           if [ ! -f public/avatars/meimei.webp ] && [ ! -f public/avatars/meimei.png ]; then
-            git fetch --no-tags origin f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0
-            git show f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0:scripts/patch-hydrated-ui.mjs > /tmp/approved-meimei-source.mjs
+            curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/jaydumisuni/nancies-readverse/contents/scripts/patch-hydrated-ui.mjs?ref=f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0" \
+              | jq -r '.content' | tr -d '\n' | base64 -d > /tmp/approved-meimei-source.mjs
             node <<'NODE'
           const fs = require('fs');
           const path = require('path');
