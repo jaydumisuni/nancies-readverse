@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "verify:architecture": "node scripts/verify-architecture.mjs",
+    "build": "npm run verify:architecture && tsc --noEmit && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "deploy:preview": "npm run build && wrangler versions upload",
-    "check": "tsc --noEmit",
+    "check": "npm run verify:architecture && tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
