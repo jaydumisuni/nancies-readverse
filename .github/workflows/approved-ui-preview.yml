@@ -16,48 +16,53 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Recover approved Mei Mei portrait when missing
-        env:
-          GH_TOKEN: ${{ github.token }}
+
+      - name: Assemble and verify approved Mei Mei portrait
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -f public/avatars/meimei.webp ] && [ ! -f public/avatars/meimei.png ]; then
-            curl -fsSL \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/jaydumisuni/nancies-readverse/contents/scripts/patch-hydrated-ui.mjs?ref=f80deb9b1015d10bafa91d8b60eb1322fc1f8fe0" \
-              | jq -r '.content' | tr -d '\n' | base64 -d > /tmp/approved-meimei-source.mjs
-            node <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
-          const source = fs.readFileSync('/tmp/approved-meimei-source.mjs', 'utf8');
-          const match = source.match(/const meiPortraitBase64 = "([A-Za-z0-9+/=]+)";/);
-          if (!match) throw new Error('Approved Mei Mei portrait payload was not found');
-          const bytes = Buffer.from(match[1], 'base64');
-          const isWebp = bytes.length > 30000 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
-          const isPng = bytes.length > 30000 && bytes[0] === 0x89 && bytes.subarray(1, 4).toString('ascii') === 'PNG';
-          if (!isWebp && !isPng) throw new Error('Recovered Mei Mei portrait is not a valid image');
-          const extension = isWebp ? 'webp' : 'png';
-          const publicPath = `/avatars/meimei.${extension}`;
-          const portrait = path.resolve(`public/avatars/meimei.${extension}`);
-          fs.mkdirSync(path.dirname(portrait), { recursive: true });
-          fs.writeFileSync(portrait, bytes);
-          const avatarsPath = path.resolve('src/avatars.ts');
-          let avatars = fs.readFileSync(avatarsPath, 'utf8');
-          avatars = avatars.replace(/mei:\s*groupD\.meimei,?/, `mei: "${publicPath}",`);
-          if (!avatars.includes(`mei: "${publicPath}"`)) throw new Error('Approved Mei Mei mapping was not written');
-          fs.writeFileSync(avatarsPath, avatars);
-          console.log(`Recovered approved ${bytes.length}-byte Mei Mei ${extension.toUpperCase()}`);
-          NODE
+          if [ ! -f public/avatars/meimei.webp ]; then
+            for part in .tmp/meimei/part{00..07}; do
+              test -s "$part"
+            done
+            mkdir -p public/avatars
+            cat .tmp/meimei/part{00..07} | tr -d '\r\n' | base64 -d > public/avatars/meimei.webp
           fi
+
+          node <<'NODE'
+          const crypto = require('crypto');
+          const fs = require('fs');
+
+          const portraitPath = 'public/avatars/meimei.webp';
+          const bytes = fs.readFileSync(portraitPath);
+          const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+          const expectedSize = 47814;
+          const expectedSha256 = '04bdb67840daa2d8bb93879aa2f14da13b8f4e89bb9738a6e3fae53c605ea521';
+
+          if (bytes.length !== expectedSize) throw new Error(`Unexpected Mei Mei portrait size: ${bytes.length}`);
+          if (bytes.subarray(0, 4).toString('ascii') !== 'RIFF' || bytes.subarray(8, 12).toString('ascii') !== 'WEBP') {
+            throw new Error('Approved Mei Mei portrait is not a valid WebP');
+          }
+          if (sha256 !== expectedSha256) throw new Error(`Approved Mei Mei portrait checksum mismatch: ${sha256}`);
+
+          const avatarsPath = 'src/avatars.ts';
+          let source = fs.readFileSync(avatarsPath, 'utf8');
+          source = source.replace(/mei:\s*groupD\.meimei,?/, 'mei: "/avatars/meimei.webp",');
+          source = source.replace(/mei:\s*"\/avatars\/meimei\.(?:png|webp)",?/, 'mei: "/avatars/meimei.webp",');
+          if (!source.includes('mei: "/avatars/meimei.webp",')) throw new Error('Approved Mei Mei mapping was not written');
+          fs.writeFileSync(avatarsPath, source);
+          console.log(`Verified approved Mei Mei portrait: ${bytes.length} bytes, ${sha256}`);
+          NODE
+
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npm install --no-save playwright@1.55.0
       - run: npx playwright install --with-deps chromium
+
       - name: Capture desktop, mobile and settings
         shell: bash
         run: |
@@ -71,6 +76,7 @@ jobs:
             sleep 1
           done
           if [ "$ready" != "1" ]; then cat ui-preview/server.log; exit 1; fi
+
           node <<'NODE'
           const { chromium } = require('playwright');
           const fs = require('fs');
@@ -100,21 +106,27 @@ jobs:
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
           kill "$SERVER_PID" || true
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: approved-ui-preview
           path: ui-preview
           if-no-files-found: error
-      - name: Commit recovered portrait and remove temporary installer
+
+      - name: Commit approved portrait and remove temporary recovery files
         if: success()
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf .tmp/meimei
+          rmdir .tmp 2>/dev/null || true
           rm -f .github/workflows/install-approved-meimei.yml
+          rm -f .github/workflows/assemble-approved-meimei.yml
+
           git config user.name "ReadVerse UI Recovery"
           git config user.email "actions@users.noreply.github.com"
-          git add public/avatars src/avatars.ts .github/workflows/install-approved-meimei.yml
+          git add -A
           if ! git diff --cached --quiet; then
             git commit -m "Use the approved Mei Mei portrait"
             git push origin HEAD:${{ github.head_ref }}
