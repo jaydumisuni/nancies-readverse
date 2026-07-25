@@ -144,11 +144,11 @@ try {
   report.interactions.readerOpened = /Chapter\s*15|Page\s*18|fullscreen|highlight/i.test(readerText);
   await page.screenshot({ path: `${outDir}/desktop-reader.png`, fullPage: true });
 
-  const noteButton = page.getByRole('button', { name: /note/i }).first();
+  const noteButton = page.locator('.reader-overlay .reader-toolbar nav button').nth(1);
   if (await noteButton.isVisible().catch(() => false)) {
     await noteButton.click();
     await page.waitForTimeout(300);
-    report.interactions.notepadOpened = await page.locator('textarea:visible').isVisible().catch(() => false);
+    report.interactions.notepadOpened = await page.locator('.floating-notepad textarea:visible').isVisible().catch(() => false);
     await page.screenshot({ path: `${outDir}/desktop-reader-note.png`, fullPage: true });
   } else {
     report.interactions.notepadOpened = false;
