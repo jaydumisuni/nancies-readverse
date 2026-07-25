@@ -1,120 +1,130 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { avatarImages, type AvatarId } from "./avatars";
 
-type ThemeId = "pink" | "crimson" | "violet" | "blue" | "emerald" | "orange" | "rose" | "teal";
-type View = "home" | "library" | "reader" | "notes" | "settings";
-type ChatMessage = { role: "user" | "companion"; text: string; attachment?: string };
-type Companion = { id: AvatarId; name: string; series: "JJK" | "Naruto"; vibe: string; greeting: string; ring: string };
+type ThemeId = "pink" | "violet" | "blue" | "emerald" | "orange" | "rose";
+type View = "home" | "library" | "notes";
+type SettingsTab = "profile" | "companion" | "appearance" | "reader" | "storage";
+type Message = { role: "user" | "companion"; text: string; attachment?: string };
+
+type Companion = {
+  id: AvatarId;
+  name: string;
+  series: "JJK" | "Naruto";
+  vibe: string;
+  shortVibe: string;
+  greeting: string;
+  ring: string;
+};
 
 const companions: Companion[] = [
-  { id: "gojo", name: "Gojo", series: "JJK", vibe: "Playful · confident · teasing", greeting: "I’m ready when you are, pretty reader. Try not to choose something boring; I have a reputation.", ring: "#ff4fa3" },
-  { id: "itachi", name: "Itachi", series: "Naruto", vibe: "Calm · observant · mysterious", greeting: "Take your time. A good story reveals itself when you stop forcing the page.", ring: "#ef3340" },
-  { id: "naruto", name: "Naruto", series: "Naruto", vibe: "Warm · loyal · energetic", greeting: "Okay! Pick a story and let’s finish one more chapter than we promised.", ring: "#ff9f1c" },
-  { id: "kakashi", name: "Kakashi", series: "Naruto", vibe: "Relaxed · clever · dry humour", greeting: "I was going to suggest an early night. Then I saw your reading list.", ring: "#66b8ff" },
-  { id: "megumi", name: "Megumi", series: "JJK", vibe: "Reserved · thoughtful · quietly caring", greeting: "I filtered out the noisy recommendations. You’re welcome.", ring: "#14d9c4" },
-  { id: "sasuke", name: "Sasuke", series: "Naruto", vibe: "Direct · intense · attentive", greeting: "Choose. I already removed the weak options.", ring: "#8d5cff" },
-  { id: "maki", name: "Maki", series: "JJK", vibe: "Strong · blunt · protective", greeting: "Read what you like. Anyone judging your shelf can leave.", ring: "#39d98a" },
-  { id: "nobara", name: "Nobara", series: "JJK", vibe: "Bold · stylish · sassy", greeting: "We’re picking something with taste. That narrows the internet considerably.", ring: "#ff5f8f" },
-  { id: "hinata", name: "Hinata", series: "Naruto", vibe: "Gentle · supportive · sweet", greeting: "Your page is safe. We can continue whenever you feel ready.", ring: "#c78cff" },
-  { id: "sakura", name: "Sakura", series: "Naruto", vibe: "Caring · practical · fiery", greeting: "Drink water, fix your posture, then open the next chapter.", ring: "#ff719f" },
-  { id: "temari", name: "Temari", series: "Naruto", vibe: "Sharp · strategic · witty", greeting: "I ranked the choices. Yes, your chaotic favourite still made the list.", ring: "#f3bd36" },
-  { id: "mei", name: "Mei Mei", series: "JJK", vibe: "Elegant · composed · calculating", greeting: "Your time is valuable. I selected only stories worth spending it on.", ring: "#7bd6ff" },
+  { id: "gojo", name: "Gojo", series: "JJK", vibe: "Playful · Confident · Teasing", shortVibe: "Playful · Confident", greeting: "I’m ready when you are, pretty reader. Try not to choose something boring; I have a reputation.", ring: "#ff4fa3" },
+  { id: "itachi", name: "Itachi", series: "Naruto", vibe: "Calm · Loyal · Observant", shortVibe: "Calm · Loyal", greeting: "Take your time. A good story reveals itself when you stop forcing the page.", ring: "#ef3340" },
+  { id: "naruto", name: "Naruto", series: "Naruto", vibe: "Energetic · Loyal · Warm", shortVibe: "Energetic · Loyal", greeting: "Okay! Pick a story and let’s finish one more chapter than we promised.", ring: "#ff9f1c" },
+  { id: "kakashi", name: "Kakashi", series: "Naruto", vibe: "Relaxed · Wise · Dry humour", shortVibe: "Relaxed · Wise", greeting: "I was going to suggest an early night. Then I saw your reading list.", ring: "#66b8ff" },
+  { id: "megumi", name: "Megumi", series: "JJK", vibe: "Reserved · Thoughtful · Quietly caring", shortVibe: "Reserved · Thoughtful", greeting: "I filtered out the noisy recommendations. You’re welcome.", ring: "#6c73ff" },
+  { id: "sasuke", name: "Sasuke", series: "Naruto", vibe: "Intense · Driven · Direct", shortVibe: "Intense · Driven", greeting: "Choose. I already removed the weak options.", ring: "#8d5cff" },
+  { id: "maki", name: "Maki", series: "JJK", vibe: "Strong · Blunt · Protective", shortVibe: "Strong · Blunt", greeting: "Read what you like. Anyone judging your shelf can leave.", ring: "#39d98a" },
+  { id: "nobara", name: "Nobara", series: "JJK", vibe: "Bold · Sassy · Stylish", shortVibe: "Bold · Sassy", greeting: "We’re picking something with taste. That narrows the internet considerably.", ring: "#ff5f8f" },
+  { id: "hinata", name: "Hinata", series: "Naruto", vibe: "Gentle · Sweet · Supportive", shortVibe: "Gentle · Sweet", greeting: "Your page is safe. We can continue whenever you feel ready.", ring: "#c78cff" },
+  { id: "sakura", name: "Sakura", series: "Naruto", vibe: "Caring · Fiery · Practical", shortVibe: "Caring · Fiery", greeting: "Drink water, fix your posture, then open the next chapter.", ring: "#ff719f" },
+  { id: "temari", name: "Temari", series: "Naruto", vibe: "Strategic · Confident · Witty", shortVibe: "Strategic · Confident", greeting: "I ranked the choices. Yes, your chaotic favourite still made the list.", ring: "#f3bd36" },
+  { id: "mei", name: "Mei Mei", series: "JJK", vibe: "Elegant · Calm · Calculating", shortVibe: "Elegant · Calm", greeting: "Your time is valuable. I selected only stories worth spending it on.", ring: "#7bd6ff" },
 ];
 
 const themes: Record<ThemeId, { label: string; accent: string; accent2: string }> = {
   pink: { label: "Pink Glow", accent: "#ff4fa3", accent2: "#ff8bc5" },
-  crimson: { label: "Crimson Night", accent: "#ef3340", accent2: "#ff6978" },
   violet: { label: "Midnight Violet", accent: "#9b6dff", accent2: "#cf9cff" },
   blue: { label: "Icy Blue", accent: "#58b8ff", accent2: "#9edaff" },
   emerald: { label: "Emerald Shadow", accent: "#36d399", accent2: "#7be8be" },
   orange: { label: "Orange Gold", accent: "#ff9f1c", accent2: "#ffd166" },
   rose: { label: "Rose Gold", accent: "#e98b93", accent2: "#ffc2c7" },
-  teal: { label: "Teal Night", accent: "#19c8c2", accent2: "#6de2de" },
 };
 
 const books = [
-  { title: "Thorns of Destiny", genre: "Fantasy", progress: 72, art: "linear-gradient(145deg,#d3d8ff,#252a54)" },
-  { title: "Moonlit Requiem", genre: "Romance", progress: 61, art: "linear-gradient(145deg,#4a203d,#11131f)" },
-  { title: "Silent Crown", genre: "Fantasy", progress: 33, art: "linear-gradient(145deg,#e8cda7,#38291e)" },
-  { title: "Hearts in Orbit", genre: "Romance", progress: 48, art: "linear-gradient(145deg,#f4a8c6,#453152)" },
-  { title: "Inkbound", genre: "Adventure", progress: 25, art: "linear-gradient(145deg,#ef744d,#2a1619)" },
+  { title: "Jujutsu Kaisen", meta: "Chapter 186", progress: 68, art: "linear-gradient(145deg,#ac8bff,#1c1738)" },
+  { title: "Chainsaw Man", meta: "Chapter 42", progress: 34, art: "linear-gradient(145deg,#7d224d,#121018)" },
+  { title: "Solo Leveling", meta: "Chapter 188", progress: 82, art: "linear-gradient(145deg,#e7c793,#2f2119)" },
+  { title: "One Piece", meta: "Chapter 1041", progress: 47, art: "linear-gradient(145deg,#f39ac5,#41263f)" },
+  { title: "Blue Lock", meta: "Volume 21", progress: 25, art: "linear-gradient(145deg,#ef744d,#29141a)" },
 ];
 
-function getInitial<T>(key: string, fallback: T): T {
-  try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
+const ringPalette = ["#ff4fa3", "#ef3340", "#9b6dff", "#58b8ff", "#19c8c2", "#36d399", "#f3bd36", "#ff9f1c", "#ffffff"];
+
+function timeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function App() {
   const [view, setView] = useState<View>("home");
-  const [companionId, setCompanionId] = useState<AvatarId>(() => getInitial("rv-companion", "gojo"));
-  const [themeId, setThemeId] = useState<ThemeId>(() => getInitial("rv-theme", "pink"));
-  const [ringColors, setRingColors] = useState<Record<string, string>>(() => getInitial("rv-rings", Object.fromEntries(companions.map((item) => [item.id, item.ring]))));
+  const [companionId, setCompanionId] = useState<AvatarId>("gojo");
+  const [themeId, setThemeId] = useState<ThemeId>("pink");
+  const [ringColors, setRingColors] = useState<Record<string, string>>(() => Object.fromEntries(companions.map((item) => [item.id, item.ring])));
   const [chatOpen, setChatOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("companion");
+  const [readerOpen, setReaderOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState("");
   const [question, setQuestion] = useState("");
-  const [sending, setSending] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [page, setPage] = useState(186);
-  const [flipping, setFlipping] = useState(false);
-  const [noteOpen, setNoteOpen] = useState(false);
-  const [note, setNote] = useState(() => getInitial("rv-note", "Reminder to self: this passage matters. Come back later. ✨"));
-  const [highlights, setHighlights] = useState<string[]>(() => getInitial("rv-highlights", ["Strength is not just what you have. It is what you choose to protect when no one is watching."]));
+  const [note, setNote] = useState("Reminder to self: this passage matters. Come back later. ✨");
+  const [highlighted, setHighlighted] = useState(true);
+  const [readerUrl, setReaderUrl] = useState<string | null>(null);
+  const [readerTitle, setReaderTitle] = useState("Thorny Crown");
   const fileRef = useRef<HTMLInputElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
 
   const companion = useMemo(() => companions.find((item) => item.id === companionId) ?? companions[0], [companionId]);
   const theme = themes[themeId];
   const ring = ringColors[companion.id] ?? companion.ring;
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  }, []);
+  const appStyle = { "--accent": theme.accent, "--accent2": theme.accent2, "--ring": ring } as CSSProperties;
 
-  useEffect(() => { localStorage.setItem("rv-companion", JSON.stringify(companionId)); }, [companionId]);
-  useEffect(() => { localStorage.setItem("rv-theme", JSON.stringify(themeId)); }, [themeId]);
-  useEffect(() => { localStorage.setItem("rv-rings", JSON.stringify(ringColors)); }, [ringColors]);
-  useEffect(() => { localStorage.setItem("rv-note", JSON.stringify(note)); }, [note]);
-  useEffect(() => { localStorage.setItem("rv-highlights", JSON.stringify(highlights)); }, [highlights]);
+  useEffect(() => () => { if (readerUrl) URL.revokeObjectURL(readerUrl); }, [readerUrl]);
 
-  function chooseCompanion(id: AvatarId) {
-    setCompanionId(id);
-    setMessages([]);
+  function openSettings(tab: SettingsTab = "companion") {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
   }
 
-  async function sendMessage(event: FormEvent) {
+  function submitMessage(event: FormEvent) {
     event.preventDefault();
-    const clean = question.trim();
-    if ((!clean && !uploadedFile) || sending) return;
-    const outgoing: ChatMessage = { role: "user", text: clean || `Open ${uploadedFile?.name}`, attachment: uploadedFile?.name };
+    const text = question.trim();
+    if (!text && !attachedFile) return;
+    const outgoing: Message = { role: "user", text: text || `Open ${attachedFile?.name}`, attachment: attachedFile?.name };
     setMessages((current) => [...current, outgoing]);
     setQuestion("");
-    if (uploadedFile) {
-      const file = uploadedFile;
-      setUploadedFile(null);
-      setMessages((current) => [...current, { role: "companion", text: `${file.name} is ready. Read it now, add it to your library, keep it offline, or save it to Drive later. I promise not to judge the file name. Much.` }]);
+    if (attachedFile) {
+      const file = attachedFile;
+      const name = file.name;
+      const nextUrl = URL.createObjectURL(file);
+      setReaderUrl((current) => { if (current) URL.revokeObjectURL(current); return nextUrl; });
+      setReaderTitle(name);
+      setAttachedFile(null);
+      setReaderOpen(true);
+      setMessages((current) => [...current, { role: "companion", text: `${name} is open in a temporary reading session. No copy was uploaded to Cloudflare. Google Drive is not connected yet, so it will disappear when this session ends unless you choose to save it later.` }]);
       return;
     }
-    setSending(true);
-    try {
-      const response = await fetch("/api/companion/help", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question: clean, companion: companion.name, vibe: companion.vibe }),
-      });
-      const body = await response.json() as { answer?: string; error?: string };
-      setMessages((current) => [...current, { role: "companion", text: body.answer ?? body.error ?? "That thought escaped. Very dramatic of it." }]);
-    } catch {
-      setMessages((current) => [...current, { role: "companion", text: "The connection wandered off. Your library didn’t. Try again in a moment." }]);
-    } finally { setSending(false); }
+    setMessages((current) => [...current, { role: "companion", text: companion.greeting }]);
   }
 
-  function turnPage(direction: 1 | -1) {
-    if (flipping) return;
-    setFlipping(true);
-    window.setTimeout(() => { setPage((current) => Math.max(1, current + direction * 2)); setFlipping(false); }, 320);
+  function attachFile(file: File | null) {
+    setAttachedFile(file);
+    if (file) setChatOpen(true);
+  }
+
+  function useSource(event: FormEvent) {
+    event.preventDefault();
+    if (!sourceUrl.trim()) return;
+    setSourceOpen(false);
+    setChatOpen(true);
+    setMessages((current) => [...current, { role: "user", text: `Open this source: ${sourceUrl.trim()}` }, { role: "companion", text: "I’ve queued the source for a temporary reading session. We’ll keep the link, not a permanent Cloudflare copy." }]);
+    setSourceUrl("");
   }
 
   async function toggleFullscreen() {
@@ -122,83 +132,178 @@ export default function App() {
     else await document.exitFullscreen();
   }
 
-  const appStyle = { "--accent": theme.accent, "--accent-2": theme.accent2, "--ring": ring } as React.CSSProperties;
-
   return (
-    <div className="readverse" style={appStyle}>
+    <div className="rv-app" style={appStyle}>
       <aside className="sidebar">
-        <button className="brand" onClick={() => setView("home")}><span>Nancy’s</span><strong>READVERSE</strong><small>Your stories. Your world.</small></button>
+        <button className="brand" onClick={() => setView("home")}>
+          <span className="nancy">Nancy’s</span>
+          <span className="readverse">READVERSE</span>
+          <span className="tagline">Your stories. Your world.</span>
+        </button>
+        <label className="side-search"><span>⌕</span><input placeholder="Search your ReadVerse" /></label>
         <nav>
-          {([['home','⌂','Home'],['library','▤','Library'],['reader','▱','Continue Reading'],['notes','✎','Notes & Highlights']] as [View,string,string][]).map(([id, icon, label]) => (
-            <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)}><i>{icon}</i>{label}</button>
-          ))}
-          <button onClick={() => setChatOpen(true)}><i>✦</i>Companion</button>
-          <button onClick={() => { setSettingsOpen(true); setView("settings"); }}><i>⚙</i>Settings</button>
+          <button className={view === "home" ? "active" : ""} onClick={() => setView("home")}><i>⌂</i>Home</button>
+          <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}><i>▤</i>Library</button>
+          <button onClick={() => setReaderOpen(true)}><i>▱</i>Continue Reading</button>
+          <button><i>♡</i>Favourites</button>
+          <button><i>◫</i>Collections</button>
+          <button onClick={() => setSourceOpen(true)}><i>⌁</i>Sources</button>
+          <button><i>↺</i>History</button>
+          <button className={view === "notes" ? "active" : ""} onClick={() => setView("notes")}><i>✎</i>Notes & Highlights</button>
+          <button onClick={() => openSettings()}><i>⚙</i>Settings</button>
         </nav>
-        <div className="streak"><small>Reading streak</small><strong>27 <em>days</em></strong><p>Plot twist: you’re the main character.</p></div>
-        <button className="profile-card" onClick={() => setSettingsOpen(true)}><span className="profile-photo">N</span><span><strong>Nancy</strong><small>Pretty reader ✨</small></span><b>⌄</b></button>
+        <div className="sidebar-bottom">
+          <div className="streak"><small>READING STREAK</small><strong>27 days</strong><p>One more chapter and today stays pink.</p></div>
+          <button className="profile" onClick={() => openSettings("profile")}><span className="photo">N</span><span><strong>Nancy</strong><small>Personal ReadVerse</small></span><b>⋯</b></button>
+        </div>
       </aside>
 
       <main className="workspace">
-        <header className="mobile-bar"><button onClick={() => document.body.classList.toggle('menu-open')}>☰</button><strong>READVERSE</strong><button onClick={() => setChatOpen(true)}>✦</button></header>
-        {view === "reader" ? (
-          <Reader refEl={readerRef} page={page} flipping={flipping} note={note} noteOpen={noteOpen} highlights={highlights} onTurn={turnPage} onFullscreen={toggleFullscreen} onNote={() => setNoteOpen(true)} onCloseNote={() => setNoteOpen(false)} onNoteChange={setNote} onHighlight={(text) => setHighlights((current) => current.includes(text) ? current : [...current, text])} />
-        ) : view === "settings" ? (
-          <Settings companions={companions} selected={companion} ring={ring} themeId={themeId} ringColors={ringColors} onCompanion={chooseCompanion} onRing={(value) => setRingColors((current) => ({ ...current, [companion.id]: value }))} onTheme={setThemeId} onClose={() => { setSettingsOpen(false); setView("home"); }} />
-        ) : view === "notes" ? (
-          <section className="page-section"><SectionTitle eyebrow="Your thoughts" title="Notes & Highlights" /><div className="notes-grid"><article className="note-card"><textarea value={note} onChange={(event) => setNote(event.target.value)} /><small>Autosaved locally · Drive sync connects later</small></article>{highlights.map((item) => <blockquote key={item}>{item}<small>Chapter 15 · page {page}</small></blockquote>)}</div></section>
-        ) : (
-          <Dashboard greeting={greeting} companion={companion} ring={ring} onChat={() => setChatOpen(true)} onReader={() => setView("reader")} onSettings={() => setView("settings")} />
-        )}
+        <header className="mobile-header">
+          <button className="mobile-brand" onClick={() => setView("home")}><span className="nancy">Nancy’s</span><span className="readverse">READVERSE</span></button>
+          <label className="mobile-search"><span>⌕</span><input placeholder="Search manga, comics, novels" /></label>
+          <button className="profile-mini" onClick={() => openSettings("profile")}>N</button>
+        </header>
+
+        {view === "home" && <Home greeting={timeGreeting()} companion={companion} ring={ring} onChat={() => setChatOpen(true)} onReader={() => setReaderOpen(true)} onUpload={() => fileRef.current?.click()} onSettings={() => openSettings()} />}
+        {view === "library" && <Library onReader={() => setReaderOpen(true)} />}
+        {view === "notes" && <Notes note={note} onNote={setNote} />}
       </main>
 
-      {!chatOpen && view !== "reader" && <div className="companion-dock"><div className="speech">{companion.greeting}</div><button className="floating-avatar" style={{ borderColor: ring }} onClick={() => setChatOpen(true)}><img src={avatarImages[companion.id]} alt={companion.name} /><span /></button></div>}
-      <CompanionChat open={chatOpen} companion={companion} ring={ring} messages={messages} question={question} sending={sending} file={uploadedFile} onClose={() => setChatOpen(false)} onQuestion={setQuestion} onSubmit={sendMessage} onAttach={() => fileRef.current?.click()} onFile={setUploadedFile} />
-      <input ref={fileRef} hidden type="file" accept="application/pdf,.pdf,.epub,.cbz,.txt,image/*" onChange={(event) => setUploadedFile(event.target.files?.[0] ?? null)} />
-      {settingsOpen && view !== "settings" && <button className="screen-dimmer" onClick={() => setSettingsOpen(false)} aria-label="Close settings" />}
+      <nav className="bottom-nav">
+        <button className={view === "home" ? "active" : ""} onClick={() => setView("home")}><i>⌂</i>Home</button>
+        <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}><i>▤</i>Library</button>
+        <button><i>⌕</i>Search</button>
+        <button onClick={() => setChatOpen(true)}><i>✦</i>{companion.name}</button>
+        <button onClick={() => openSettings()}><i>⚙</i>Settings</button>
+      </nav>
+
+      {!chatOpen && !readerOpen && !settingsOpen && (
+        <div className="floating-companion">
+          <div className="speech">{companion.greeting}</div>
+          <button className="float-avatar" style={{ borderColor: ring }} onClick={() => setChatOpen(true)}><img src={avatarImages[companion.id]} alt={companion.name} /><span /></button>
+        </div>
+      )}
+
+      <ChatPanel open={chatOpen} companion={companion} ring={ring} messages={messages} question={question} file={attachedFile} onClose={() => setChatOpen(false)} onQuestion={setQuestion} onSubmit={submitMessage} onAttach={() => fileRef.current?.click()} onClearFile={() => setAttachedFile(null)} />
+      <SettingsModal open={settingsOpen} tab={settingsTab} onTab={setSettingsTab} companions={companions} selected={companion} ring={ring} ringColors={ringColors} themeId={themeId} onClose={() => setSettingsOpen(false)} onCompanion={(id) => { setCompanionId(id); setMessages([]); }} onRing={(color) => setRingColors((current) => ({ ...current, [companion.id]: color }))} onTheme={setThemeId} />
+      <ReaderOverlay open={readerOpen} refEl={readerRef} sourceUrl={readerUrl} title={readerTitle} page={page} note={note} notesOpen={notesOpen} highlighted={highlighted} onClose={() => setReaderOpen(false)} onTurn={(direction) => setPage((current) => Math.max(1, current + direction * 2))} onFullscreen={toggleFullscreen} onNotes={() => setNotesOpen(true)} onCloseNotes={() => setNotesOpen(false)} onNote={setNote} onHighlight={() => setHighlighted((current) => !current)} />
+      <SourceDialog open={sourceOpen} value={sourceUrl} onValue={setSourceUrl} onSubmit={useSource} onClose={() => setSourceOpen(false)} />
+
+      <input ref={fileRef} hidden type="file" accept="application/pdf,.pdf,.epub,.cbz,.txt" onChange={(event) => attachFile(event.target.files?.[0] ?? null)} />
+      <div className="lock-badge">APPROVED UI · VISUAL STRUCTURE LOCKED</div>
     </div>
   );
 }
 
-function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) { return <header className="section-title"><div><small>{eyebrow}</small><h2>{title}</h2></div><button>View all →</button></header>; }
+function Home({ greeting, companion, ring, onChat, onReader, onUpload, onSettings }: { greeting: string; companion: Companion; ring: string; onChat: () => void; onReader: () => void; onUpload: () => void; onSettings: () => void }) {
+  return (
+    <>
+      <article className="hero">
+        <div className="hero-copy">
+          <div className="eyebrow">YOUR SHELF IS READY</div>
+          <h1>{greeting},<br /><span>Nancy!</span> ✦</h1>
+          <p>Your stories stay temporary unless you choose to save them. Find comics, manga, novels and books, then read them your way.</p>
+          <div className="hero-actions"><button className="btn primary" onClick={onReader}>Continue Reading</button><button className="btn" onClick={onChat}>Find something with {companion.name}</button></div>
+          <div className="genre-pills"><span>Manga</span><span>Comics</span><span>Novels</span><span>Books</span><span>PDF</span></div>
+        </div>
+        <div className="hero-character">
+          <div className="hero-orbit" style={{ borderColor: ring }} />
+          <img src={avatarImages[companion.id]} alt={companion.name} />
+          <div className="hero-signature">{companion.name}</div>
+        </div>
+        <aside className="companion-card">
+          <div className="eyebrow">MY COMPANION</div>
+          <div className="mini"><img className="avatar" style={{ borderColor: ring }} src={avatarImages[companion.id]} alt={companion.name} /><span><strong>{companion.name}</strong><small>{companion.vibe}</small></span></div>
+          <button className="btn primary" onClick={onChat}>Chat now</button>
+          <button className="btn" onClick={onUpload}>Upload a file</button>
+          <button className="btn" onClick={onSettings}>Customise</button>
+        </aside>
+      </article>
 
-function Dashboard({ greeting, companion, ring, onChat, onReader, onSettings }: { greeting: string; companion: Companion; ring: string; onChat: () => void; onReader: () => void; onSettings: () => void }) {
-  return <>
-    <section className="hero-dashboard">
-      <div className="hero-copy"><small>COMICS · MANGA · NOVELS · BOOKS</small><h1>{greeting},<br /><span>Nancy.</span></h1><p>Your stories stay temporary unless you choose to add them, favourite them, save the file, or keep them offline.</p><div><button className="primary" onClick={onReader}>▤ Continue Reading</button><button onClick={onChat}>✦ Find with {companion.name}</button></div><div className="genre-pills"><span>Romance</span><span>Dark Fantasy</span><span>Action</span><span>Mystery</span></div></div>
-      <div className="hero-companion"><div className="hero-orbit" style={{ borderColor: ring }} /><img src={avatarImages[companion.id]} alt={companion.name} /><div className="hero-signature">{companion.name}</div></div>
-      <article className="companion-card"><small>MY COMPANION</small><div><img style={{ borderColor: ring }} src={avatarImages[companion.id]} alt="" /><span><strong>{companion.name}</strong><small>{companion.vibe}</small></span></div><button className="primary" onClick={onChat}>Chat now</button><button onClick={onSettings}>Customize</button></article>
-    </section>
-    <section className="content-section"><SectionTitle eyebrow="Pick up where you left off" title="Continue Reading" /><div className="book-row">{books.map((book) => <article className="book-card" key={book.title} onClick={onReader}><div className="book-art" style={{ background: book.art }}><span>{book.progress}%</span><b>{book.title.slice(0,1)}</b></div><strong>{book.title}</strong><small>{book.genre}</small><div className="progress"><i style={{ width: `${book.progress}%` }} /></div></article>)}</div></section>
-    <section className="dashboard-grid"><article className="feature-card"><small>✦ {companion.name}’s Pick</small><h3>Velvet Eclipse</h3><p>A deal. A lie. A vow that binds. What could possibly go wrong?</p><button className="primary" onClick={onReader}>Read now</button></article><article className="feature-card"><small>♡ Favourites</small><h3>Your forever shelf</h3><p>Everything you loved enough to admit publicly.</p><button>Open shelf</button></article><article className="feature-card"><small>☁ Sync & Offline</small><h3>12 books ready</h3><p>Read anywhere. Google Drive connects after the full experience passes testing.</p><button>Manage storage</button></article></section>
-    <section className="content-section"><SectionTitle eyebrow="Match your energy" title="Mood Vibes" /><div className="mood-row"><button>♡ Sweet & Heartwarming</button><button>◐ Dark & Mysterious</button><button>⚔ Fierce & Epic</button><button>☁ Soft & Healing</button><button>✦ Fun & Chaotic</button></div></section>
-  </>;
+      <section className="section"><SectionTitle eyebrow="BACK TO YOUR STORIES" title="Continue Reading" /><BookRow onReader={onReader} /></section>
+      <section className="dashboard-grid">
+        <article className="feature"><small>✦ {companion.name}’S PICK</small><h3>Velvet Eclipse</h3><p>A deal. A lie. A vow that binds. What could possibly go wrong?</p><button className="btn primary" onClick={onReader}>Read now</button></article>
+        <article className="feature"><small>♡ FAVOURITES</small><h3>Your forever shelf</h3><p>Everything you loved enough to admit publicly.</p><button className="btn">Open shelf</button></article>
+        <article className="feature"><small>☁ SYNC & OFFLINE</small><h3>Google Drive ready</h3><p>Your personal saves, settings, notes and progress belong to your account.</p><button className="btn">Storage settings</button></article>
+      </section>
+      <section className="section"><SectionTitle eyebrow="MATCH YOUR ENERGY" title="Mood Vibes" /><div className="mood-row"><button>♡ Sweet & Heartwarming</button><button>◐ Dark & Mysterious</button><button>⚔ Fierce & Epic</button><button>☁ Soft & Healing</button><button>✦ Fun & Chaotic</button></div></section>
+    </>
+  );
 }
 
-function CompanionChat({ open, companion, ring, messages, question, sending, file, onClose, onQuestion, onSubmit, onAttach, onFile }: { open: boolean; companion: Companion; ring: string; messages: ChatMessage[]; question: string; sending: boolean; file: File | null; onClose: () => void; onQuestion: (value: string) => void; onSubmit: (event: FormEvent) => void; onAttach: () => void; onFile: (file: File | null) => void }) {
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return <header className="section-title"><div><small>{eyebrow}</small><h2>{title}</h2></div><button className="link-btn">View all →</button></header>;
+}
+
+function BookRow({ onReader }: { onReader: () => void }) {
+  return <div className="book-row">{books.map((book) => <button className="book-card" key={book.title} onClick={onReader}><div className="cover" style={{ "--cover": book.art } as CSSProperties}><b>{book.title.slice(0, 1)}</b><span>{book.progress}%</span></div><strong>{book.title}</strong><small>{book.meta}</small><div className="progress"><i style={{ width: `${book.progress}%` }} /></div></button>)}</div>;
+}
+
+function Library({ onReader }: { onReader: () => void }) {
+  return <section className="page-section"><SectionTitle eyebrow="YOUR COLLECTION" title="Library" /><div className="library-banner"><div><small>PERSONAL READVERSE</small><h2>Everything she chose to keep.</h2><p>Saved files, favourites and reading progress will live in her Google account—not as permanent Cloudflare copies.</p></div><button className="btn primary">Connect Google</button></div><BookRow onReader={onReader} /></section>;
+}
+
+function Notes({ note, onNote }: { note: string; onNote: (value: string) => void }) {
+  return <section className="page-section"><SectionTitle eyebrow="YOUR THOUGHTS" title="Notes & Highlights" /><div className="notes-grid"><article className="note-card"><textarea value={note} onChange={(event) => onNote(event.target.value)} /><small>Temporary until Google sync is connected</small></article><blockquote>Strength is not just what you have. It is what you choose to protect when no one is watching.<small>Chapter 15 · page 186</small></blockquote></div></section>;
+}
+
+function ChatPanel({ open, companion, ring, messages, question, file, onClose, onQuestion, onSubmit, onAttach, onClearFile }: { open: boolean; companion: Companion; ring: string; messages: Message[]; question: string; file: File | null; onClose: () => void; onQuestion: (value: string) => void; onSubmit: (event: FormEvent) => void; onAttach: () => void; onClearFile: () => void }) {
   return <aside className={`chat-panel ${open ? "open" : ""}`} aria-hidden={!open}>
-    <header><img style={{ borderColor: ring }} src={avatarImages[companion.id]} alt={companion.name} /><div><strong>{companion.name}</strong><small>{companion.vibe}</small></div><button onClick={onClose}>×</button></header>
-    <div className="chat-body"><div className="message companion"><img src={avatarImages[companion.id]} alt="" /><p>{companion.greeting}</p></div>{messages.map((message, index) => <div key={index} className={`message ${message.role}`}>{message.role === "companion" && <img src={avatarImages[companion.id]} alt="" />}<div><p>{message.text}</p>{message.attachment && <small>📎 {message.attachment}</small>}</div></div>)}{sending && <div className="message companion"><img src={avatarImages[companion.id]} alt="" /><p className="typing">thinking ···</p></div>}</div>
-    {file && <div className="attachment-preview"><span>PDF</span><div><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(1)} MB · ready to open</small></div><button onClick={() => onFile(null)}>×</button></div>}
+    <header className="chat-head"><img style={{ borderColor: ring }} src={avatarImages[companion.id]} alt={companion.name} /><div><strong>{companion.name}</strong><small>{companion.vibe}</small></div><button className="icon-btn" onClick={onClose}>×</button></header>
+    <div className="chat-body"><div className="message companion"><img src={avatarImages[companion.id]} alt="" /><p>{companion.greeting}</p></div>{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>{message.role === "companion" && <img src={avatarImages[companion.id]} alt="" />}<div><p>{message.text}</p>{message.attachment && <small>📎 {message.attachment}</small>}</div></div>)}</div>
     <div className="quick-actions"><button onClick={() => onQuestion("Find me something sweet and heartwarming")}>♡ Sweet</button><button onClick={() => onQuestion("Find me something dark and mysterious")}>◐ Dark</button><button onClick={() => onQuestion("Surprise me, but protect my sleep")}>✦ Surprise me</button></div>
-    <form onSubmit={onSubmit}><button type="button" onClick={onAttach} title="Upload PDF">＋</button><input value={question} onChange={(event) => onQuestion(event.target.value)} placeholder={`Ask ${companion.name} anything…`} /><button className="send" type="submit">➤</button></form>
+    {file && <div className="file-pill show"><span>PDF</span><div><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(1)} MB · temporary session</small></div><button onClick={onClearFile}>×</button></div>}
+    <form className="chat-form" onSubmit={onSubmit}><button type="button" onClick={onAttach}>＋</button><input value={question} onChange={(event) => onQuestion(event.target.value)} placeholder={`Ask ${companion.name} anything…`} /><button className="send" type="submit">➤</button></form>
   </aside>;
 }
 
-function Settings({ companions, selected, ring, themeId, ringColors, onCompanion, onRing, onTheme, onClose }: { companions: Companion[]; selected: Companion; ring: string; themeId: ThemeId; ringColors: Record<string,string>; onCompanion: (id: AvatarId) => void; onRing: (value: string) => void; onTheme: (id: ThemeId) => void; onClose: () => void }) {
-  const colors = ["#ff4fa3","#ef3340","#9b6dff","#58b8ff","#19c8c2","#36d399","#f3bd36","#ff9f1c","#ffffff"];
-  return <section className="settings-page"><header><div><small>Make it yours</small><h2>Appearance & Companion</h2></div><button onClick={onClose}>×</button></header>
-    <div className="settings-layout"><div className="companion-picker"><h3>Choose your companion</h3><p>Each keeps ReadVerse reliable, but brings their own humour and delivery.</p><div className="companion-grid">{companions.map((item) => <button className={selected.id === item.id ? "selected" : ""} key={item.id} onClick={() => onCompanion(item.id)}><img style={{ borderColor: ringColors[item.id] ?? item.ring }} src={avatarImages[item.id]} alt={item.name} /><strong>{item.name}</strong><small>{item.vibe}</small></button>)}</div></div>
-    <aside className="customizer"><h3>Customize {selected.name}</h3><img className="large-avatar" style={{ borderColor: ring }} src={avatarImages[selected.id]} alt={selected.name} /><label>Companion ring color</label><div className="color-row">{colors.map((color) => <button key={color} className={ring === color ? "chosen" : ""} style={{ background: color }} onClick={() => onRing(color)} />)}</div><label>Site theme</label><div className="theme-grid">{(Object.entries(themes) as [ThemeId, typeof themes[ThemeId]][]).map(([id, value]) => <button key={id} className={themeId === id ? "chosen" : ""} onClick={() => onTheme(id)}><i style={{ background: `linear-gradient(135deg,${value.accent},${value.accent2})` }} />{value.label}</button>)}</div><div className="toggle-line"><span>Ring glow</span><input type="checkbox" defaultChecked /></div><div className="toggle-line"><span>Page flip animation</span><input type="checkbox" defaultChecked /></div></aside></div>
+function SettingsModal({ open, tab, onTab, companions, selected, ring, ringColors, themeId, onClose, onCompanion, onRing, onTheme }: { open: boolean; tab: SettingsTab; onTab: (tab: SettingsTab) => void; companions: Companion[]; selected: Companion; ring: string; ringColors: Record<string, string>; themeId: ThemeId; onClose: () => void; onCompanion: (id: AvatarId) => void; onRing: (value: string) => void; onTheme: (id: ThemeId) => void }) {
+  return <div className={`modal ${open ? "open" : ""}`}>
+    <section className="settings">
+      <header className="settings-head"><div><small>MAKE IT YOURS</small><h2>ReadVerse Settings</h2></div><button className="icon-btn" onClick={onClose}>×</button></header>
+      <div className="settings-body">
+        <nav className="settings-tabs">
+          {([['profile','♙','Profile'],['companion','✦','Companion'],['appearance','◉','Appearance'],['reader','▥','Reader'],['storage','☁','Storage & Sync']] as [SettingsTab,string,string][]).map(([id, icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => onTab(id)}><i>{icon}</i>{label}</button>)}
+        </nav>
+        <div className="settings-content">
+          {tab === "companion" && <CompanionSettings companions={companions} selected={selected} ring={ring} ringColors={ringColors} onCompanion={onCompanion} onRing={onRing} />}
+          {tab === "appearance" && <AppearanceSettings themeId={themeId} onTheme={onTheme} />}
+          {tab === "profile" && <SimpleSettings eyebrow="PERSONALISE THE EXPERIENCE" title="Nancy’s profile" text="Profile picture, display name, birthday and account preferences will sync to her Google account." />}
+          {tab === "reader" && <SimpleSettings eyebrow="READ YOUR WAY" title="Reader preferences" text="Page flip, swipe sensitivity, fullscreen, font size, brightness, highlights and notepad behaviour." />}
+          {tab === "storage" && <SimpleSettings eyebrow="YOUR DATA, YOUR ACCOUNT" title="Storage & Sync" text="Temporary source files stay in-session. Permanent saves, notes, settings and progress belong in Google Drive." />}
+        </div>
+      </div>
+    </section>
+  </div>;
+}
+
+function CompanionSettings({ companions, selected, ring, ringColors, onCompanion, onRing }: { companions: Companion[]; selected: Companion; ring: string; ringColors: Record<string, string>; onCompanion: (id: AvatarId) => void; onRing: (value: string) => void }) {
+  return <section className="settings-panel active">
+    <div className="selected-row"><img className="selected-portrait" style={{ borderColor: ring }} src={avatarImages[selected.id]} alt={selected.name} /><article className="selected-copy"><small>SELECTED COMPANION</small><h3>{selected.name}</h3><p>{selected.vibe}. Keeps the humour in character without taking away ReadVerse’s sweet, dependable personality.</p></article><aside className="ring-panel"><strong>Ring colour for {selected.name}</strong><div className="color-row">{ringPalette.map((color) => <button key={color} className={`color-dot ${ring === color ? "active" : ""}`} style={{ background: color }} onClick={() => onRing(color)} />)}</div><p>Each companion remembers a separate ring colour. The site theme stays independent.</p></aside></div>
+    <div className="settings-subhead"><small>CHOOSE YOUR COMPANION</small><h3>Six male · six female · twelve different vibes</h3></div>
+    <div className="companion-grid">{companions.map((item) => <button className={`companion-option ${selected.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => onCompanion(item.id)}><img style={{ borderColor: ringColors[item.id] ?? item.ring }} src={avatarImages[item.id]} alt={item.name} /><strong>{item.name}</strong><small>{item.shortVibe}</small></button>)}</div>
   </section>;
 }
 
-function Reader({ refEl, page, flipping, note, noteOpen, highlights, onTurn, onFullscreen, onNote, onCloseNote, onNoteChange, onHighlight }: { refEl: React.RefObject<HTMLDivElement | null>; page: number; flipping: boolean; note: string; noteOpen: boolean; highlights: string[]; onTurn: (direction: 1 | -1) => void; onFullscreen: () => void; onNote: () => void; onCloseNote: () => void; onNoteChange: (value: string) => void; onHighlight: (value: string) => void }) {
-  const passage = "Strength is not just what you have. It is what you choose to protect when no one is watching.";
-  return <section className="reader" ref={refEl}><header><button onClick={() => history.back()}>‹</button><div><strong>Thorny Crown</strong><small>Chapter 15 · Faint Light in the Rain</small></div><div><button onClick={onNote}>✎</button><button onClick={onFullscreen}>⛶</button></div></header>
-    <div className={`book ${flipping ? "flipping" : ""}`}><button className="page-edge left" onClick={() => onTurn(-1)}>‹</button><article className="paper left-page"><small>CHAPTER 15</small><h2>Faint Light in the Rain</h2><p>The rain had not stopped since the evening before. It drummed against the windows of the old dormitory, like fingers tapping out a restless song.</p><p className="highlight" onClick={() => onHighlight(passage)}>{passage}</p><p>Yuji thought about that as he walked the empty hallways, the words echoing louder than the rain.</p><b>{page}</b></article><article className="paper right-page"><p>Outside, somewhere beyond the glass, the city glowed faintly—uncaring, relentless.</p><p>But inside, even in the darkest moments, a choice could still be made.</p><hr /><p className="center">End of Chapter 15</p><b>{page + 1}</b></article><button className="page-edge right" onClick={() => onTurn(1)}>›</button></div>
-    <footer><button onClick={() => onTurn(-1)}>←</button><div><i style={{ width: `${Math.min(100, page / 3)}%` }} /></div><span>{page} / 240</span><button onClick={() => onTurn(1)}>→</button></footer>
-    {noteOpen && <aside className="notepad"><header><strong>My Note</strong><button onClick={onCloseNote}>×</button></header><div className="note-tools">B&nbsp;&nbsp; <i>I</i>&nbsp;&nbsp; <u>U</u>&nbsp;&nbsp; • List</div><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} /><small>Autosaved · linked to page {page}</small></aside>}
-    <div className="reader-hint">Swipe or tap the page edge to turn</div>{highlights.length > 0 && <button className="highlight-count" onClick={onNote}>✦ {highlights.length} highlight{highlights.length === 1 ? "" : "s"}</button>}
+function AppearanceSettings({ themeId, onTheme }: { themeId: ThemeId; onTheme: (id: ThemeId) => void }) {
+  return <section className="settings-panel active"><div className="settings-subhead"><small>COLOUR THE READVERSE</small><h3>Theme colours</h3></div><div className="theme-grid">{(Object.entries(themes) as [ThemeId, (typeof themes)[ThemeId]][]).map(([id, theme]) => <button className={`theme-tile ${themeId === id ? "active" : ""}`} key={id} onClick={() => onTheme(id)}><i className="theme-swatch" style={{ "--c1": theme.accent, "--c2": theme.accent2 } as CSSProperties} /><span><strong>{theme.label}</strong><small>Independent from companion ring</small></span></button>)}</div></section>;
+}
+
+function SimpleSettings({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
+  return <section className="settings-panel active"><div className="simple-settings"><small>{eyebrow}</small><h3>{title}</h3><p>{text}</p><div className="placeholder-lines"><i /><i /><i /></div></div></section>;
+}
+
+function ReaderOverlay({ open, refEl, sourceUrl, title, page, note, notesOpen, highlighted, onClose, onTurn, onFullscreen, onNotes, onCloseNotes, onNote, onHighlight }: { open: boolean; refEl: React.RefObject<HTMLDivElement | null>; sourceUrl: string | null; title: string; page: number; note: string; notesOpen: boolean; highlighted: boolean; onClose: () => void; onTurn: (direction: 1 | -1) => void; onFullscreen: () => void; onNotes: () => void; onCloseNotes: () => void; onNote: (value: string) => void; onHighlight: () => void }) {
+  return <section className={`reader-overlay ${open ? "open" : ""}`} ref={refEl}>
+    <header className="reader-toolbar"><button onClick={onClose}>×</button><div className="title"><strong>{title}</strong><small>{sourceUrl ? "Temporary local reading session" : "Chapter 15 · Faint Light in the Rain"}</small></div><nav><button onClick={onNotes}>✎ Notes</button><button onClick={onFullscreen}>⛶ Fullscreen</button></nav></header>
+    <div className="reader-window">{sourceUrl ? <iframe className="pdf-frame" src={sourceUrl} title={title} /> : <div className="book-spread"><button className="page-edge prev" onClick={() => onTurn(-1)} /><article className="page left"><small>CHAPTER 15</small><h2>Faint Light in the Rain</h2><p>The rain had not stopped since the evening before. It drummed against the windows of the old dormitory, like fingers tapping out a restless song.</p><p className={highlighted ? "highlight" : ""} onClick={onHighlight}>Strength is not just what you have. It is what you choose to protect when no one is watching.</p><p>Yuji thought about that as he walked the empty hallways, the words echoing louder than the rain.</p><b>{page}</b></article><article className="page right"><p>Outside, somewhere beyond the glass, the city glowed faintly—uncaring, relentless.</p><p>But inside, even in the darkest moments, a choice could still be made.</p><hr /><p className="center">End of Chapter 15</p><b>{page + 1}</b></article><button className="page-edge next" onClick={() => onTurn(1)} /></div>}
+    </div>
+    <footer className="reader-footer"><button onClick={() => onTurn(-1)}>←</button><span>{page} / 240</span><button onClick={() => onTurn(1)}>→</button></footer>
+    <aside className={`notepad ${notesOpen ? "open" : ""}`}><header><strong>My Note</strong><button onClick={onCloseNotes}>×</button></header><textarea value={note} onChange={(event) => onNote(event.target.value)} /><small>Linked to page {page}</small></aside>
   </section>;
+}
+
+function SourceDialog({ open, value, onValue, onSubmit, onClose }: { open: boolean; value: string; onValue: (value: string) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+  return <div className={`source-dialog ${open ? "open" : ""}`}><form className="source-card" onSubmit={onSubmit}><div className="eyebrow">ADD A SOURCE</div><h2>Paste a reading link</h2><p>ReadVerse will use the link for a temporary session and remember only the source unless the user chooses to save the file.</p><input value={value} onChange={(event) => onValue(event.target.value)} placeholder="https://example.com/book-or-reader" /><div className="actions"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn primary" type="submit">Use source</button></div></form></div>;
 }
