@@ -1,0 +1,1 @@
+Check the direct workers.dev deployment independently of the custom domain.
