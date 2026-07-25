@@ -65,6 +65,30 @@ const avatarsPath = resolve(root, "src/avatars.ts");
 let avatarsSource = await readFile(avatarsPath, "utf8");
 const meiMatchesBefore = avatarsSource.match(/meiMei/g)?.length ?? 0;
 avatarsSource = avatarsSource.split("meiMei").join("meimei");
+
+// The generated Mei Mei data URI is valid but Chromium rejected it inline.
+// Extract it into a normal static WebP asset and point the roster alias at it.
+const avatarsDPath = resolve(root, "src/avatarsD.ts");
+const avatarsDSource = await readFile(avatarsDPath, "utf8");
+const meiDataMatch = avatarsDSource.match(/meimei:\s*"data:image\/webp;base64,([^"]+)"/);
+if (!meiDataMatch) {
+  throw new Error("Mei Mei avatar data was not found in src/avatarsD.ts");
+}
+const meiBytes = Buffer.from(meiDataMatch[1], "base64");
+if (
+  meiBytes.length < 1024 ||
+  meiBytes.subarray(0, 4).toString("ascii") !== "RIFF" ||
+  meiBytes.subarray(8, 12).toString("ascii") !== "WEBP"
+) {
+  throw new Error("Mei Mei avatar data is not a valid WebP file");
+}
+const publicAvatarDirectory = resolve(root, "public/avatars");
+await mkdir(publicAvatarDirectory, { recursive: true });
+await writeFile(resolve(publicAvatarDirectory, "meimei.webp"), meiBytes);
+avatarsSource = avatarsSource.replace(
+  /mei:\s*groupD\.meimei/g,
+  'mei: "/avatars/meimei.webp"',
+);
 await writeFile(avatarsPath, avatarsSource, "utf8");
 
 // Re-read the written files so the build cannot continue with a silent no-op.
@@ -76,7 +100,10 @@ if (verifiedApp.includes("JSX.Element")) {
 if (verifiedAvatars.includes("meiMei")) {
   throw new Error("Hydration compatibility fix failed: meiMei remains in src/avatars.ts");
 }
+if (!verifiedAvatars.includes('mei: "/avatars/meimei.webp"')) {
+  throw new Error("Hydration compatibility fix failed: Mei Mei static asset alias was not written");
+}
 
 console.log(
-  `Hydrated ReadVerse UI from ${parts.length} payload parts; normalized ${jsxMatchesBefore} JSX type reference(s) and ${meiMatchesBefore} Mei Mei alias(es).`,
+  `Hydrated ReadVerse UI from ${parts.length} payload parts; normalized ${jsxMatchesBefore} JSX type reference(s), ${meiMatchesBefore} Mei Mei alias(es), and extracted a ${meiBytes.length}-byte Mei Mei WebP asset.`,
 );
