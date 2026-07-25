@@ -1,0 +1,1 @@
+Trigger Cloudflare build and live verification after correcting the approved Mei Mei portrait from a falsely-labelled WebP to its actual validated PNG format.
