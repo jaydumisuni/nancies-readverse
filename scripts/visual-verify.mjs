@@ -180,7 +180,7 @@ try {
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const mobilePage = await mobileContext.newPage();
   await mobilePage.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-  await mobilePage.locator('button:visible').filter({ hasText: /Continue Reading/ }).first().click();
+  await mobilePage.locator('.continue-section .book-card').first().click();
   await mobilePage.locator('.reader-overlay').waitFor({ state: 'visible', timeout: 10000 });
   await mobilePage.screenshot({ path: `${outDir}/mobile-reader.png`, fullPage: true });
   report.interactions.mobileReaderOpened = true;
