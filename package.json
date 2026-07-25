@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "hydrate": "node scripts/hydrate-ui.mjs && node scripts/patch-hydrated-ui.mjs",
+    "hydrate": "node scripts/hydrate-ui.mjs && node scripts/patch-final-ui.mjs",
     "dev": "npm run hydrate && vite",
     "build": "npm run hydrate && tsc --noEmit && vite build",
     "preview": "vite preview",
