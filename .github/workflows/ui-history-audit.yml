@@ -30,6 +30,17 @@ jobs:
           const fs = require('fs');
           const short = process.argv[2];
           const out = process.argv[3];
+
+          async function clickExact(page, text) {
+            const target = page.getByText(text, { exact: true });
+            if (await target.count()) {
+              await target.first().click({ force: true });
+              await page.waitForTimeout(500);
+              return true;
+            }
+            return false;
+          }
+
           (async () => {
             const browser = await chromium.launch({ headless: true });
             const targets = [
@@ -43,8 +54,19 @@ jobs:
               page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
               page.on('pageerror', err => errors.push(String(err)));
               await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
-              await page.screenshot({ path: `${out}/${short}-${t.name}.png`, fullPage: true });
-              fs.writeFileSync(`${out}/${short}-${t.name}.json`, JSON.stringify({ title: await page.title(), url: page.url(), errors }, null, 2));
+              await page.screenshot({ path: `${out}/${short}-${t.name}-home.png`, fullPage: true });
+
+              const settingsOpened = await clickExact(page, 'Settings');
+              if (settingsOpened) {
+                await page.screenshot({ path: `${out}/${short}-${t.name}-settings.png`, fullPage: true });
+                await clickExact(page, 'Companion');
+                const meiFound = await clickExact(page, 'Mei Mei');
+                if (meiFound) {
+                  await page.screenshot({ path: `${out}/${short}-${t.name}-meimei.png`, fullPage: true });
+                }
+              }
+
+              fs.writeFileSync(`${out}/${short}-${t.name}.json`, JSON.stringify({ title: await page.title(), url: page.url(), errors, settingsOpened }, null, 2));
               await context.close();
             }
             await browser.close();
