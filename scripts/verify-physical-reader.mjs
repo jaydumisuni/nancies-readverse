@@ -195,8 +195,12 @@ try {
   assert.ok(mobileHeightCoverage > .60);
   assert.ok(overflow <= 1, `Mobile reader overflowed by ${overflow}px`);
 
-  await mobilePage.locator(".physical-reader-stage").dispatchEvent("touchstart", { touches: [{ clientX: 330, clientY: 410 }] });
-  await mobilePage.locator(".physical-reader-stage").dispatchEvent("touchend", { changedTouches: [{ clientX: 70, clientY: 410 }] });
+  await mobilePage.locator(".physical-reader-stage").evaluate((stage) => {
+    const start = new Touch({ identifier: 1, target: stage, clientX: 330, clientY: 410, screenX: 330, screenY: 410, pageX: 330, pageY: 410, radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1 });
+    stage.dispatchEvent(new TouchEvent("touchstart", { touches: [start], targetTouches: [start], changedTouches: [start], bubbles: true, cancelable: true }));
+    const end = new Touch({ identifier: 1, target: stage, clientX: 70, clientY: 410, screenX: 70, screenY: 410, pageX: 70, pageY: 410, radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1 });
+    stage.dispatchEvent(new TouchEvent("touchend", { touches: [], targetTouches: [], changedTouches: [end], bubbles: true, cancelable: true }));
+  });
   await mobilePage.waitForTimeout(600);
   assert.equal(await mobilePage.locator(".physical-page-number").textContent(), "2");
   await mobilePage.locator(".experience-select select").selectOption("manga");
