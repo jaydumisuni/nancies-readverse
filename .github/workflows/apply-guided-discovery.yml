@@ -1,6 +1,8 @@
 name: Apply guided discovery and library flow
 
 on:
+  push:
+    branches: [implement-guided-discovery-library]
   pull_request:
     branches: [main]
 
