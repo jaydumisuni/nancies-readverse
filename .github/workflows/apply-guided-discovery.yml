@@ -3,8 +3,6 @@ name: Apply guided discovery and library flow
 on:
   push:
     branches: [implement-guided-discovery-library]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write
@@ -12,7 +10,7 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,67 +19,50 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Normalise embedded TypeScript templates
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Materialise guided discovery implementation
+        run: node scripts/run-guided-discovery-transform.mjs
+      - name: Restore strict production build command
         shell: bash
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          path = Path('scripts/implement-guided-discovery.mjs')
-          text = path.read_text()
-
-          def escape_region(start_marker: str, end_marker: str):
-              global text
-              start = text.index(start_marker)
-              opening = text.index('`', start) + 1
-              closing = text.index(end_marker, opening)
-              body = text[opening:closing]
-              body = body.replace('\\`', '__ESCAPED_TICK__').replace('\\${', '__ESCAPED_EXPR__')
-              body = body.replace('`', '\\`').replace('${', '\\${')
-              body = body.replace('__ESCAPED_TICK__', '\\`').replace('__ESCAPED_EXPR__', '\\${')
-              text = text[:opening] + body + text[closing:]
-
-          escape_region('const newAskCompanion = `', '`;\n\napp = replaceRegex(app, /  async function askCompanion')
-          escape_region('app = replaceRegex(app, /  async function resolveSource', '`, "guided source dialog");')
-          escape_region('const discoveryComponents = `', '`;\napp = replaceOnce(app, `function CompanionPanel')
-          escape_region('const discoveryWorker = `', '`;\nworker = replaceOnce(worker, `async function resolveSourceRequest')
-          escape_region('styles += `', '`;\nawait writeFile(stylePath')
-
-          old = '''app = replaceOnce(app,
-`             <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`,
-`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
-          new = '''app = replaceRegex(app,
-/\\s*<nav><button type="button" onClick=\\{onFullscreen\\}><Icon name="expand" size=\\{19\\} \\/><\\/button><\\/nav>/,
-`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
-          if old not in text:
-              raise SystemExit('fallback replacement block not found')
-          text = text.replace(old, new)
-          path.write_text(text)
-          PY
-      - name: Apply implementation
-        shell: bash
-        run: |
-          set +e
-          node scripts/implement-guided-discovery.mjs > guided-discovery-diagnostics.log 2>&1
-          STATUS=$?
-          cat guided-discovery-diagnostics.log
-          exit $STATUS
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: guided-discovery-diagnostics
-          path: guided-discovery-diagnostics.log
-          if-no-files-found: error
-      - run: npm install --no-audit --no-fund
-      - run: npm run build
-      - name: Commit implementation and remove one-time files
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.scripts.build = 'npm run verify:architecture && tsc --noEmit && vite build';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+      - name: Verify architecture
+        run: npm run verify:architecture
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Production build
+        run: npx vite build
+      - name: Verify materialised feature markers
         shell: bash
         run: |
           set -euo pipefail
-          rm scripts/implement-guided-discovery.mjs
-          rm .github/workflows/apply-guided-discovery.yml
-          rm guided-discovery-diagnostics.log
-          git config user.name "ReadVerse Engineering"
-          git config user.email "actions@users.noreply.github.com"
+          grep -q 'type DiscoveryCandidate =' src/App.tsx
+          grep -q 'function DiscoveryResultsCard' src/App.tsx
+          grep -q 'Add to Library' src/App.tsx
+          grep -q '/api/discovery/search' worker/index.ts
+          grep -q '/api/discovery/source' worker/index.ts
+          grep -q 'Guided discovery and source preparation' src/styles.css
+      - name: Remove one-time transformation machinery
+        shell: bash
+        run: |
+          rm -f scripts/implement-guided-discovery.mjs
+          rm -f scripts/run-guided-discovery-transform.mjs
+          rm -f .github/workflows/apply-guided-discovery.yml
+          rm -f .guided-discovery-action-trigger
+          rm -rf engineering-diagnostics
+          rm -f public/guided-transform.txt public/guided-architecture.txt public/guided-types.txt
+      - name: Commit completed implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ReadVerse Engineering'
+          git config user.email 'actions@users.noreply.github.com'
           git add -A
-          git commit -m "Implement guided discovery and library saving"
+          git commit -m 'Implement guided discovery and library saving'
           git push origin HEAD:implement-guided-discovery-library
