@@ -1,8 +1,0 @@
-/home/runner/work/nancies-readverse/nancies-readverse/scripts/implement-guided-discovery.mjs:216
-            text: characterise(companion, `I found it. This looks like “${source.title}”. Check the details, then tell me whether I should prepare it for reading.`),
-                                           ^
-
-SyntaxError: Unexpected identifier 'I'
-    at checkSyntax (node:internal/main/check_syntax:74:5)
-
-Node.js v22.23.1
