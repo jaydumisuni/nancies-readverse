@@ -22,12 +22,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install and build
+      - name: Install and build readable test bundle
         run: |
           npm install --no-audit --no-fund
           npm install --no-save playwright
           npx playwright install chromium
-          npm run build
+          npm run verify:architecture
+          npx tsc --noEmit
+          npx vite build --minify false --sourcemap
       - name: Run browser verification
         shell: bash
         run: |
