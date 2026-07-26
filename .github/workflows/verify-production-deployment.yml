@@ -1,0 +1,109 @@
+name: Verify exact production deployment
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-production-deployment.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build canonical ReadVerse source
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Compare production assets byte for byte
+        env:
+          PRODUCTION_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
+        run: |
+          mkdir -p production-deploy-evidence
+          python3 <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import time
+          import urllib.request
+
+          base = os.environ['PRODUCTION_URL'].rstrip('/')
+          root = pathlib.Path('dist/client')
+          local_html = (root / 'index.html').read_text()
+
+          def fetch(path):
+              separator = '&' if '?' in path else '?'
+              url = f"{base}{path}{separator}proof={int(time.time())}"
+              request = urllib.request.Request(url, headers={
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache',
+                  'User-Agent': 'ReadVerse-Production-Proof/1.0',
+              })
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  return response.read(), dict(response.headers), response.status
+
+          production_html_bytes, production_headers, status = fetch('/')
+          production_html = production_html_bytes.decode('utf-8')
+          asset_pattern = re.compile(r'["\'](/assets/[^"\']+)["\']')
+          local_assets = sorted(set(asset_pattern.findall(local_html)))
+          production_assets = sorted(set(asset_pattern.findall(production_html)))
+          if not local_assets:
+              raise SystemExit('The local build index contains no hashed assets')
+          if production_assets != local_assets:
+              raise SystemExit(f'Production index assets differ. local={local_assets} production={production_assets}')
+
+          assets = []
+          for asset in local_assets:
+              local_bytes = (root / asset.lstrip('/')).read_bytes()
+              production_bytes, headers, asset_status = fetch(asset)
+              local_sha = hashlib.sha256(local_bytes).hexdigest()
+              production_sha = hashlib.sha256(production_bytes).hexdigest()
+              if production_sha != local_sha:
+                  raise SystemExit(f'Production asset mismatch for {asset}: {production_sha} != {local_sha}')
+              assets.append({
+                  'path': asset,
+                  'bytes': len(local_bytes),
+                  'sha256': local_sha,
+                  'status': asset_status,
+                  'content_type': headers.get('Content-Type'),
+              })
+
+          health_bytes, _, health_status = fetch('/api/health')
+          health = json.loads(health_bytes)
+          if health_status != 200 or health.get('status') != 'transient-reader':
+              raise SystemExit(f'Production health marker is wrong: {health}')
+          if health.get('storage') != 'no permanent Cloudflare copies':
+              raise SystemExit(f'Production storage marker is wrong: {health}')
+
+          evidence = {
+              'status': 'passed',
+              'production_url': base,
+              'production_index_status': status,
+              'index_cache_control': production_headers.get('Cache-Control'),
+              'assets': assets,
+              'health': health,
+          }
+          pathlib.Path('production-deploy-evidence/report.json').write_text(json.dumps(evidence, indent=2))
+          pathlib.Path('production-deploy-evidence/production-index.html').write_text(production_html)
+          pathlib.Path('production-deploy-evidence/local-index.html').write_text(local_html)
+          print(json.dumps(evidence, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-production-deployment-evidence
+          path: production-deploy-evidence
+          if-no-files-found: error
