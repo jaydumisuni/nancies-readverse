@@ -1,9 +1,9 @@
-file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080336095:5
+file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080667281:5
   if (count !== 1) throw new Error(`${label}: expected one match, found ${count}`);
                          ^
 
 Error: discovery intent helpers: expected one match, found 0
-    at replaceOnce (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080336095:5:26)
-    at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080336095:779:7
+    at replaceOnce (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080667281:5:26)
+    at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/.guided-discovery-materialise.mjs?v=1785080667281:779:7
 
 Node.js v22.23.1
