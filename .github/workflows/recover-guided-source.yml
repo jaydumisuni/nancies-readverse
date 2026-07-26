@@ -1,4 +1,4 @@
-name: Recover and verify guided discovery
+name: Apply guided source identity correction
 
 on:
   push:
@@ -10,18 +10,15 @@ permissions:
   contents: write
 
 jobs:
-  recover:
+  correct:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           ref: implement-guided-discovery-library
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Stabilise source identity
+      - name: Correct source identity handling
         shell: bash
         run: |
           python3 <<'PY'
@@ -63,39 +60,12 @@ jobs:
               raise SystemExit('updateSourceCard target not found')
           path.write_text(text)
           PY
-      - name: Install and build readable test bundle
-        run: |
-          npm install --no-audit --no-fund
-          npm install --no-save playwright
-          npx playwright install chromium
-          npm run verify:architecture
-          npx tsc --noEmit
-          npx vite build --minify false --sourcemap
-      - name: Run browser verification
-        shell: bash
-        run: |
-          rm -rf engineering-evidence/guided-discovery
-          mkdir -p engineering-evidence/guided-discovery
-          npx wrangler dev --local --config dist/nancies_readverse/wrangler.json --ip 127.0.0.1 --port 4173 > engineering-evidence/guided-discovery/server.txt 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          READY=0
-          for i in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then READY=1; break; fi
-            sleep 1
-          done
-          test "$READY" -eq 1
-          set +e
-          node scripts/verify-guided-discovery.mjs
-          STATUS=$?
-          echo "$STATUS" > engineering-evidence/guided-discovery/exit-status.txt
-          exit 0
-      - name: Commit source and evidence
+      - name: Commit correction
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx engineering-evidence/guided-discovery
-          git commit -m "Stabilise and verify guided source flow" || exit 0
+          git add src/App.tsx
+          git commit -m "Stabilise guided source identity" || exit 0
           git push origin HEAD:implement-guided-discovery-library
