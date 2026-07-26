@@ -79,9 +79,9 @@ try {
   await capture(page, "desktop-book");
   pass("Desktop opens a real eight-page PDF as a two-page physical book");
 
-  await page.getByRole("button", { name: "Next page" }).click();
+  await page.locator(".physical-page-arrow.next").click();
   await page.waitForFunction(() => document.querySelector(".reader-page-counter span")?.textContent?.includes("3–4"));
-  await page.getByRole("button", { name: "Previous page" }).click();
+  await page.locator(".physical-page-arrow.previous").click();
   await page.waitForFunction(() => document.querySelector(".reader-page-counter span")?.textContent?.includes("1–2"));
   pass("Animated forward and backward page turns update the real PDF pages");
 
