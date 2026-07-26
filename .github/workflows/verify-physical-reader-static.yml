@@ -1,0 +1,42 @@
+name: Verify physical PDF reader locally
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser and PDF test tools
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save playwright@1.55.0 pdf-lib@1.17.1
+          npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start the local static and API harness
+        run: |
+          mkdir -p physical-reader-evidence
+          node scripts/reader-test-server.mjs > physical-reader-evidence/server.log 2>&1 &
+          echo $! > /tmp/readverse-reader-server.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat physical-reader-evidence/server.log
+          exit 1
+      - name: Verify every physical reader function and layout
+        run: node scripts/verify-physical-reader.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: physical-reader-evidence
+          path: physical-reader-evidence
+          if-no-files-found: error
