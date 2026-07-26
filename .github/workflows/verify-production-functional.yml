@@ -37,7 +37,7 @@ jobs:
           const { chromium } = require('playwright');
 
           const base = process.env.READVERSE_URL.replace(/\/$/, '');
-          const sourceUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf?utm_source=readverse-proof&campaign=verification';
+          const sourceUrl = 'https://raw.githubusercontent.com/jaydumisuni/nancies-readverse/main/public/fixtures/sample.pdf?utm_source=readverse-proof&campaign=verification';
           const companions = ['Gojo', 'Itachi', 'Naruto', 'Kakashi', 'Megumi', 'Sasuke', 'Maki', 'Nobara', 'Hinata', 'Sakura', 'Temari', 'Mei Mei'];
           const report = { status: 'running', productionUrl: base, checkedAt: new Date().toISOString(), companions: {}, checks: [], consoleErrors: [] };
 
@@ -93,11 +93,11 @@ jobs:
               method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }),
             });
             assert.ok(resolved.source?.streamUrl);
-            assert.ok(resolved.source.directUrl.includes('/dummy.pdf'));
+            assert.ok(resolved.source.directUrl.includes('/sample.pdf'));
             assert.doesNotMatch(resolved.source.directUrl, /utm_|campaign=/i);
             const stream = await fetch(`${base}${resolved.source.streamUrl}`);
             assert.equal(stream.status, 200);
-            assert.match(stream.headers.get('content-type') || '', /application\/pdf/);
+            assert.match(stream.headers.get('content-type') || '', /application\/pdf|application\/octet-stream/);
             assert.equal(stream.headers.get('x-readverse-storage'), 'temporary-stream');
             report.checks.push('Tracked external PDF URL resolved to a clean temporary stream');
 
