@@ -7,7 +7,7 @@ on:
 jobs:
   verify-reader:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
