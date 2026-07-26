@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/restore-video-approved-ui.yml
       - .recovery/**
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,6 +15,7 @@ permissions:
 
 jobs:
   restore-verify-clean:
+    if: github.head_ref == 'restore-video-approved-ui' || github.ref == 'refs/heads/restore-video-approved-ui'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
