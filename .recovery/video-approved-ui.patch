@@ -1,0 +1,532 @@
+--- a/src/App.tsx	2026-07-25 06:57:40.000000000 +0000
++++ b/src/App.tsx	2026-07-26 00:11:37.566074785 +0000
+@@ -9,7 +9,7 @@
+   useRef,
+   useState,
+ } from "react";
+-import { avatarImages, type AvatarId } from "./avatarData";
++import { avatarImages, type AvatarId } from "./avatars";
+ 
+ type Gender = "woman" | "man" | "nonbinary" | "prefer_not_to_say";
+ type ThemeId =
+@@ -86,6 +86,26 @@
+   updatedAt: string;
+ };
+ 
++type ReaderSource = {
++  id: string;
++  title: string;
++  url: string;
++  format: string;
++  sourceUrl?: string;
++};
++
++type ResolveSourceResponse = {
++  ok: boolean;
++  source?: {
++    sourceUrl: string;
++    title: string;
++    format: string;
++    streamUrl: string;
++    temporary: true;
++  };
++  error?: string;
++};
++
+ const themes: Theme[] = [
+   {
+     id: "pink",
+@@ -298,7 +318,7 @@
+     searchLine: "The sources are ranked, the lanes are assigned, and the slow ones know they are replaceable.",
+   },
+   {
+-    id: "meiMei",
++    id: "mei",
+     name: "Mei Mei",
+     series: "Jujutsu Kaisen",
+     gender: "female",
+@@ -536,8 +556,14 @@
+   const [searching, setSearching] = useState(false);
+   const [nudgeVisible, setNudgeVisible] = useState(true);
+   const [activeSection, setActiveSection] = useState("home");
++  const [readerSource, setReaderSource] = useState<ReaderSource | null>(null);
++  const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
++  const [sourceUrl, setSourceUrl] = useState("");
++  const [sourceResolving, setSourceResolving] = useState(false);
++  const [sourceError, setSourceError] = useState("");
+   const fileInputRef = useRef<HTMLInputElement>(null!);
+   const readerRef = useRef<HTMLDivElement>(null!);
++  const sessionFileUrls = useRef<Map<string, string>>(new Map());
+ 
+   const theme = themes.find((item) => item.id === themeId) ?? themes[0];
+   const companion =
+@@ -556,6 +582,11 @@
+     ];
+   }, [messages, companion.greeting]);
+ 
++  useEffect(() => () => {
++    for (const url of sessionFileUrls.current.values()) URL.revokeObjectURL(url);
++    sessionFileUrls.current.clear();
++  }, []);
++
+   useEffect(() => {
+     const root = document.documentElement;
+     root.style.setProperty("--accent", theme.accent);
+@@ -662,13 +693,12 @@
+         headers: { "content-type": "application/json" },
+         body: JSON.stringify({
+           question: cleanQuestion,
+-          profileName: profile.displayName || profile.name,
+-          companion: {
+-            id: companion.id,
+-            name: companion.name,
+-            traits: companion.traits,
+-            delivery: companion.delivery,
+-          },
++          companion: companion.name,
++          vibe: `${companion.traits.join(", ")}. ${companion.delivery}`,
++          history: messages.slice(-10).map((message) => ({
++            role: message.role === "companion" ? "assistant" : "user",
++            text: message.text,
++          })),
+         }),
+       });
+       const body = (await response.json()) as { answer?: string; error?: string };
+@@ -714,6 +744,8 @@
+       type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+       sizeLabel: formatFileSize(file.size),
+     };
++    const objectUrl = URL.createObjectURL(file);
++    sessionFileUrls.current.set(upload.id, objectUrl);
+ 
+     setMessages((current) => [
+       ...current,
+@@ -737,6 +769,79 @@
+     setChatOpen(true);
+   }
+ 
++  function openUploadedFile(upload: UploadItem) {
++    const url = sessionFileUrls.current.get(upload.id);
++    if (!url) {
++      setMessages((current) => [
++        ...current,
++        {
++          id: uid("expired-file"),
++          role: "companion",
++          text: characterise(companion, "That temporary file is no longer in this browser session. Attach it again and I will open it properly."),
++          time: timeNow(),
++        },
++      ]);
++      return;
++    }
++    const format = upload.name.split(".").pop()?.toLowerCase() || upload.type.toLowerCase();
++    setReaderSource({ id: upload.id, title: upload.name, url, format });
++    setReaderOpen(true);
++    setMessages((current) => [
++      ...current,
++      {
++        id: uid("read-file"),
++        role: "companion",
++        text: characterise(companion, `Opening “${upload.name}” in a temporary reading session. Nothing was copied to Cloudflare.`),
++        time: timeNow(),
++      },
++    ]);
++  }
++
++  async function resolveSource(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    const cleanUrl = sourceUrl.trim();
++    if (!cleanUrl || sourceResolving) return;
++    setSourceResolving(true);
++    setSourceError("");
++    try {
++      const response = await fetch("/api/source/resolve", {
++        method: "POST",
++        headers: { "content-type": "application/json" },
++        body: JSON.stringify({ url: cleanUrl }),
++      });
++      const body = (await response.json()) as ResolveSourceResponse;
++      if (!response.ok || !body.ok || !body.source) {
++        throw new Error(body.error || "ReadVerse could not resolve that source.");
++      }
++      const source = body.source;
++      setReaderSource({
++        id: uid("source"),
++        title: source.title,
++        url: source.streamUrl,
++        format: source.format,
++        sourceUrl: source.sourceUrl,
++      });
++      setReaderOpen(true);
++      setSourceDialogOpen(false);
++      setSourceUrl("");
++      setChatOpen(true);
++      setMessages((current) => [
++        ...current,
++        { id: uid("source-user"), role: "user", text: cleanUrl, time: timeNow() },
++        {
++          id: uid("source-reply"),
++          role: "companion",
++          text: characterise(companion, `I verified “${source.title}” and opened it temporarily. I kept the source link, not a permanent copy.`),
++          time: timeNow(),
++        },
++      ]);
++    } catch (error) {
++      setSourceError(error instanceof Error ? error.message : "ReadVerse could not resolve that source.");
++    } finally {
++      setSourceResolving(false);
++    }
++  }
++
+   function addUploadedToLibrary(upload: UploadItem) {
+     const newBook: Book = {
+       id: upload.id,
+@@ -839,7 +944,20 @@
+               className={activeSection === id ? "active" : ""}
+               key={id}
+               type="button"
+-              onClick={() => setActiveSection(id)}
++              onClick={() => {
++                setActiveSection(id);
++                if (id === "sources") {
++                  setSourceError("");
++                  setSourceDialogOpen(true);
++                } else if (id === "continue") {
++                  setReaderSource(null);
++                  setReaderOpen(true);
++                } else if (id === "notes") {
++                  setReaderSource(null);
++                  setReaderOpen(true);
++                  setNotesOpen(true);
++                }
++              }}
+             >
+               <Icon name={icon as Parameters<typeof Icon>[0]["name"]} />
+               <span>{label}</span>
+@@ -877,7 +995,7 @@
+ 
+       <main className={`main-shell ${chatOpen ? "with-chat" : ""}`}>
+         <header className="utility-bar">
+-          <div className="mobile-brand">ReadVerse</div>
++          <div className="mobile-brand"><span>Nancy’s</span><strong>READVERSE</strong></div>
+           <label className="global-search">
+             <Icon name="search" size={18} />
+             <input
+@@ -947,7 +1065,7 @@
+                 <BookCard
+                   book={book}
+                   key={book.id}
+-                  onOpen={() => setReaderOpen(true)}
++                  onOpen={() => { setReaderSource(null); setReaderOpen(true); }}
+                 />
+               ))}
+             </div>
+@@ -961,7 +1079,7 @@
+                   book={book}
+                   key={book.id}
+                   compact
+-                  onOpen={() => setReaderOpen(true)}
++                  onOpen={() => { setReaderSource(null); setReaderOpen(true); }}
+                 />
+               ))}
+             </div>
+@@ -1040,18 +1158,7 @@
+         onQuestionChange={setQuestion}
+         onAttach={() => fileInputRef.current?.click()}
+         onMood={chooseMood}
+-        onReadUpload={(upload) => {
+-          setReaderOpen(true);
+-          setMessages((current) => [
+-            ...current,
+-            {
+-              id: uid("read-file"),
+-              role: "companion",
+-              text: characterise(companion, `Opening “${upload.name}”. Try not to judge the cover before page three.`),
+-              time: timeNow(),
+-            },
+-          ]);
+-        }}
++        onReadUpload={openUploadedFile}
+         onAddUpload={addUploadedToLibrary}
+       />
+ 
+@@ -1063,6 +1170,17 @@
+         onChange={handleFileUpload}
+       />
+ 
++      {sourceDialogOpen && (
++        <SourceDialog
++          value={sourceUrl}
++          resolving={sourceResolving}
++          error={sourceError}
++          onValue={setSourceUrl}
++          onSubmit={resolveSource}
++          onClose={() => setSourceDialogOpen(false)}
++        />
++      )}
++
+       {settingsOpen && (
+         <SettingsModal
+           activeTab={settingsTab}
+@@ -1094,6 +1212,7 @@
+           page={readerPage}
+           pageTurning={pageTurning}
+           readerRef={readerRef}
++          source={readerSource}
+           onClose={() => setReaderOpen(false)}
+           onFullscreen={toggleFullscreen}
+           onNext={() => turnPage("next")}
+@@ -1143,7 +1262,7 @@
+     hinata: `${line} We can take it one page at a time.`,
+     sakura: `${line} And yes, I checked it twice.`,
+     temari: `${line} Efficient. As it should be.`,
+-    meiMei: `${line} A worthwhile use of our time.`,
++    mei: `${line} A worthwhile use of our time.`,
+   };
+   return touches[companion.id] ?? line;
+ }
+@@ -1354,6 +1473,56 @@
+   );
+ }
+ 
++function SourceDialog({
++  value,
++  resolving,
++  error,
++  onValue,
++  onSubmit,
++  onClose,
++}: {
++  value: string;
++  resolving: boolean;
++  error: string;
++  onValue: (value: string) => void;
++  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
++  onClose: () => void;
++}) {
++  return (
++    <div className="modal-backdrop source-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
++      <section className="source-dialog">
++        <header>
++          <div>
++            <span className="kicker">Temporary source</span>
++            <h2>Open a reading link</h2>
++          </div>
++          <button type="button" onClick={onClose} aria-label="Close source dialog">
++            <Icon name="close" size={21} />
++          </button>
++        </header>
++        <p>Paste a public PDF, EPUB, CBZ or TXT link, or a page containing an accessible reading file. ReadVerse verifies it before opening it and keeps no permanent Cloudflare copy.</p>
++        <form onSubmit={onSubmit}>
++          <label>
++            Source URL
++            <input
++              type="url"
++              value={value}
++              onChange={(event) => onValue(event.target.value)}
++              placeholder="https://example.com/book.pdf"
++              required
++              autoFocus
++            />
++          </label>
++          {error && <div className="source-error">{error}</div>}
++          <button className="source-submit" type="submit" disabled={resolving || !value.trim()}>
++            {resolving ? "Verifying source…" : "Verify and open"}
++          </button>
++        </form>
++      </section>
++    </div>
++  );
++}
++
+ function SettingsModal({
+   activeTab,
+   companion,
+@@ -1702,6 +1871,7 @@
+   page,
+   pageTurning,
+   readerRef,
++  source,
+   onClose,
+   onFullscreen,
+   onNext,
+@@ -1717,6 +1887,7 @@
+   page: number;
+   pageTurning: "next" | "previous" | null;
+   readerRef: React.RefObject<HTMLDivElement>;
++  source: ReaderSource | null;
+   onClose: () => void;
+   onFullscreen: () => void;
+   onNext: () => void;
+@@ -1751,8 +1922,8 @@
+             <Icon name="close" size={22} />
+           </button>
+           <div>
+-            <strong>Jujutsu Kaisen: Thorny Crown</strong>
+-            <small>Chapter 15 · Page {page}</small>
++            <strong>{source ? source.title : "Jujutsu Kaisen: Thorny Crown"}</strong>
++            <small>{source ? `Temporary ${source.format.toUpperCase()} session` : `Chapter 15 · Page ${page}`}</small>
+           </div>
+           <nav>
+             <button type="button">Aa</button>
+@@ -1764,6 +1935,22 @@
+           </nav>
+         </header>
+ 
++        {source ? (
++          <div className="document-stage">
++            <iframe className="reader-document" src={source.url} title={source.title} />
++            <a className="document-open-link" href={source.url} target="_blank" rel="noreferrer">Open in a separate tab</a>
++            {notesOpen && (
++              <aside className="floating-notepad">
++                <header>
++                  <span>✎ My Note</span>
++                  <button type="button" onClick={onCloseNotes}><Icon name="close" size={18} /></button>
++                </header>
++                <textarea value={note} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onNoteChange(event.target.value)} placeholder="Write something worth remembering…" />
++                <footer><button type="button"><b>B</b></button><button type="button"><i>I</i></button><button type="button"><u>U</u></button><span>Saved locally · Drive sync later</span></footer>
++              </aside>
++            )}
++          </div>
++        ) : (
+         <div className={`book-stage ${pageTurning ? `turn-${pageTurning}` : ""}`}>
+           <button className="page-edge previous" type="button" onClick={onPrevious}>
+             ‹
+@@ -1839,18 +2026,22 @@
+             </aside>
+           )}
+         </div>
++        )}
+ 
+         <footer className="reader-footer">
+-          <span>{page} / 240</span>
+-          <input
+-            type="range"
+-            min="1"
+-            max="240"
+-            value={page}
+-            readOnly
+-            aria-label="Reading progress"
+-          />
+-          <span>{Math.round((page / 240) * 100)}%</span>
++          {source ? (
++            <>
++              <span>Temporary session</span>
++              <div className="temporary-reader-line" />
++              <span>Not saved</span>
++            </>
++          ) : (
++            <>
++              <span>{page} / 240</span>
++              <input type="range" min="1" max="240" value={page} readOnly aria-label="Reading progress" />
++              <span>{Math.round((page / 240) * 100)}%</span>
++            </>
++          )}
+         </footer>
+       </div>
+     </div>
+--- a/src/styles.css	2026-07-25 06:57:40.000000000 +0000
++++ b/src/styles.css	2026-07-26 00:12:19.862073586 +0000
+@@ -1765,3 +1765,102 @@
+   .paper-page { padding-inline: 24px; }
+   .highlight-tools { gap: 4px; }
+ }
++
++/* Canonical video-reference functionality additions */
++.mobile-brand span,
++.mobile-brand strong { display: block; line-height: 1; }
++.mobile-brand span { font-family: Georgia, serif; font-style: italic; color: var(--accent-2); font-size: 1rem; }
++.mobile-brand strong { margin-top: 3px; color: #fff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: .46rem; letter-spacing: .17em; }
++
++.source-backdrop { z-index: 120; }
++.source-dialog {
++  width: min(620px, calc(100vw - 28px));
++  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
++  border-radius: 22px;
++  background: linear-gradient(145deg, rgba(18,14,23,.99), rgba(8,7,11,.99));
++  box-shadow: 0 32px 100px rgba(0,0,0,.72), 0 0 55px color-mix(in srgb, var(--accent-glow) 35%, transparent);
++  overflow: hidden;
++}
++.source-dialog > header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 21px 23px;
++  border-bottom: 1px solid var(--line);
++}
++.source-dialog h2 { margin: 5px 0 0; font-size: 1.55rem; }
++.source-dialog > header > button {
++  width: 42px;
++  height: 42px;
++  border: 1px solid var(--line);
++  border-radius: 13px;
++  background: rgba(255,255,255,.035);
++  display: grid;
++  place-items: center;
++}
++.source-dialog > p { margin: 0; padding: 22px 23px 5px; color: var(--muted); line-height: 1.65; }
++.source-dialog form { display: grid; gap: 15px; padding: 18px 23px 24px; }
++.source-dialog label { display: grid; gap: 8px; color: #ddd7e3; font-size: .82rem; font-weight: 650; }
++.source-dialog input {
++  width: 100%;
++  border: 1px solid var(--line);
++  border-radius: 12px;
++  background: #101018;
++  color: #fff;
++  padding: 13px 14px;
++  outline: none;
++}
++.source-dialog input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
++.source-submit {
++  min-height: 46px;
++  border: 0;
++  border-radius: 12px;
++  background: linear-gradient(135deg, var(--accent), var(--accent-2));
++  color: #fff;
++  font-weight: 750;
++  box-shadow: 0 14px 35px color-mix(in srgb, var(--accent) 22%, transparent);
++}
++.source-submit:disabled { opacity: .55; cursor: wait; }
++.source-error { border: 1px solid rgba(255,86,110,.35); border-radius: 11px; background: rgba(112,20,36,.22); color: #ffb7c2; padding: 11px 13px; font-size: .78rem; line-height: 1.45; }
++
++.document-stage {
++  position: relative;
++  min-height: 0;
++  padding: 10px;
++  overflow: hidden;
++  background: #08080d;
++}
++.reader-document {
++  width: 100%;
++  height: 100%;
++  min-height: 0;
++  border: 1px solid var(--line);
++  border-radius: 12px;
++  background: #fff;
++}
++.document-open-link {
++  position: absolute;
++  right: 22px;
++  bottom: 20px;
++  z-index: 4;
++  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
++  border-radius: 999px;
++  background: rgba(8,7,12,.88);
++  color: var(--accent-2);
++  padding: 8px 12px;
++  text-decoration: none;
++  font-size: .72rem;
++  backdrop-filter: blur(16px);
++}
++.temporary-reader-line { height: 3px; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); opacity: .75; }
++
++@media (max-width: 720px) {
++  .mobile-brand { min-width: 62px; }
++  .mobile-brand span { font-size: .82rem; }
++  .mobile-brand strong { font-size: .38rem; }
++  .source-dialog { width: 100%; min-height: 100%; border: 0; border-radius: 0; }
++  .source-dialog > p { font-size: .84rem; }
++  .document-stage { padding: 0; }
++  .reader-document { border: 0; border-radius: 0; }
++  .document-open-link { right: 12px; bottom: 12px; }
++}
