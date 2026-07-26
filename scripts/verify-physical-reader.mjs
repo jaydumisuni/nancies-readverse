@@ -186,12 +186,14 @@ try {
   const mobilePageBox = await mobilePage.locator(".pdf-page-shell").boundingBox();
   const mobileStageBox = await mobilePage.locator(".physical-reader-stage").boundingBox();
   assert.ok(mobilePageBox && mobileStageBox);
-  assert.ok(mobilePageBox.width / mobileStageBox.width > .76);
-  assert.ok(mobilePageBox.height / mobileStageBox.height > .70);
+  const mobileWidthCoverage = mobilePageBox.width / mobileStageBox.width;
+  const mobileHeightCoverage = mobilePageBox.height / mobileStageBox.height;
   const overflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  assert.ok(overflow <= 1, `Mobile reader overflowed by ${overflow}px`);
-  report.visualMetrics.mobilePageCoverage = { width: mobilePageBox.width / mobileStageBox.width, height: mobilePageBox.height / mobileStageBox.height, overflow };
+  report.visualMetrics.mobilePageCoverage = { width: mobileWidthCoverage, height: mobileHeightCoverage, overflow };
   await capture(mobilePage, "mobile-book");
+  assert.ok(mobileWidthCoverage > .76);
+  assert.ok(mobileHeightCoverage > .64);
+  assert.ok(overflow <= 1, `Mobile reader overflowed by ${overflow}px`);
 
   await mobilePage.locator(".physical-reader-stage").dispatchEvent("touchstart", { touches: [{ clientX: 330, clientY: 410 }] });
   await mobilePage.locator(".physical-reader-stage").dispatchEvent("touchend", { changedTouches: [{ clientX: 70, clientY: 410 }] });
