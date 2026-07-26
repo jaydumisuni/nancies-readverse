@@ -1,13 +1,13 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "nancies-readverse",
-  "main": "worker/index.ts",
+  "main": "worker/diagnostic-wrapper.ts",
   "compatibility_date": "2026-07-24",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/guided-branch-diagnostics/*"]
   },
   "observability": {
     "enabled": true
