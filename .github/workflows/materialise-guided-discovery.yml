@@ -69,4 +69,4 @@ jobs:
           git commit -m "Materialise guided discovery implementation" || git commit --allow-empty -m "Record guided discovery materialisation failure"
           git push origin HEAD:implement-guided-discovery-library
 
-# retrigger: 2026-07-26T17:05:00Z
+# retrigger: 2026-07-26T17:10:00Z
