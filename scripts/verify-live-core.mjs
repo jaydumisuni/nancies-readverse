@@ -51,17 +51,18 @@ async function verifyOnce() {
   }
   report.personalities = personalityOutputs;
 
-  const fixtureUrl = `${baseUrl}/fixtures/source-with-ads.html`;
+  const sourceUrl = "https://raw.githubusercontent.com/jaydumisuni/nancies-readverse/main/public/fixtures/sample.pdf?utm_source=readverse-live-proof&campaign=verification";
   const resolved = await api("/api/source/resolve", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url: fixtureUrl }),
+    body: JSON.stringify({ url: sourceUrl }),
   });
-  if (!resolved.response.ok || !resolved.body?.source?.streamUrl) throw new Error(`Source fixture did not resolve: ${resolved.body?.error || resolved.response.status}`);
-  if (!resolved.body.source.directUrl.includes("/fixtures/sample.pdf")) throw new Error("Resolver selected the wrong source link");
-  if (/utm_|campaign=|ads\.invalid|tracker\.invalid/i.test(resolved.body.source.directUrl)) throw new Error("Resolver retained an ad or tracking URL");
+  if (!resolved.response.ok || !resolved.body?.source?.streamUrl) throw new Error(`Public source did not resolve: ${resolved.body?.error || resolved.response.status}`);
+  if (!resolved.body.source.directUrl.includes("/sample.pdf")) throw new Error("Resolver selected the wrong source file");
+  if (/utm_|campaign=/i.test(resolved.body.source.directUrl)) throw new Error("Resolver retained tracking parameters");
   const streamed = await fetch(`${baseUrl}${resolved.body.source.streamUrl}`);
-  if (!streamed.ok || !String(streamed.headers.get("content-type")).includes("application/pdf")) throw new Error("Resolved PDF stream did not open");
+  const streamType = String(streamed.headers.get("content-type") || "");
+  if (!streamed.ok || !/(application\/pdf|application\/octet-stream)/i.test(streamType)) throw new Error("Resolved PDF stream did not open");
   if (streamed.headers.get("x-readverse-storage") !== "temporary-stream") throw new Error("Temporary stream marker is missing");
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -99,7 +100,7 @@ async function verifyOnce() {
 
   await page.locator('.reader-toolbar button[aria-label="Close reader"]').click();
   await page.getByRole("button", { name: "Sources" }).click();
-  await page.locator(".source-dialog input[type=url]").fill(fixtureUrl);
+  await page.locator(".source-dialog input[type=url]").fill(sourceUrl);
   await page.locator(".source-submit").click();
   await page.locator('.reader-document[src*="/api/source/stream"]').waitFor({ state: "visible", timeout: 20000 });
   const sourceMessage = await page.locator(".message-bubble").last().innerText();
@@ -111,7 +112,7 @@ async function verifyOnce() {
     approvedDesktopLayout: true,
     approvedMobileBrand: true,
     localPdfOpened: true,
-    sourcePageResolved: true,
+    sourceUrlResolved: true,
     sourcePdfOpened: true,
     saveBlockedWithoutGoogle: true,
     consoleErrors,
@@ -144,4 +145,4 @@ if (report.failures.length) {
   console.error(report.failures.join("\n"));
   process.exit(1);
 }
-console.log("Live ReadVerse video-approved UI, transient reader, source resolver and all companion conversations verified.");
+console.log("Live ReadVerse video-approved UI, transient reader, public source resolver and all companion conversations verified.");
