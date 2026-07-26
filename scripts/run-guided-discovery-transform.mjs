@@ -33,10 +33,10 @@ escapeRegion("styles += `", "`;\nawait writeFile(stylePath");
 
 const oldFallback = `app = replaceOnce(app,
 \`             <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>\`,
-\`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>\`, "fallback library button");`;
+\`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>\`, "fallback library button");`.replaceAll("${", "\\${");
 const regexFallback = `app = replaceRegex(app,
 /\\s*<nav><button type="button" onClick=\\{onFullscreen\\}><Icon name="expand" size=\\{19\\} \\/><\\/button><\\/nav>/,
-\`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>\`, "fallback library button");`;
+\`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>\`, "fallback library button");`.replaceAll("${", "\\${");
 if (!text.includes(oldFallback)) throw new Error("Fallback reader replacement block was not found");
 text = text.replace(oldFallback, regexFallback);
 
