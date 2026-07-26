@@ -1,0 +1,82 @@
+name: Restore video-approved ReadVerse UI
+
+on:
+  push:
+    branches: [restore-video-approved-ui]
+    paths:
+      - .github/workflows/restore-video-approved-ui.yml
+      - .recovery/**
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/restore-video-approved-ui.yml
+      - .recovery/**
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  restore-freeze:
+    if: github.head_ref == 'restore-video-approved-ui' || github.ref == 'refs/heads/restore-video-approved-ui'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: restore-video-approved-ui
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Recover the source that passed the video-reference visual gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/8616814116/zip" > /tmp/readverse-approved-source.zip
+          rm -rf /tmp/readverse-approved-source
+          mkdir -p /tmp/readverse-approved-source
+          unzip -q /tmp/readverse-approved-source.zip -d /tmp/readverse-approved-source
+
+          echo "aa1c2068e49b0bae19e5172124eb50f1a78fc8c109a04c78b653fd7a5cf9bf8a  /tmp/readverse-approved-source/src/App.tsx" | sha256sum -c -
+          echo "cf480399901d7e3cc266326eb6959d0e03019cfb9cae4a5c1c395f946195b543  /tmp/readverse-approved-source/src/styles.css" | sha256sum -c -
+
+          cp /tmp/readverse-approved-source/src/App.tsx src/App.tsx
+          cp /tmp/readverse-approved-source/src/styles.css src/styles.css
+          git apply .recovery/video-approved-ui.patch
+          git apply .recovery/transient-architecture.patch
+
+          python3 <<'PY'
+          from pathlib import Path
+          main = Path("src/main.tsx")
+          main.write_text(main.read_text().replace('import "./functional.css";\n', ''))
+          Path("src/functional.css").unlink(missing_ok=True)
+          PY
+
+          echo "beaba154b6b4d39e498fe3ef528f723dd709a3b30a57eca6af7bba413ad7a943  src/App.tsx" | sha256sum -c -
+          echo "c743baa8cf08a5646d1981276d92ed111f31d30a26ec6e2c62c4f63164afc764  src/styles.css" | sha256sum -c -
+          grep -q 'No copy was uploaded to Cloudflare' src/App.tsx
+          grep -q 'Google Drive is not connected yet' src/App.tsx
+          ! grep -q 'localStorage' src/App.tsx
+          ! grep -q 'Gogo' src/App.tsx
+          ! grep -q 'meiMei' src/App.tsx
+          test ! -e src/functional.css
+
+      - name: Verify architecture, types and production build
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+
+      - name: Commit only the clean canonical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ReadVerse Video Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A src
+          git commit -m "Restore the exact video-approved ReadVerse UI"
+          git push origin HEAD:restore-video-approved-ui
