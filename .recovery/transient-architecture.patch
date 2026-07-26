@@ -1,0 +1,29 @@
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -423,7 +423,7 @@
+ function useStoredState<T>(key: string, initialValue: T) {
+   const [value, setValue] = useState<T>(() => {
+     try {
+-      const saved = localStorage.getItem(key);
++      const saved = sessionStorage.getItem(key);
+       return saved ? (JSON.parse(saved) as T) : initialValue;
+     } catch {
+       return initialValue;
+@@ -431,7 +431,7 @@
+   });
+ 
+   useEffect(() => {
+-    localStorage.setItem(key, JSON.stringify(value));
++    sessionStorage.setItem(key, JSON.stringify(value));
+   }, [key, value]);
+ 
+   return [value, setValue] as const;
+@@ -791,7 +791,7 @@
+       {
+         id: uid("read-file"),
+         role: "companion",
+-        text: characterise(companion, `Opening “${upload.name}” in a temporary reading session. Nothing was copied to Cloudflare.`),
++        text: characterise(companion, `Opening “${upload.name}” in a temporary reading session. No copy was uploaded to Cloudflare. Google Drive is not connected yet, so the file remains in this browser session only.`),
+         time: timeNow(),
+       },
+     ]);
