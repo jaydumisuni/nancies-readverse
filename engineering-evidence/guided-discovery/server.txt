@@ -14,10 +14,10 @@ env.AI_MODEL ("@cf/ibm-granite/granite-4.0-h-micro")      Environment Variable  
 ⎔ Starting local server...
 [wrangler:info] ✨ Parsed 3 valid header rules.
 [wrangler:info] Ready on http://127.0.0.1:4173
-[wrangler:info] GET / 200 OK (8ms)
-[wrangler:info] GET / 200 OK (5ms)
-[wrangler:info] GET /assets/index-BNEEKZXD.js 200 OK (7ms)
-[wrangler:info] GET /assets/index-Cz_8g9XM.css 200 OK (33ms)
-[wrangler:info] POST /api/companion/help 200 OK (6ms)
-[wrangler:info] POST /api/source/resolve 200 OK (39ms)
-[wrangler:info] HEAD /api/source/stream 200 OK (38ms)
+[wrangler:info] GET / 200 OK (7ms)
+[wrangler:info] GET / 200 OK (4ms)
+[wrangler:info] GET /assets/index-BNEEKZXD.js 200 OK (6ms)
+[wrangler:info] GET /assets/index-Cz_8g9XM.css 200 OK (6ms)
+[wrangler:info] POST /api/companion/help 200 OK (4ms)
+[wrangler:info] POST /api/source/resolve 200 OK (104ms)
+[wrangler:info] HEAD /api/source/stream 200 OK (51ms)
