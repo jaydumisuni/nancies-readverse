@@ -1,0 +1,197 @@
+name: Restore video-approved ReadVerse UI
+
+on:
+  push:
+    branches: [restore-video-approved-ui]
+    paths:
+      - .github/workflows/restore-video-approved-ui.yml
+      - .recovery/**
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  restore-verify-clean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: restore-video-approved-ui
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Recover the exact hydrated source shown in the approved video
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/8616814116/zip" > /tmp/readverse-approved-source.zip
+          rm -rf /tmp/readverse-approved-source
+          mkdir -p /tmp/readverse-approved-source
+          unzip -q /tmp/readverse-approved-source.zip -d /tmp/readverse-approved-source
+
+          echo "aa1c2068e49b0bae19e5172124eb50f1a78fc8c109a04c78b653fd7a5cf9bf8a  /tmp/readverse-approved-source/src/App.tsx" | sha256sum -c -
+          echo "cf480399901d7e3cc266326eb6959d0e03019cfb9cae4a5c1c395f946195b543  /tmp/readverse-approved-source/src/styles.css" | sha256sum -c -
+
+          cp /tmp/readverse-approved-source/src/App.tsx src/App.tsx
+          cp /tmp/readverse-approved-source/src/styles.css src/styles.css
+          git apply .recovery/video-approved-ui.patch
+          git apply .recovery/transient-architecture.patch
+
+          python3 <<'PY'
+          from pathlib import Path
+          main = Path("src/main.tsx")
+          source = main.read_text()
+          source = source.replace('import "./functional.css";\n', '')
+          main.write_text(source)
+          Path("src/functional.css").unlink(missing_ok=True)
+          PY
+
+          grep -q 'Ten lanes. Two verifiers. No waiting politely in line.' src/App.tsx
+          grep -q 'Pick the colour of the world, not the companion.' src/App.tsx
+          grep -q 'Make every screen feel like the same good book.' src/App.tsx
+          grep -q 'No copy was uploaded to Cloudflare' src/App.tsx
+          grep -q 'Google Drive is not connected yet' src/App.tsx
+          grep -q 'id: "mei"' src/App.tsx
+          ! grep -q 'Gogo' src/App.tsx
+          ! grep -q 'meiMei' src/App.tsx
+          ! grep -q 'localStorage' src/App.tsx
+          test ! -e src/functional.css
+
+      - name: Build canonical source
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+
+      - name: Install visual verifier
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Verify the video layout and working reader
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/readverse-video-proof
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/readverse-video-proof/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in {1..60}; do
+            curl -fsS http://127.0.0.1:4173 >/dev/null && break
+            sleep 1
+          done
+
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const { chromium } = require('playwright');
+
+          async function assertImages(page) {
+            const broken = await page.locator('img').evaluateAll(images => images
+              .filter(image => !image.complete || image.naturalWidth < 1)
+              .map(image => image.getAttribute('src')));
+            assert.deepEqual(broken, [], `Broken images: ${broken.join(', ')}`);
+          }
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const report = { checks: [], consoleErrors: [] };
+            const desktop = await browser.newContext({ viewport: { width: 1918, height: 1016 }, deviceScaleFactor: 1 });
+            const page = await desktop.newPage();
+            page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
+            page.on('pageerror', error => report.consoleErrors.push(String(error)));
+            await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+
+            assert.equal(await page.locator('.brand-name').textContent(), 'Nancy’s');
+            assert.equal(await page.locator('.brand-word').textContent(), 'READVERSE');
+            assert.ok(await page.getByText('Ten lanes. Two verifiers. No waiting politely in line.').isVisible());
+            assert.ok(await page.locator('.companion-panel.open').isVisible());
+            await assertImages(page);
+            report.checks.push('Desktop dashboard, sidebar and fixed companion chat match the approved recording');
+            await page.screenshot({ path: '/tmp/readverse-video-proof/desktop-dashboard-chat.png', fullPage: true });
+
+            await page.locator('.utility-actions button[aria-label="Settings"]').click();
+            await page.locator('.settings-modal').waitFor({ state: 'visible' });
+            assert.equal(await page.locator('.companion-roster button').count(), 12);
+            assert.ok(await page.getByText('Six male · six female · twelve different vibes').isVisible());
+            await assertImages(page);
+            report.checks.push('Companion settings modal and twelve-character grid match the approved recording');
+            await page.screenshot({ path: '/tmp/readverse-video-proof/settings-companion.png', fullPage: false });
+
+            await page.locator('.settings-layout > nav button').filter({ hasText: 'Appearance' }).click();
+            assert.equal(await page.locator('.theme-grid button').count(), 8);
+            assert.ok(await page.getByText('Pick the colour of the world, not the companion.').isVisible());
+            report.checks.push('Eight-theme appearance panel matches the approved recording');
+            await page.screenshot({ path: '/tmp/readverse-video-proof/settings-appearance.png', fullPage: false });
+
+            await page.locator('.settings-modal > header > button').click();
+            await page.locator('.settings-modal').waitFor({ state: 'detached' });
+            const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
+            await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles({ name: 'nancy-proof.pdf', mimeType: 'application/pdf', buffer: pdf });
+            await page.getByRole('button', { name: 'Read now' }).last().click();
+            await page.locator('.reader-overlay').waitFor({ state: 'visible' });
+            const readerSource = await page.locator('.reader-document').getAttribute('src');
+            assert.ok(readerSource && readerSource.startsWith('blob:'), `Reader source was ${readerSource}`);
+            assert.ok(await page.getByText('Temporary PDF session').isVisible());
+            report.checks.push('PDF attached through chat opens as a real temporary document session');
+            await page.screenshot({ path: '/tmp/readverse-video-proof/pdf-reader.png', fullPage: false });
+
+            await page.locator('.reader-toolbar button[aria-label="Close reader"]').click();
+            await page.getByRole('button', { name: 'Sources' }).click();
+            await page.locator('.source-dialog').waitFor({ state: 'visible' });
+            assert.ok(await page.getByText('Open a reading link').isVisible());
+            report.checks.push('Sources control opens the temporary verified-link flow');
+            await page.screenshot({ path: '/tmp/readverse-video-proof/source-dialog.png', fullPage: false });
+            await desktop.close();
+
+            const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 1 });
+            const mobilePage = await mobile.newPage();
+            mobilePage.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
+            mobilePage.on('pageerror', error => report.consoleErrors.push(String(error)));
+            await mobilePage.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+            assert.equal(await mobilePage.locator('.mobile-brand span').textContent(), 'Nancy’s');
+            assert.equal(await mobilePage.locator('.mobile-brand strong').textContent(), 'READVERSE');
+            const overflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+            assert.ok(overflow <= 1, `Mobile horizontal overflow: ${overflow}px`);
+            await assertImages(mobilePage);
+            report.checks.push('Mobile branding and responsive dashboard have no horizontal overflow');
+            await mobilePage.screenshot({ path: '/tmp/readverse-video-proof/mobile-dashboard.png', fullPage: true });
+            await mobile.close();
+
+            assert.deepEqual(report.consoleErrors, [], `Console errors: ${report.consoleErrors.join('\n')}`);
+            fs.writeFileSync('/tmp/readverse-video-proof/report.json', JSON.stringify({ status: 'passed', ...report }, null, 2));
+            await browser.close();
+          })().catch(error => {
+            fs.writeFileSync('/tmp/readverse-video-proof/report.json', JSON.stringify({ status: 'failed', error: String(error), stack: error.stack }, null, 2));
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Upload visual and functional proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-approved-ui-proof
+          path: /tmp/readverse-video-proof
+          if-no-files-found: error
+
+      - name: Freeze clean canonical source
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .recovery
+          rm -f .github/workflows/restore-video-approved-ui.yml
+
+          git config user.name "ReadVerse Video Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore the exact video-approved ReadVerse UI"
+          git push origin HEAD:restore-video-approved-ui
