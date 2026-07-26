@@ -43,9 +43,9 @@ jobs:
           npm install --no-save playwright@1.55.0 2>&1 | tee -a companion-intelligence-evidence/install.log
           npx playwright install --with-deps chromium 2>&1 | tee -a companion-intelligence-evidence/install.log
           npm run build 2>&1 | tee companion-intelligence-evidence/build.log
-      - name: Start the complete local app
+      - name: Start the compiled worker and client
         run: |
-          npm run dev -- --host 127.0.0.1 --port 8787 > companion-intelligence-evidence/server.log 2>&1 &
+          node scripts/compiled-worker-test-server.mjs > companion-intelligence-evidence/server.log 2>&1 &
           echo $! > /tmp/readverse-companion-server.pid
           for i in {1..90}; do
             if curl -fsS http://127.0.0.1:8787/api/health > companion-intelligence-evidence/health.json; then exit 0; fi
@@ -91,11 +91,12 @@ jobs:
         run: |
           rm scripts/fix-companion-intelligence.mjs
           rm scripts/remove-obsolete-fallback.mjs
+          rm scripts/compiled-worker-test-server.mjs
           rm scripts/test-companion-intelligence.mjs
           rm .github/workflows/fix-companion-intelligence.yml
           git config user.name "ReadVerse Companion Recovery"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx worker/index.ts scripts/fix-companion-intelligence.mjs scripts/remove-obsolete-fallback.mjs scripts/test-companion-intelligence.mjs .github/workflows/fix-companion-intelligence.yml
+          git add src/App.tsx worker/index.ts scripts/fix-companion-intelligence.mjs scripts/remove-obsolete-fallback.mjs scripts/compiled-worker-test-server.mjs scripts/test-companion-intelligence.mjs .github/workflows/fix-companion-intelligence.yml
           git commit -m "Make the companion conversational and source-aware"
           git push origin HEAD:fix-companion-intelligence
       - name: Remove temporary launcher from main
