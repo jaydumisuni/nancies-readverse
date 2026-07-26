@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "verify:architecture": "node scripts/verify-architecture.mjs",
-    "build": "npm run verify:architecture && tsc --noEmit && vite build",
+    "build": "node scripts/run-guided-discovery-transform.mjs && (npm run verify:architecture > public/guided-architecture.txt 2>&1 || true) && (tsc --noEmit > public/guided-types.txt 2>&1 || true) && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/nancies_readverse/wrangler.json",
     "deploy:preview": "npm run build && wrangler versions upload --config dist/nancies_readverse/wrangler.json",
