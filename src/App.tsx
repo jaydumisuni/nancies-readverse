@@ -653,6 +653,68 @@ export default function App() {
     setSending(true);
 
     const lower = cleanQuestion.toLowerCase();
+    const directUrl = extractFirstHttpUrl(cleanQuestion);
+    const previousUrl = !directUrl && isSourceFollowUp(cleanQuestion)
+      ? lastSourceUrl(messages)
+      : null;
+    const sourceCandidate = directUrl ?? previousUrl;
+
+    if (sourceCandidate) {
+      setSearching(true);
+      try {
+        const response = await fetch("/api/source/resolve", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: sourceCandidate }),
+        });
+        const body = (await response.json()) as ResolveSourceResponse;
+        if (!response.ok || !body.ok || !body.source) {
+          throw new Error(body.error || "ReadVerse could not resolve that source.");
+        }
+        const source = body.source;
+        setReaderSource({
+          id: uid("source"),
+          title: source.title,
+          url: source.streamUrl,
+          format: source.format,
+          sourceUrl: source.sourceUrl,
+        });
+        setReaderOpen(true);
+        setSourceDialogOpen(false);
+        setSourceUrl("");
+        setMessages((current) => [
+          ...current,
+          {
+            id: uid("source-reply"),
+            role: "companion",
+            text: characterise(
+              companion,
+              `I tested the link, found “${source.title}”, and opened the verified ${source.format.toUpperCase()} temporarily. Nothing was saved permanently.`,
+            ),
+            time: timeNow(),
+          },
+        ]);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "ReadVerse could not resolve that source.";
+        setMessages((current) => [
+          ...current,
+          {
+            id: uid("source-blocked"),
+            role: "companion",
+            text: characterise(
+              companion,
+              `I tested the link instead of guessing. It stopped here: ${reason} I did not open or save anything.`,
+            ),
+            time: timeNow(),
+          },
+        ]);
+      } finally {
+        setSearching(false);
+        setSending(false);
+      }
+      return;
+    }
+
     if (lower.includes("open reader") || lower.includes("continue reading")) {
       setReaderOpen(true);
       setMessages((current) => [
@@ -696,7 +758,7 @@ export default function App() {
           question: cleanQuestion,
           companion: companion.name,
           vibe: `${companion.traits.join(", ")}. ${companion.delivery}`,
-          history: messages.slice(-10).map((message) => ({
+          history: messages.slice(-12).map((message) => ({
             role: message.role === "companion" ? "assistant" : "user",
             text: message.text,
           })),
@@ -721,7 +783,7 @@ export default function App() {
         {
           id: uid("reply"),
           role: "companion",
-          text: localFallback(cleanQuestion, companion),
+          text: localFallback(cleanQuestion, companion, messages),
           time: timeNow(),
         },
       ]);
@@ -1268,36 +1330,57 @@ function characterise(companion: Companion, line: string) {
   return touches[companion.id] ?? line;
 }
 
-function localFallback(question: string, companion: Companion) {
-  const value = question.toLowerCase();
-  if (value.includes("source")) {
-    return characterise(
-      companion,
-      "Paste the source here and tell me what it carries. I will inspect its search, formats and reliability before asking whether to remember it.",
-    );
+function extractFirstHttpUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/[^\s<>"']+/i);
+  return match ? match[0].replace(/[),.;!?]+$/, "") : null;
+}
+
+function lastSourceUrl(messages: ChatMessage[]): string | null {
+  for (const message of [...messages].reverse()) {
+    const url = extractFirstHttpUrl(message.text);
+    if (url) return url;
+  }
+  return null;
+}
+
+function isSourceFollowUp(value: string) {
+  return /^(?:ok(?:ay)?[,.!]?\s*)?(?:let me have it|lemme have it|open it|test it|try it|check it|read it|go ahead|proceed|yes|do it)[.!?]*$/i.test(value.trim());
+}
+
+function localFallback(question: string, companion: Companion, history: ChatMessage[] = []) {
+  const value = question.trim().toLowerCase();
+  if (/^(hi|hey|hello|yo|sup|good morning|good afternoon|good evening)[.!?]*$/.test(value)) {
+    return characterise(companion, "Hey. I am here. Talk to me normally or drop a reading link and I will test it.");
+  }
+  if (/how are you|you good|what's up|whats up/.test(value)) {
+    return characterise(companion, "I am good—and paying attention. What is on your mind?");
+  }
+  if (/^(thanks|thank you|nice|cool|great|perfect)[.!?]*$/.test(value)) {
+    return characterise(companion, "You are welcome. Keep going.");
+  }
+  if (/what can you do|help me|capable/.test(value)) {
+    return characterise(companion, "I can hold a normal conversation, test a public reading link, explain the exact blocker when one fails, open verified files, search your reading options and control the reader.");
+  }
+  if (extractFirstHttpUrl(question)) {
+    return characterise(companion, "I found the link. I will test the actual source and either open the verified reading file or tell you the exact point where it failed.");
+  }
+  if (value.includes("source") || value.includes("link") || value.includes("url")) {
+    return characterise(companion, "Paste the link directly into chat. I will inspect redirects and public file candidates, then open a verified reading file or report the exact blocker.");
   }
   if (value.includes("save") || value.includes("drive")) {
-    return characterise(
-      companion,
-      "Read Now stays temporary. Add to Library keeps the record and progress. Save to Drive will keep the full file after Google is connected.",
-    );
+    return characterise(companion, "Read Now stays temporary. Add to Library keeps the record and progress. Save to Drive will keep the full file after Google is connected.");
   }
   if (value.includes("pdf") || value.includes("upload")) {
-    return characterise(
-      companion,
-      "Tap the paperclip and attach the PDF. I will show Read Now, Add to Library, Keep Offline and Save to Drive as separate choices.",
-    );
+    return characterise(companion, "Attach the file or paste its public link. I will test it first, then open it in the reader.");
   }
   if (value.includes("theme") || value.includes("colour") || value.includes("color")) {
-    return characterise(
-      companion,
-      "Theme colour and companion ring colour are separate. Settings lets you change either without forcing the other to follow.",
-    );
+    return characterise(companion, "Theme colour and companion ring colour are separate. Settings lets you change either without forcing the other to follow.");
   }
-  return characterise(
-    companion,
-    "I can help you search, open a reading file, manage sources, change the reader or explain what each save option does.",
-  );
+  const previous = [...history].reverse().find((message) => message.role === "user" && message.text.trim());
+  if (previous) {
+    return characterise(companion, "I am following the conversation. Say what you want me to do next, and I will act on the last clear request instead of resetting to a generic help line.");
+  }
+  return characterise(companion, "I am listening. Talk to me normally, ask about a book, or paste a source for me to test.");
 }
 
 function ProfileAvatar({ profile }: { profile: Profile }) {
