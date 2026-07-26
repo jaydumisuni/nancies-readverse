@@ -22,9 +22,24 @@ jobs:
       - name: Install the reader into the approved UI
         run: node scripts/install-physical-reader.mjs
       - name: Verify the production build
+        id: build
+        continue-on-error: true
+        shell: bash
         run: |
-          npm install --no-audit --no-fund
-          npm run build
+          set -o pipefail
+          npm install --no-audit --no-fund 2>&1 | tee install.log
+          npm run build 2>&1 | tee build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: physical-reader-build-diagnostics
+          path: |
+            install.log
+            build.log
+          if-no-files-found: warn
+      - name: Stop when the build is not clean
+        if: steps.build.outcome != 'success'
+        run: exit 1
       - name: Commit the canonical reader and remove one-time installer
         run: |
           rm scripts/install-physical-reader.mjs
