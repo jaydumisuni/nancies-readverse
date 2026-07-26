@@ -126,11 +126,11 @@ try {
   await page.locator(".reader-side-panel header button").click();
   pass("Ribbon bookmarks can be added, listed and revisited");
 
-  await page.getByRole("button", { name: /Notes/ }).click();
+  await page.locator(".reader-tools button").filter({ hasText: "Notes" }).click();
   const noteBox = page.locator(".document-note textarea");
   await noteBox.fill("The paper feeling makes the real page easier to remember.");
   await page.locator(".reader-side-panel header button").click();
-  await page.getByRole("button", { name: /Notes/ }).click();
+  await page.locator(".reader-tools button").filter({ hasText: "Notes" }).click();
   assert.equal(await noteBox.inputValue(), "The paper feeling makes the real page easier to remember.");
   await page.locator(".reader-side-panel header button").click();
   pass("Document notes remain attached to the current reading session");

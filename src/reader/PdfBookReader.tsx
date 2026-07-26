@@ -530,7 +530,7 @@ function PdfPage({
         span.style.height = `${fontHeight * 1.18}px`;
         textLayer.appendChild(span);
       }
-    })().catch(() => undefined);
+    })().catch((error) => { console.error(`ReadVerse PDF page ${pageNumber} render failed`, error); });
     return () => {
       cancelled = true;
       renderTask?.cancel();
@@ -629,7 +629,7 @@ function Thumbnail({ pdf, pageNumber, active, onOpen }: { pdf: PDFDocumentProxy;
       canvas.height = Math.ceil(viewport.height);
       task = page.render({ canvas, viewport, background: "#ffffff" });
       await task.promise;
-    })().catch(() => undefined);
+    })().catch((error) => { console.error(`ReadVerse PDF thumbnail ${pageNumber} render failed`, error); });
     return () => { cancelled = true; task?.cancel(); };
   }, [pageNumber, pdf]);
   return <button type="button" className={`pdf-thumbnail ${active ? "active" : ""}`} onClick={onOpen}><canvas ref={canvasRef} /><span>Page {pageNumber}</span></button>;
