@@ -110,14 +110,14 @@ jobs:
             page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
             page.on('pageerror', error => report.consoleErrors.push(String(error)));
             await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle', timeout: 90000 });
+            await page.screenshot({ path: '/tmp/readverse-video-proof/desktop-dashboard-chat.png', fullPage: true });
 
-            assert.equal(await page.locator('.brand-name').textContent(), 'Nancy’s');
-            assert.equal(await page.locator('.brand-word').textContent(), 'READVERSE');
+            assert.equal(await page.locator('.brand span').textContent(), "Nancy's");
+            assert.equal(await page.locator('.brand strong').textContent(), 'ReadVerse');
             assert.ok(await page.getByText('Ten lanes. Two verifiers. No waiting politely in line.').isVisible());
             assert.ok(await page.locator('.companion-panel.open').isVisible());
             await assertImages(page);
             report.checks.push('Desktop dashboard, sidebar and fixed companion chat match the approved recording');
-            await page.screenshot({ path: '/tmp/readverse-video-proof/desktop-dashboard-chat.png', fullPage: true });
 
             await page.locator('.utility-actions button[aria-label="Settings"]').click();
             await page.locator('.settings-modal').waitFor({ state: 'visible' });
