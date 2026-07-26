@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 
+// Validation retry after switching to the compiled worker harness.
 const path = "worker/index.ts";
 let source = await readFile(path, "utf8");
 const start = source.indexOf("const fallbackVoices: Record<string, (question: string) => string> = {");
