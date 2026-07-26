@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -15,51 +15,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: implement-guided-discovery-library
-          fetch-depth: 0
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Prepare guided discovery patch
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          path = Path('scripts/implement-guided-discovery.mjs')
-          text = path.read_text()
-
-          def escape_region(start_marker: str, end_marker: str):
-              global text
-              start = text.index(start_marker)
-              opening = text.index('`', start) + 1
-              closing = text.index(end_marker, opening)
-              body = text[opening:closing]
-              body = body.replace('\\`', '__ESCAPED_TICK__').replace('\\${', '__ESCAPED_EXPR__')
-              body = body.replace('`', '\\`').replace('${', '\\${')
-              body = body.replace('__ESCAPED_TICK__', '\\`').replace('__ESCAPED_EXPR__', '\\${')
-              text = text[:opening] + body + text[closing:]
-
-          escape_region('const newAskCompanion = `', '`;\n\napp = replaceRegex(app, /  async function askCompanion')
-          escape_region('app = replaceRegex(app, /  async function resolveSource', '`, "guided source dialog");')
-          escape_region('const discoveryComponents = `', '`;\napp = replaceOnce(app, `function CompanionPanel')
-          escape_region('const discoveryWorker = `', '`;\nworker = replaceOnce(worker, `async function resolveSourceRequest')
-          escape_region('styles += `', '`;\nawait writeFile(stylePath')
-
-          old = '''app = replaceOnce(app,
-`             <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`,
-`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
-          new = '''app = replaceRegex(app,
-/\\s*<nav><button type="button" onClick=\\{onFullscreen\\}><Icon name="expand" size=\\{19\\} \\/><\\/button><\\/nav>/,
-`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
-          if old not in text:
-              raise SystemExit('fallback replacement block not found')
-          path.write_text(text.replace(old, new))
-          PY
-          node scripts/implement-guided-discovery.mjs
 
       - name: Install dependencies
         run: npm install
@@ -68,20 +28,6 @@ jobs:
         run: |
           set -o pipefail
           npm run build 2>&1 | tee build.log
-
-      - name: Commit verified implementation
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-          git checkout origin/main -- .github/workflows/ci.yml
-          rm -f scripts/implement-guided-discovery.mjs
-          rm -f .github/workflows/apply-guided-discovery.yml
-          git config user.name "ReadVerse Engineering"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A
-          git commit -m "Implement guided discovery and library saving"
-          git push origin HEAD:implement-guided-discovery-library
 
       - name: Upload build diagnostics
         if: always()
@@ -99,20 +45,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install dependencies
         run: npm install
+
       - name: Install Chromium
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
+
       - name: Verify live video-approved UI, transient reader, source resolver and all companions
         run: node scripts/verify-live-core.mjs
         env:
           READVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
+
       - name: Upload live evidence
         if: always()
         uses: actions/upload-artifact@v4
