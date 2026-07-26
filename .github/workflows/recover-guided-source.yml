@@ -1,4 +1,4 @@
-name: Recover guided discovery source
+name: Verify recovered guided discovery
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  recover:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,58 +21,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Stabilise source identity
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          path = Path('src/App.tsx')
-          text = path.read_text()
-          old = '''    return body.source;
-  }
-'''
-          new = '''    return {
-      ...body.source,
-      id: body.source.id || `source-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    };
-  }
-'''
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif 'id: body.source.id || `source-' not in text:
-              raise SystemExit('resolveSourceCandidate return target not found')
-          old = '''  function updateSourceCard(sourceId: string, updater: (card: SourceCard) => SourceCard) {
-    setMessages((current) => current.map((message) => message.sourceCard?.source.id === sourceId
-      ? { ...message, sourceCard: updater(message.sourceCard) }
-      : message));
-  }
-'''
-          new = '''  function updateSourceCard(sourceId: string, updater: (card: SourceCard) => SourceCard) {
-    if (!sourceId) return;
-    setMessages((current) => current.map((message) => {
-      const card = message.sourceCard;
-      return card?.source?.id === sourceId
-        ? { ...message, sourceCard: updater(card) }
-        : message;
-    }));
-  }
-'''
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif 'const card = message.sourceCard;' not in text:
-              raise SystemExit('updateSourceCard target not found')
-          path.write_text(text)
-          PY
-      - name: Strict build
+      - name: Install and build readable test bundle
         run: |
           npm install --no-audit --no-fund
-          npm run build
-      - name: Commit recovered source
+          npm install --no-save playwright
+          npx playwright install chromium
+          npm run verify:architecture
+          npx tsc --noEmit
+          npx vite build --minify false --sourcemap
+      - name: Run browser verification
+        shell: bash
+        run: |
+          rm -rf engineering-evidence/guided-discovery
+          mkdir -p engineering-evidence/guided-discovery
+          npx wrangler dev --local --config dist/nancies_readverse/wrangler.json --ip 127.0.0.1 --port 4173 > engineering-evidence/guided-discovery/server.txt 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          READY=0
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+          set +e
+          node scripts/verify-guided-discovery.mjs
+          STATUS=$?
+          echo "$STATUS" > engineering-evidence/guided-discovery/exit-status.txt
+          exit 0
+      - name: Commit verification evidence
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx
-          git commit -m "Stabilise guided source identity" || exit 0
+          git add engineering-evidence/guided-discovery
+          git commit -m "Record recovered guided discovery evidence" || exit 0
           git push origin HEAD:implement-guided-discovery-library
