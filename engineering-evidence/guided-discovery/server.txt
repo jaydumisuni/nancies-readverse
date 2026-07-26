@@ -1,16 +1,23 @@
 
-> nancies-readverse@1.1.0 dev
-> vite --host 127.0.0.1 --port 4173
+ ⛅️ wrangler 4.114.0
+────────────────────
+Your Worker has access to the following bindings:
+Binding                                                   Resource                  Mode
+env.AI                                                    AI                        not supported
+env.ASSETS                                                Assets                    local
+env.APP_NAME ("Nancy's ReadVerse")                        Environment Variable      local
+env.AI_MODEL ("@cf/ibm-granite/granite-4.0-h-micro")      Environment Variable      local
 
-⎔ Establishing remote connection...
-[31merror when starting dev server:
-Error: Failed to start the remote proxy session. Error reloading remote server: In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN environment variable for wrangler to work. Please go to https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ for instructions on how to create an api token, and assign its value to CLOUDFLARE_API_TOKEN.
-    at startRemoteProxySession (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/@cloudflare/vite-plugin/dist/index.mjs:81458:10)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-    at async maybeStartOrUpdateRemoteProxySession (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/@cloudflare/vite-plugin/dist/index.mjs:81528:68)
-    at async file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/@cloudflare/vite-plugin/dist/index.mjs:84359:80
-    at async Promise.all (index 0)
-    at async getDevMiniflareOptions (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/@cloudflare/vite-plugin/dist/index.mjs:84356:70)
-    at async BasicMinimalPluginContext.configureServer (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/@cloudflare/vite-plugin/dist/index.mjs:84790:27)
-    at async _createServer (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/vite/dist/node/chunks/config.js:25682:86)
-    at async CAC.<anonymous> (file:///home/runner/work/nancies-readverse/nancies-readverse/node_modules/vite/dist/node/cli.js:572:18)[39m
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Starting local server...
+[wrangler:info] ✨ Parsed 3 valid header rules.
+[wrangler:info] Ready on http://127.0.0.1:4173
+[wrangler:info] GET / 200 OK (9ms)
+[wrangler:info] GET / 200 OK (5ms)
+[wrangler:info] GET /assets/index-BNEEKZXD.js 200 OK (4ms)
+[wrangler:info] GET /assets/index-Cz_8g9XM.css 200 OK (39ms)
+[wrangler:info] POST /api/companion/help 200 OK (10ms)
+[wrangler:info] POST /api/source/resolve 200 OK (67ms)
+[wrangler:info] HEAD /api/source/stream 200 OK (37ms)
