@@ -1,4 +1,4 @@
 install=0
 architecture=0
-types=2
+types=0
 vite=0

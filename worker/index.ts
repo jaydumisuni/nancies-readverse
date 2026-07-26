@@ -408,7 +408,7 @@ function sourceFormatRank(format: string): number {
 }
 function stringValue(value: unknown): string | undefined {
   if (typeof value === "string" && value.trim()) return value.trim();
-  if (Array.isArray(value)) return value.find((item): item is string => typeof item === "string" && item.trim())?.trim();
+  if (Array.isArray(value)) return value.find((item): item is string => typeof item === "string" && Boolean(item.trim()))?.trim();
   return undefined;
 }
 function formatBytes(bytes: number): string {

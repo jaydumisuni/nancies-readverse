@@ -5,7 +5,7 @@ rendering chunks...
 [2mdist/nancies_readverse/[22m[32m.vite/manifest.json  [39m[1m[2m 0.16 kB[22m[1m[22m
 [2mdist/nancies_readverse/[22m[32mwrangler.json        [39m[1m[2m 1.54 kB[22m[1m[22m
 [2mdist/nancies_readverse/[22m[36mindex.js             [39m[1m[2m34.09 kB[22m[1m[22m
-[32m✓ built in 145ms[39m
+[32m✓ built in 132ms[39m
 [36mvite v7.3.6 [32mbuilding client environment for production...[36m[39m
 transforming...
 [32m✓[39m 38 modules transformed.
@@ -21,4 +21,4 @@ computing gzip size...
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 2.38s[39m
+[32m✓ built in 2.27s[39m

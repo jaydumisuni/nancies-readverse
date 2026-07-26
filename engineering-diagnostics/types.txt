@@ -1,2 +1,0 @@
-worker/index.ts(411,73): error TS2322: Type 'string | false' is not assignable to type 'boolean'.
-  Type 'string' is not assignable to type 'boolean'.
