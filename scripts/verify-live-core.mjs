@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 
-const baseUrl = (process.env.READVERSE_URL || "https://nancyreadverse.1ink.online/").replace(/\/$/, "");
+const baseUrl = (process.env.READVERSE_URL || "https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/").replace(/\/$/, "");
 const outDir = "live-evidence";
 await mkdir(outDir, { recursive: true });
 
@@ -41,7 +41,7 @@ async function verifyOnce() {
         companion,
         history: [
           { role: "user", text: firstQuestion },
-          { role: "companion", text: first.body.answer },
+          { role: "assistant", text: first.body.answer },
         ],
       }),
     });
@@ -66,41 +66,56 @@ async function verifyOnce() {
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await mobile.goto(baseUrl, { waitUntil: "networkidle", timeout: 60000 });
-  const brand = mobile.locator('.mobile-brand[aria-label="Nancy\'s ReadVerse"]');
+  const brand = mobile.locator(".mobile-brand");
   await brand.waitFor({ state: "visible", timeout: 10000 });
+  if ((await brand.locator("span").textContent()) !== "Nancy’s") throw new Error("Mobile Nancy’s wordmark is missing");
+  if ((await brand.locator("strong").textContent()) !== "READVERSE") throw new Error("Mobile READVERSE wordmark is missing");
   const nancySize = Number.parseFloat(await brand.locator("span").evaluate((el) => getComputedStyle(el).fontSize));
   const readverseSize = Number.parseFloat(await brand.locator("strong").evaluate((el) => getComputedStyle(el).fontSize));
   if (!(readverseSize < nancySize * 0.6)) throw new Error("Mobile READVERSE wordmark is not smaller than Nancy’s");
+  const mobileOverflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (mobileOverflow > 1) throw new Error(`Mobile layout overflows horizontally by ${mobileOverflow}px`);
   await mobile.screenshot({ path: `${outDir}/mobile-home.png`, fullPage: true });
   await mobile.close();
 
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1918, height: 1016 } });
   const consoleErrors = [];
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 60000 });
 
+  if ((await page.locator(".brand span").textContent()) !== "Nancy's") throw new Error("Desktop Nancy’s wordmark is missing");
+  if (!(await page.locator(".companion-panel.open").isVisible())) throw new Error("Desktop companion chat did not open in the approved layout");
+
   const pdf = await readFile("public/fixtures/sample.pdf");
-  await page.locator('input[type="file"]').setInputFiles({ name: "nancy-local-test.pdf", mimeType: "application/pdf", buffer: pdf });
-  await page.locator('.reader-document iframe[src^="blob:"]').waitFor({ state: "visible", timeout: 10000 });
-  const localStatus = await page.getByRole("status").innerText();
-  if (!localStatus.includes("No copy was uploaded to Cloudflare")) throw new Error("Local PDF did not confirm transient handling");
+  await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles({ name: "nancy-local-test.pdf", mimeType: "application/pdf", buffer: pdf });
+  await page.getByRole("button", { name: "Read now" }).last().click();
+  await page.locator('.reader-document[src^="blob:"]').waitFor({ state: "visible", timeout: 10000 });
+  const localMessage = await page.locator(".message-bubble").last().innerText();
+  if (!localMessage.includes("No copy was uploaded to Cloudflare") || !localMessage.includes("Google Drive is not connected yet")) {
+    throw new Error("Local PDF did not confirm transient handling and blocked Google saving");
+  }
   await page.screenshot({ path: `${outDir}/desktop-local-pdf.png`, fullPage: true });
 
-  await page.getByRole("button", { name: /Session/ }).click();
-  await page.locator('.url-import input[type="url"]').fill(fixtureUrl);
-  await page.locator('.url-import button[type="submit"]').click();
-  await page.locator('.reader-document iframe[src^="/api/source/stream"]').waitFor({ state: "visible", timeout: 20000 });
-  const sourceStatus = await page.getByRole("status").innerText();
-  if (!sourceStatus.includes("temporary stream")) throw new Error("Source URL did not open as a temporary stream");
+  await page.locator('.reader-toolbar button[aria-label="Close reader"]').click();
+  await page.getByRole("button", { name: "Sources" }).click();
+  await page.locator(".source-dialog input[type=url]").fill(fixtureUrl);
+  await page.locator(".source-submit").click();
+  await page.locator('.reader-document[src*="/api/source/stream"]').waitFor({ state: "visible", timeout: 20000 });
+  const sourceMessage = await page.locator(".message-bubble").last().innerText();
+  if (!sourceMessage.includes("opened it temporarily") || !sourceMessage.includes("not a permanent copy")) throw new Error("Source URL did not confirm temporary verified opening");
   await page.screenshot({ path: `${outDir}/desktop-source-pdf.png`, fullPage: true });
 
-  await page.getByRole("button", { name: "Save file" }).click();
-  const saveStatus = await page.getByRole("status").innerText();
-  if (!saveStatus.includes("Google Drive is not connected yet") || !saveStatus.includes("was not saved")) throw new Error("Save file falsely claimed success without Google");
-
   if (consoleErrors.length) throw new Error(`Browser console errors: ${consoleErrors.join(" | ")}`);
-  report.browser = { localPdfOpened: true, sourcePageResolved: true, sourcePdfOpened: true, saveBlockedWithoutGoogle: true, consoleErrors };
+  report.browser = {
+    approvedDesktopLayout: true,
+    approvedMobileBrand: true,
+    localPdfOpened: true,
+    sourcePageResolved: true,
+    sourcePdfOpened: true,
+    saveBlockedWithoutGoogle: true,
+    consoleErrors,
+  };
   await page.close();
 }
 
@@ -129,4 +144,4 @@ if (report.failures.length) {
   console.error(report.failures.join("\n"));
   process.exit(1);
 }
-console.log("Live ReadVerse core, transient file handling, source resolution and all companion conversations verified.");
+console.log("Live ReadVerse video-approved UI, transient reader, source resolver and all companion conversations verified.");
