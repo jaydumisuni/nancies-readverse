@@ -40,21 +40,6 @@ const personalityGuides: Record<string, string> = {
   "Mei Mei": "elegant, composed, observant, calculating, efficient, subtly mischievous and careful with time",
 };
 
-const fallbackVoices: Record<string, (question: string) => string> = {
-  Gojo: (q) => `Easy. ${readingAnswer(q)} Try to look impressed; I put effort into making that look effortless.`,
-  Itachi: (q) => `${readingAnswer(q)} Move carefully, verify the source, and keep only what you deliberately choose.`,
-  Naruto: (q) => `${readingAnswer(q)} We’ll get it open. One clean step at a time—no giving up halfway.`,
-  Kakashi: (q) => `${readingAnswer(q)} Surprisingly responsible, I know.`,
-  Megumi: (q) => `${readingAnswer(q)} It is the least noisy path, which is usually the right one.`,
-  Sasuke: (q) => `${readingAnswer(q)} Use the direct path. Ignore the distractions.`,
-  Maki: (q) => `${readingAnswer(q)} No fake success messages. It works or it does not.`,
-  Nobara: (q) => `${readingAnswer(q)} Clean, useful, and no ugly ad circus. Correct priorities.`,
-  Hinata: (q) => `${readingAnswer(q)} Nothing is saved unless you choose it, so you stay in control.`,
-  Sakura: (q) => `${readingAnswer(q)} Check the file type and source first. We are not feeding broken files to the reader.`,
-  Temari: (q) => `${readingAnswer(q)} Efficient: resolve, verify, stream, then save only on command.`,
-  "Mei Mei": (q) => `${readingAnswer(q)} Temporary access first; permanent storage only when it is worth the cost.`,
-};
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -89,7 +74,9 @@ async function handleCompanion(request: Request, env: Env, ctx: ExecutionContext
 
   const history = normalizeHistory(body.history);
   const personality = personalityGuides[companion] ?? personalityGuides.Gojo;
-  const fallback = (fallbackVoices[companion] ?? fallbackVoices.Gojo)(question);
+  const deterministic = quickConversation(question, companion, history);
+  if (deterministic) return json({ ok: true, answer: deterministic, mode: "conversation-router", companion });
+  const fallback = conversationalFallback(question, companion, history);
 
   try {
     const result = await env.AI.run(env.AI_MODEL as keyof AiModels, {
@@ -100,15 +87,17 @@ async function handleCompanion(request: Request, env: Env, ctx: ExecutionContext
             `You are the ${companion}-inspired reading companion selected in Nancy's ReadVerse. ` +
             `Use only broad personality traits: ${personality}. ${customVibe}. ` +
             "Maintain the same voice across the whole conversation. Do not claim to be the canonical copyrighted character, quote catchphrases, or reproduce copyrighted dialogue. " +
-            "Be concise, useful, spoiler-aware and honest. Never claim that a file opened, a source resolved, a setting saved, or a Google action completed unless the client supplied a confirmed result. " +
+            "Hold a normal human conversation first. Reply naturally to greetings, jokes, acknowledgements and follow-up messages. Use the recent conversation to resolve words like it, that, yes and go ahead. Do not reset to a generic product description. " +
+            "When the user supplies a source URL, the client tests it; do not pretend you tested it yourself. Never claim that a file opened, a source resolved, a setting saved, or a Google action completed unless the client supplied a confirmed result. " +
             "ReadVerse keeps fetched files temporary. Permanent files, settings, notes and progress belong in the user's Google account only after explicit consent. " +
-            "Do not suggest bypassing DRM, paywalls, authentication, CAPTCHAs or access controls. Ad and tracker removal is allowed only for content the user is permitted to access.",
+            "Do not provide instructions to defeat DRM, paywalls, authentication, CAPTCHAs or access controls. Only mention this restriction when it is actually relevant; never inject it into greetings or ordinary conversation. " +
+            "Be concise, useful, spoiler-aware, context-aware and honest. Avoid repeating the same sentence structure or signature line in consecutive replies.",
         },
         ...history,
         { role: "user", content: question },
       ],
-      max_tokens: 280,
-      temperature: 0.72,
+      max_tokens: 360,
+      temperature: 0.78,
     });
     return json({ ok: true, answer: extractText(result) || fallback, mode: "workers-ai", companion });
   } catch (error) {
@@ -216,7 +205,7 @@ async function resolveSource(source: URL): Promise<ResolvedSource> {
   const html = (await response.text()).slice(0, 2 * 1024 * 1024);
   const candidates = extractFileCandidates(html, finalUrl);
   if (!candidates.length) {
-    throw new Error("No accessible PDF, EPUB, CBZ or TXT file was found. Protected, login-only, DRM, CAPTCHA and paywalled sources are not bypassed.");
+    throw new Error("No public PDF, EPUB, CBZ or TXT file was exposed by that page. It may require a login, a browser challenge, or a download action the server cannot verify.");
   }
 
   for (const candidate of candidates.slice(0, 20)) {
@@ -329,12 +318,67 @@ function normalizeHistory(value: unknown): Array<{ role: "user" | "assistant"; c
   return result;
 }
 
-function readingAnswer(question: string): string {
+function companionFlourish(companion: string, line: string): string {
+  const endings: Record<string, string> = {
+    Gojo: " I was paying attention. Try not to look too surprised.",
+    Itachi: " Quietly. Properly.",
+    Naruto: " We have this.",
+    Kakashi: " Efficient enough to be suspicious.",
+    Megumi: " No unnecessary noise.",
+    Sasuke: " That is the direct answer.",
+    Maki: " Simple.",
+    Nobara: " Standards maintained.",
+    Hinata: " We can take it one step at a time.",
+    Sakura: " Clear and checked.",
+    Temari: " Efficient, as it should be.",
+    "Mei Mei": " Worth the time.",
+  };
+  return line + (endings[companion] ?? "");
+}
+
+function quickConversation(
+  question: string,
+  companion: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): string | null {
+  const value = question.trim().toLowerCase();
+  if (/^(hi|hey|hello|yo|sup|good morning|good afternoon|good evening)[.!?]*$/.test(value)) {
+    return companionFlourish(companion, "Hey. I am here. How are you, and what are we doing today?");
+  }
+  if (/how are you|you good|what(?:'s| is) up/.test(value)) {
+    return companionFlourish(companion, "I am good. More importantly, I am following the conversation. What is on your mind?");
+  }
+  if (/^(thanks|thank you|nice|cool|great|perfect)[.!?]*$/.test(value)) {
+    return companionFlourish(companion, "You are welcome. Keep going.");
+  }
+  if (/what can you do|what are you capable of/.test(value)) {
+    return companionFlourish(companion, "I can chat normally, help choose what to read, inspect a public source through ReadVerse, explain exact failures, and control the reading workflow.");
+  }
+  if (/^(yes|yeah|yep|okay|ok|go ahead|continue|do it)[.!?]*$/.test(value) && history.length) {
+    return companionFlourish(companion, "I have the context. The client will carry out the last clear action; if it needs a link or file, I will ask for only that missing piece.");
+  }
+  return null;
+}
+
+function conversationalFallback(
+  question: string,
+  companion: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): string {
   const value = question.toLowerCase();
-  if (/upload|file|pdf|epub|cbz/.test(value)) return "Open the file temporarily in this session first. It is not copied to Cloudflare; saving requires an explicit Google Drive action.";
-  if (/link|source|url|ad/.test(value)) return "Paste the source link. ReadVerse can remove tracking parameters, ignore ad links, follow safe redirects and verify an accessible reading file without bypassing protected access.";
-  if (/save|drive|setting|note|progress/.test(value)) return "Personal data belongs in the user's Google account. Until Google is connected, the current session must not pretend it saved permanently.";
-  return "Tell me what you are trying to read, and I will help choose the cleanest temporary route without claiming anything was saved.";
+  if (/upload|file|pdf|epub|cbz/.test(value)) {
+    return companionFlourish(companion, "Attach the file or paste its public link. ReadVerse will test it before opening it temporarily.");
+  }
+  if (/link|source|url|ad/.test(value)) {
+    return companionFlourish(companion, "Paste the link directly. ReadVerse will inspect public redirects and file candidates, then open a verified file or report the exact blocker.");
+  }
+  if (/save|drive|setting|note|progress/.test(value)) {
+    return companionFlourish(companion, "Temporary reading works now. Permanent saving waits for an explicit Google action, so the app will not pretend it saved anything.");
+  }
+  if (history.length) {
+    return companionFlourish(companion, "I am following. Tell me the next action in plain words and I will keep the current context instead of starting over.");
+  }
+  return companionFlourish(companion, "Talk to me normally. Ask about a book, tell me what mood you want, or paste a source for ReadVerse to test.");
 }
 
 function detectFormat(contentType: string, filename: string): string | null {
