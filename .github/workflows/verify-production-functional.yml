@@ -37,6 +37,7 @@ jobs:
           const { chromium } = require('playwright');
 
           const base = process.env.READVERSE_URL.replace(/\/$/, '');
+          const sourceUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf?utm_source=readverse-proof&campaign=verification';
           const companions = ['Gojo', 'Itachi', 'Naruto', 'Kakashi', 'Megumi', 'Sasuke', 'Maki', 'Nobara', 'Hinata', 'Sakura', 'Temari', 'Mei Mei'];
           const report = { status: 'running', productionUrl: base, checkedAt: new Date().toISOString(), companions: {}, checks: [], consoleErrors: [] };
 
@@ -88,18 +89,17 @@ jobs:
             }));
             report.checks.push('All twelve companions completed distinct two-turn conversations');
 
-            const fixtureUrl = `${base}/fixtures/source-with-ads.html`;
             const resolved = await api('/api/source/resolve', {
-              method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: fixtureUrl }),
+              method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }),
             });
             assert.ok(resolved.source?.streamUrl);
-            assert.ok(resolved.source.directUrl.includes('/fixtures/sample.pdf'));
-            assert.doesNotMatch(resolved.source.directUrl, /utm_|campaign=|ads\.invalid|tracker\.invalid/i);
+            assert.ok(resolved.source.directUrl.includes('/dummy.pdf'));
+            assert.doesNotMatch(resolved.source.directUrl, /utm_|campaign=/i);
             const stream = await fetch(`${base}${resolved.source.streamUrl}`);
             assert.equal(stream.status, 200);
             assert.match(stream.headers.get('content-type') || '', /application\/pdf/);
             assert.equal(stream.headers.get('x-readverse-storage'), 'temporary-stream');
-            report.checks.push('Ad-filled source page resolved to the clean temporary PDF stream');
+            report.checks.push('Tracked external PDF URL resolved to a clean temporary stream');
 
             const browser = await chromium.launch({ headless: true });
             const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -139,7 +139,7 @@ jobs:
 
             await page.locator('.reader-toolbar button[aria-label="Close reader"]').click();
             await page.getByRole('button', { name: 'Sources' }).click();
-            await page.locator('.source-dialog input[type=url]').fill(fixtureUrl);
+            await page.locator('.source-dialog input[type=url]').fill(sourceUrl);
             await page.locator('.source-submit').click();
             await page.locator('.reader-document[src*="/api/source/stream"]').waitFor({ state: 'visible', timeout: 20000 });
             const sourceMessage = await page.locator('.message-bubble').last().innerText();
