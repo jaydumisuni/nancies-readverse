@@ -43,6 +43,16 @@ jobs:
           escape_region('const discoveryComponents = `', '`;\napp = replaceOnce(app, `function CompanionPanel')
           escape_region('const discoveryWorker = `', '`;\nworker = replaceOnce(worker, `async function resolveSourceRequest')
           escape_region('styles += `', '`;\nawait writeFile(stylePath')
+
+          old = '''app = replaceOnce(app,
+`             <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`,
+`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
+          new = '''app = replaceRegex(app,
+/\\s*<nav><button type="button" onClick=\\{onFullscreen\\}><Icon name="expand" size=\\{19\\} \\/><\\/button><\\/nav>/,
+`             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>`, "fallback library button");'''
+          if old not in text:
+              raise SystemExit('fallback replacement block not found')
+          text = text.replace(old, new)
           path.write_text(text)
           PY
       - name: Apply implementation
