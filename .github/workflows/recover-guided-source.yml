@@ -1,0 +1,78 @@
+name: Recover guided discovery source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/recover-guided-source.yml
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: implement-guided-discovery-library
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Stabilise source identity
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('src/App.tsx')
+          text = path.read_text()
+          old = '''    return body.source;
+  }
+'''
+          new = '''    return {
+      ...body.source,
+      id: body.source.id || `source-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+  }
+'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'id: body.source.id || `source-' not in text:
+              raise SystemExit('resolveSourceCandidate return target not found')
+          old = '''  function updateSourceCard(sourceId: string, updater: (card: SourceCard) => SourceCard) {
+    setMessages((current) => current.map((message) => message.sourceCard?.source.id === sourceId
+      ? { ...message, sourceCard: updater(message.sourceCard) }
+      : message));
+  }
+'''
+          new = '''  function updateSourceCard(sourceId: string, updater: (card: SourceCard) => SourceCard) {
+    if (!sourceId) return;
+    setMessages((current) => current.map((message) => {
+      const card = message.sourceCard;
+      return card?.source?.id === sourceId
+        ? { ...message, sourceCard: updater(card) }
+        : message;
+    }));
+  }
+'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'const card = message.sourceCard;' not in text:
+              raise SystemExit('updateSourceCard target not found')
+          path.write_text(text)
+          PY
+      - name: Strict build
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit recovered source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ReadVerse Engineering"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "Stabilise guided source identity" || exit 0
+          git push origin HEAD:implement-guided-discovery-library
