@@ -104,6 +104,10 @@ reader = reader.replaceAll(
   'page.render({ canvasContext: context, viewport:',
   'page.render({ canvas, canvasContext: context, viewport:',
 );
+reader = reader.replaceAll(
+  'page.render({ canvasContext: context, viewport })',
+  'page.render({ canvas, canvasContext: context, viewport })',
+);
 await writeFile(readerPath, reader, "utf8");
 
 console.log("Installed the physical PDF reader without changing the dashboard layout.");
