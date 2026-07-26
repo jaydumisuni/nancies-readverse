@@ -1,0 +1,35 @@
+name: Fix physical reader bookmarks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/fix-reader-bookmarks.mjs
+      - run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit the canonical controls and remove patch files
+        run: |
+          rm scripts/fix-reader-bookmarks.mjs
+          rm .github/workflows/fix-reader-bookmarks.yml
+          rm -f package-lock.json
+          git config user.name "ReadVerse Reader Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Make physical reader bookmarks useful"
+          git push origin HEAD:${{ github.head_ref }}
