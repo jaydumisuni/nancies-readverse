@@ -1,11 +1,8 @@
 name: Apply guided discovery and library flow
 
 on:
-  push:
-    branches: [implement-guided-discovery-library]
-    paths:
-      - scripts/implement-guided-discovery.mjs
-      - .github/workflows/apply-guided-discovery.yml
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
