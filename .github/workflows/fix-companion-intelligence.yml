@@ -1,0 +1,96 @@
+name: Fix companion intelligence
+
+on:
+  push:
+    branches: [fix-companion-intelligence]
+    paths:
+      - scripts/fix-companion-intelligence.mjs
+      - scripts/test-companion-intelligence.mjs
+      - .github/workflows/fix-companion-intelligence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-companion-intelligence
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install context-aware routing
+        run: |
+          node scripts/fix-companion-intelligence.mjs
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = 'src/App.tsx';
+          let source = await readFile(path, 'utf8');
+          source = source.replace('let me have it|open it', 'let me have it|lemme have it|open it');
+          await writeFile(path, source, 'utf8');
+          NODE
+      - name: Install and build
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          npm run build
+      - name: Start the complete local app
+        run: |
+          mkdir -p companion-intelligence-evidence
+          npm run dev -- --host 127.0.0.1 --port 8787 > companion-intelligence-evidence/server.log 2>&1 &
+          echo $! > /tmp/readverse-companion-server.pid
+          for i in {1..90}; do
+            if curl -fsS http://127.0.0.1:8787/api/health > companion-intelligence-evidence/health.json; then exit 0; fi
+            sleep 1
+          done
+          cat companion-intelligence-evidence/server.log
+          exit 1
+      - name: Verify deterministic conversation and real source resolution
+        run: |
+          curl -fsS -X POST http://127.0.0.1:8787/api/companion/help \
+            -H 'content-type: application/json' \
+            --data '{"question":"hi","companion":"Gojo","history":[]}' \
+            > companion-intelligence-evidence/greeting.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const body = JSON.parse(await readFile('companion-intelligence-evidence/greeting.json', 'utf8'));
+          assert.equal(body.ok, true);
+          assert.equal(body.mode, 'conversation-router');
+          assert.match(body.answer, /Hey\. I am here\./);
+          NODE
+          curl -fsS -X POST http://127.0.0.1:8787/api/source/resolve \
+            -H 'content-type: application/json' \
+            --data '{"url":"https://richandpoordads.org/"}' \
+            > companion-intelligence-evidence/source-resolution.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const body = JSON.parse(await readFile('companion-intelligence-evidence/source-resolution.json', 'utf8'));
+          assert.equal(body.ok, true);
+          assert.equal(body.source?.format, 'pdf');
+          assert.match(body.source?.streamUrl || '', /api\/source\/stream/);
+          NODE
+      - name: Exercise normal chat URL routing and follow-up context
+        run: READVERSE_TEST_URL=http://127.0.0.1:8787 node scripts/test-companion-intelligence.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: companion-intelligence-evidence
+          path: companion-intelligence-evidence
+          if-no-files-found: error
+      - name: Commit canonical fix and remove temporary machinery
+        run: |
+          rm scripts/fix-companion-intelligence.mjs
+          rm scripts/test-companion-intelligence.mjs
+          rm .github/workflows/fix-companion-intelligence.yml
+          git config user.name "ReadVerse Companion Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx worker/index.ts scripts/fix-companion-intelligence.mjs scripts/test-companion-intelligence.mjs .github/workflows/fix-companion-intelligence.yml
+          git commit -m "Make the companion conversational and source-aware"
+          git push origin HEAD:fix-companion-intelligence
