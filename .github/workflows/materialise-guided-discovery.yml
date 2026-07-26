@@ -71,3 +71,5 @@ jobs:
           git add src/App.tsx src/reader/PdfBookReader.tsx src/styles.css worker/index.ts engineering-diagnostics
           git commit -m "Materialise guided discovery implementation" || git commit --allow-empty -m "Record guided discovery materialisation failure"
           git push origin HEAD:implement-guided-discovery-library
+
+# retrigger: 2026-07-26T16:50:00Z
