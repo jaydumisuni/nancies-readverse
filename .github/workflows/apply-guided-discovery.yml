@@ -19,6 +19,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Normalise embedded TypeScript templates
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('scripts/implement-guided-discovery.mjs')
+          text = path.read_text()
+
+          def escape_region(start_marker: str, end_marker: str):
+              global text
+              start = text.index(start_marker)
+              opening = text.index('`', start) + 1
+              closing = text.index(end_marker, opening)
+              body = text[opening:closing]
+              body = body.replace('\\`', '__ESCAPED_TICK__').replace('\\${', '__ESCAPED_EXPR__')
+              body = body.replace('`', '\\`').replace('${', '\\${')
+              body = body.replace('__ESCAPED_TICK__', '\\`').replace('__ESCAPED_EXPR__', '\\${')
+              text = text[:opening] + body + text[closing:]
+
+          escape_region('const newAskCompanion = `', '`;\n\napp = replaceRegex(app, /  async function askCompanion')
+          escape_region('app = replaceRegex(app, /  async function resolveSource', '`, "guided source dialog");')
+          escape_region('const discoveryComponents = `', '`;\napp = replaceOnce(app, `function CompanionPanel')
+          escape_region('const discoveryWorker = `', '`;\nworker = replaceOnce(worker, `async function resolveSourceRequest')
+          escape_region('styles += `', '`;\nawait writeFile(stylePath')
+          path.write_text(text)
+          PY
       - name: Apply implementation
         shell: bash
         run: |
