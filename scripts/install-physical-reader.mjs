@@ -93,4 +93,17 @@ const replacement = `function ReaderModal({
 
 source = source.slice(0, start) + replacement;
 await writeFile(path, source, "utf8");
+
+const readerPath = "src/reader/PdfBookReader.tsx";
+let reader = await readFile(readerPath, "utf8");
+reader = reader.replace(
+  '        if (cancelled) {\n          await document.destroy();\n          return;\n        }',
+  '        if (cancelled) return;',
+);
+reader = reader.replaceAll(
+  'page.render({ canvasContext: context, viewport:',
+  'page.render({ canvas, canvasContext: context, viewport:',
+);
+await writeFile(readerPath, reader, "utf8");
+
 console.log("Installed the physical PDF reader without changing the dashboard layout.");
