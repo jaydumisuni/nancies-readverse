@@ -1,4 +1,4 @@
-name: Materialise guided discovery implementation
+name: Verify guided discovery implementation
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  materialise:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -21,43 +21,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Materialise source
-        id: materialise
+      - name: Strict verification
+        id: verify
         continue-on-error: true
         shell: bash
         run: |
           mkdir -p engineering-diagnostics
           set +e
-          node scripts/run-guided-discovery-transform.mjs > engineering-diagnostics/transform.log 2>&1
-          STATUS=$?
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          printf 'transform_exit=%s\n' "$STATUS" > engineering-diagnostics/workflow-status.txt
-          cat engineering-diagnostics/transform.log
-          exit "$STATUS"
-      - name: Strict build
-        id: build
-        if: steps.materialise.outputs.status == '0'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          npm install --no-audit --no-fund > engineering-diagnostics/install.log 2>&1
+          npm install --no-audit --no-fund > engineering-diagnostics/install.txt 2>&1
           INSTALL=$?
-          npm run verify:architecture > engineering-diagnostics/architecture.log 2>&1
+          npm run verify:architecture > engineering-diagnostics/architecture.txt 2>&1
           ARCH=$?
-          npx tsc --noEmit > engineering-diagnostics/types.log 2>&1
+          npx tsc --noEmit > engineering-diagnostics/types.txt 2>&1
           TYPES=$?
-          npx vite build > engineering-diagnostics/vite.log 2>&1
+          npx vite build > engineering-diagnostics/vite.txt 2>&1
           VITE=$?
           printf 'install=%s\narchitecture=%s\ntypes=%s\nvite=%s\n' "$INSTALL" "$ARCH" "$TYPES" "$VITE" > engineering-diagnostics/build-status.txt
+          cat engineering-diagnostics/types.txt
           test "$INSTALL" -eq 0 -a "$ARCH" -eq 0 -a "$TYPES" -eq 0 -a "$VITE" -eq 0
-      - name: Commit materialised source or diagnostics
+      - name: Commit diagnostics
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx src/reader/PdfBookReader.tsx src/styles.css worker/index.ts engineering-diagnostics
-          git commit -m "Materialise guided discovery implementation" || exit 0
+          git add engineering-diagnostics
+          git commit -m "Record guided discovery verification" || exit 0
           git push origin HEAD:implement-guided-discovery-library
