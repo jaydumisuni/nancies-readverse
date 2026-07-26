@@ -1,0 +1,35 @@
+name: Finalize physical PDF reader
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/finalize-physical-reader.mjs
+      - name: Build the canonical reader
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit canonical source and remove finalizer
+        run: |
+          rm scripts/finalize-physical-reader.mjs
+          rm .github/workflows/finalize-physical-reader.yml
+          git config user.name "ReadVerse Reader Recovery"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx src/reader/PdfBookReader.tsx src/reader/pdf-book-reader.css scripts/finalize-physical-reader.mjs .github/workflows/finalize-physical-reader.yml
+          git commit -m "Finalize the physical PDF reader"
+          git push origin HEAD:${{ github.head_ref }}
