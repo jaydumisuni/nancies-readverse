@@ -26,6 +26,7 @@ jobs:
       - name: Install context-aware routing
         run: |
           node scripts/fix-companion-intelligence.mjs
+          node scripts/remove-obsolete-fallback.mjs
           node --input-type=module <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
           const path = 'src/App.tsx';
@@ -34,14 +35,16 @@ jobs:
           await writeFile(path, source, 'utf8');
           NODE
       - name: Install and build
-        run: |
-          npm install --no-audit --no-fund
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
-          npm run build
-      - name: Start the complete local app
+        shell: bash
         run: |
           mkdir -p companion-intelligence-evidence
+          set -o pipefail
+          npm install --no-audit --no-fund 2>&1 | tee companion-intelligence-evidence/install.log
+          npm install --no-save playwright@1.55.0 2>&1 | tee -a companion-intelligence-evidence/install.log
+          npx playwright install --with-deps chromium 2>&1 | tee -a companion-intelligence-evidence/install.log
+          npm run build 2>&1 | tee companion-intelligence-evidence/build.log
+      - name: Start the complete local app
+        run: |
           npm run dev -- --host 127.0.0.1 --port 8787 > companion-intelligence-evidence/server.log 2>&1 &
           echo $! > /tmp/readverse-companion-server.pid
           for i in {1..90}; do
@@ -87,11 +90,12 @@ jobs:
       - name: Commit canonical fix to review branch
         run: |
           rm scripts/fix-companion-intelligence.mjs
+          rm scripts/remove-obsolete-fallback.mjs
           rm scripts/test-companion-intelligence.mjs
           rm .github/workflows/fix-companion-intelligence.yml
           git config user.name "ReadVerse Companion Recovery"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx worker/index.ts scripts/fix-companion-intelligence.mjs scripts/test-companion-intelligence.mjs .github/workflows/fix-companion-intelligence.yml
+          git add src/App.tsx worker/index.ts scripts/fix-companion-intelligence.mjs scripts/remove-obsolete-fallback.mjs scripts/test-companion-intelligence.mjs .github/workflows/fix-companion-intelligence.yml
           git commit -m "Make the companion conversational and source-aware"
           git push origin HEAD:fix-companion-intelligence
       - name: Remove temporary launcher from main
