@@ -266,3 +266,5 @@
   .reader-tools button { width: 20%; }
   .experience-select select { width: 64px; }
 }
+
+.bookmark-current { width: 100%; min-height: 38px; border: 1px solid color-mix(in srgb, var(--accent) 38%, rgba(255,255,255,.08)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, rgba(255,255,255,.025)); color: #f7edf2; font-size: .62rem; }

@@ -343,11 +343,18 @@ export default function PdfBookReader({
               {panel === "thumbnails" && pdf && Array.from({ length: pdf.numPages }, (_, index) => (
                 <Thumbnail key={index + 1} pdf={pdf} pageNumber={index + 1} active={visiblePages.includes(index + 1)} onOpen={() => goToPage(index + 1)} />
               ))}
-              {panel === "bookmarks" && (bookmarks.length ? bookmarks.map((item) => (
-                <button type="button" className="outline-item" key={item.page} onClick={() => goToPage(item.page)}>
-                  <b>Ribbon bookmark</b><span>Page {item.page}</span>
-                </button>
-              )) : <p className="empty-panel">Place a ribbon bookmark on a page and it will appear here.</p>)}
+              {panel === "bookmarks" && (
+                <>
+                  <button type="button" className="bookmark-current" onClick={toggleBookmark}>
+                    {bookmarked ? "Remove ribbon from this page" : "Add ribbon to this page"}
+                  </button>
+                  {bookmarks.length ? bookmarks.map((item) => (
+                    <button type="button" className="outline-item" key={item.page} onClick={() => goToPage(item.page)}>
+                      <b>Ribbon bookmark</b><span>Page {item.page}</span>
+                    </button>
+                  )) : <p className="empty-panel">Place a ribbon bookmark on a page and it will appear here.</p>}
+                </>
+              )}
               {panel === "highlights" && (
                 <>
                   {highlights.length ? highlights.map((item) => (
@@ -431,7 +438,7 @@ export default function PdfBookReader({
         <div className="reader-tools">
           <button type="button" className={panel === "contents" ? "active" : ""} onClick={() => setPanel(panel === "contents" ? null : "contents")}><span>☷</span>Contents</button>
           <button type="button" className={panel === "thumbnails" ? "active" : ""} onClick={() => setPanel(panel === "thumbnails" ? null : "thumbnails")}><span>▦</span>Thumbnails</button>
-          <button type="button" className={bookmarked ? "active" : ""} onClick={toggleBookmark}><span>♧</span>Bookmark</button>
+          <button type="button" className={panel === "bookmarks" || bookmarked ? "active" : ""} onClick={() => setPanel(panel === "bookmarks" ? null : "bookmarks")}><span>♧</span>Bookmark</button>
           <button type="button" className={panel === "highlights" ? "active" : ""} onClick={() => setPanel(panel === "highlights" ? null : "highlights")}><span>✎</span>Highlights</button>
           <button type="button" className={panel === "notes" ? "active" : ""} onClick={() => setPanel(panel === "notes" ? null : "notes")}><span>▤</span>Notes</button>
           <button type="button" className={areaMode ? "active" : ""} onClick={() => setAreaMode((current) => !current)}><span>▱</span>Area marker</button>
