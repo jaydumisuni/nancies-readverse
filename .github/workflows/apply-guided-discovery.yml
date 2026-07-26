@@ -21,6 +21,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Correct worker predicate typing
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('worker/index.ts')
+          text = path.read_text()
+          old = 'typeof item === "string" && item.trim()'
+          new = 'typeof item === "string" && Boolean(item.trim())'
+          if old not in text:
+              raise SystemExit('worker predicate target not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Strict verification
         id: verify
         continue-on-error: true
@@ -39,13 +52,13 @@ jobs:
           printf 'install=%s\narchitecture=%s\ntypes=%s\nvite=%s\n' "$INSTALL" "$ARCH" "$TYPES" "$VITE" > engineering-diagnostics/build-status.txt
           cat engineering-diagnostics/types.txt
           test "$INSTALL" -eq 0 -a "$ARCH" -eq 0 -a "$TYPES" -eq 0 -a "$VITE" -eq 0
-      - name: Commit diagnostics
+      - name: Commit correction and diagnostics
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
-          git add engineering-diagnostics
-          git commit -m "Record guided discovery verification" || exit 0
+          git add worker/index.ts engineering-diagnostics
+          git commit -m "Fix guided discovery worker typing" || exit 0
           git push origin HEAD:implement-guided-discovery-library
