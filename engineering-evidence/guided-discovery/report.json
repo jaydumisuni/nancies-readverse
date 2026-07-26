@@ -1,0 +1,36 @@
+{
+  "passed": [
+    "dashboard geometry unchanged",
+    "open companion chat",
+    "normal greeting remains conversational",
+    "direct source is verified before opening"
+  ],
+  "failed": [
+    {
+      "name": "source preparation shows real stages and waits for open",
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('.source-result-card.status-ready') to be visible\n"
+    },
+    {
+      "name": "prepared source opens physical reader",
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Open and read' }).last()\n"
+    },
+    {
+      "name": "memory description returns candidate choices",
+      "error": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('.chat-input input')\n"
+    },
+    {
+      "name": "wrong result asks for a distinguishing clue",
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Not this one' }).first()\n"
+    },
+    {
+      "name": "failed source explains why and offers next action",
+      "error": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('.chat-input input')\n"
+    }
+  ],
+  "consoleErrors": [
+    "Cannot read properties of undefined (reading 'format')"
+  ],
+  "debug": {
+    "sourceFound": "PDF\ndummy\nw3.org\nVerified\nFormat\nPDF\nSize\n13 KB\nStorage\nTemporary until you save it\nPrepare to read\nNot the right one"
+  }
+}
