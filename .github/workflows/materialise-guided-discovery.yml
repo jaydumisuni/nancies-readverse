@@ -21,16 +21,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run source materialisation
+      - name: Run source materialisation with persistent diagnostics
         id: transform
         continue-on-error: true
         shell: bash
         run: |
           set +e
-          node scripts/run-guided-discovery-transform.mjs > /tmp/materialise.log 2>&1
+          mkdir -p engineering-diagnostics
+          node --check scripts/run-guided-discovery-transform.mjs > engineering-diagnostics/nodecheck-run.log 2>&1
+          echo "run_check=$?" > engineering-diagnostics/check-status.txt
+          node --check scripts/implement-guided-discovery.mjs > engineering-diagnostics/nodecheck-implement.log 2>&1
+          echo "implement_check=$?" >> engineering-diagnostics/check-status.txt
+          node scripts/run-guided-discovery-transform.mjs > engineering-diagnostics/materialise.log 2>&1
           STATUS=$?
-          echo "exit_code=$STATUS" >> "$GITHUB_OUTPUT"
-          cat /tmp/materialise.log
+          echo "transform_exit=$STATUS" >> engineering-diagnostics/check-status.txt
+          cat engineering-diagnostics/nodecheck-run.log || true
+          cat engineering-diagnostics/nodecheck-implement.log || true
+          cat engineering-diagnostics/materialise.log || true
           exit $STATUS
       - name: Run strict build
         id: build
@@ -39,19 +46,15 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm install --no-audit --no-fund > /tmp/install.log 2>&1
+          npm install --no-audit --no-fund > engineering-diagnostics/install.log 2>&1
           INSTALL_STATUS=$?
-          npm run verify:architecture > /tmp/architecture.log 2>&1
+          npm run verify:architecture > engineering-diagnostics/architecture.log 2>&1
           ARCH_STATUS=$?
-          npx tsc --noEmit > /tmp/types.log 2>&1
+          npx tsc --noEmit > engineering-diagnostics/types.log 2>&1
           TYPE_STATUS=$?
-          npx vite build > /tmp/vite.log 2>&1
+          npx vite build > engineering-diagnostics/vite.log 2>&1
           VITE_STATUS=$?
-          printf 'install=%s\narchitecture=%s\ntypes=%s\nvite=%s\n' "$INSTALL_STATUS" "$ARCH_STATUS" "$TYPE_STATUS" "$VITE_STATUS" > /tmp/build-status.txt
-          cat /tmp/build-status.txt
-          cat /tmp/architecture.log || true
-          cat /tmp/types.log || true
-          cat /tmp/vite.log || true
+          printf 'install=%s\narchitecture=%s\ntypes=%s\nvite=%s\n' "$INSTALL_STATUS" "$ARCH_STATUS" "$TYPE_STATUS" "$VITE_STATUS" > engineering-diagnostics/build-status.txt
           test "$INSTALL_STATUS" -eq 0 -a "$ARCH_STATUS" -eq 0 -a "$TYPE_STATUS" -eq 0 -a "$VITE_STATUS" -eq 0
       - name: Commit result to implementation branch
         if: always()
@@ -59,12 +62,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p engineering-diagnostics
-          cp /tmp/materialise.log engineering-diagnostics/materialise.log 2>/dev/null || true
-          cp /tmp/install.log engineering-diagnostics/install.log 2>/dev/null || true
-          cp /tmp/architecture.log engineering-diagnostics/architecture.log 2>/dev/null || true
-          cp /tmp/types.log engineering-diagnostics/types.log 2>/dev/null || true
-          cp /tmp/vite.log engineering-diagnostics/vite.log 2>/dev/null || true
-          cp /tmp/build-status.txt engineering-diagnostics/build-status.txt 2>/dev/null || true
           printf 'workflow_ran=true\ntransform=%s\nbuild=%s\n' '${{ steps.transform.outcome }}' '${{ steps.build.outcome }}' > engineering-diagnostics/workflow-status.txt
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
@@ -72,4 +69,4 @@ jobs:
           git commit -m "Materialise guided discovery implementation" || git commit --allow-empty -m "Record guided discovery materialisation failure"
           git push origin HEAD:implement-guided-discovery-library
 
-# retrigger: 2026-07-26T16:50:00Z
+# retrigger: 2026-07-26T17:00:00Z
