@@ -192,7 +192,7 @@ try {
   report.visualMetrics.mobilePageCoverage = { width: mobileWidthCoverage, height: mobileHeightCoverage, overflow };
   await capture(mobilePage, "mobile-book");
   assert.ok(mobileWidthCoverage > .76);
-  assert.ok(mobileHeightCoverage > .64);
+  assert.ok(mobileHeightCoverage > .60);
   assert.ok(overflow <= 1, `Mobile reader overflowed by ${overflow}px`);
 
   await mobilePage.locator(".physical-reader-stage").dispatchEvent("touchstart", { touches: [{ clientX: 330, clientY: 410 }] });

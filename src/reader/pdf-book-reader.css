@@ -241,9 +241,9 @@
   .experience-comic .physical-book,
   .experience-manga .physical-book,
   .experience-magazine .physical-book,
-  .experience-document .physical-book { width: calc(100% - 24px); height: calc(100% - 18px); }
-  .book-cover-back { inset: 1.5% 1%; border-radius: 12px; }
-  .page-stack { width: 3%; top: 3%; bottom: 3%; }
+  .experience-document .physical-book { width: calc(100% - 16px); height: auto; min-height: 0; padding-block: 8px; }
+  .book-cover-back { inset: -3px -5px; border-radius: 12px; }
+  .page-stack { width: 3%; top: 1px; bottom: 1px; }
   .pdf-page-shell { max-width: 100%; max-height: calc(100vh - 154px); }
   .book-gutter { display: none; }
   .physical-page-arrow { width: 34px; height: 66px; font-size: 1.5rem; opacity: .7; }
