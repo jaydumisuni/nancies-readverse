@@ -8,8 +8,13 @@ const results = { passed: [], failed: [], consoleErrors: [], debug: {} };
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
-page.on("console", message => { if (message.type() === "error") results.consoleErrors.push(message.text()); });
-page.on("pageerror", error => results.consoleErrors.push(error.message));
+page.on("console", message => {
+  if (message.type() === "error") {
+    const location = message.location();
+    results.consoleErrors.push(`${message.text()} @ ${location.url || "unknown"}:${location.lineNumber ?? "?"}:${location.columnNumber ?? "?"}`);
+  }
+});
+page.on("pageerror", error => results.consoleErrors.push(error.stack || error.message));
 
 async function check(name, task) {
   try {
