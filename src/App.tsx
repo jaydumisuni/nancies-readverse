@@ -1868,6 +1868,7 @@ function SettingsModal({
 function ReaderModal({
   fullscreen,
   note,
+  readerRef,
   source,
   onClose,
   onFullscreen,
@@ -1921,6 +1922,7 @@ function ReaderModal({
       title={activeSource.title}
       format={activeSource.format}
       fullscreen={fullscreen}
+      readerRef={readerRef}
       note={note}
       onClose={onClose}
       onFullscreen={onFullscreen}

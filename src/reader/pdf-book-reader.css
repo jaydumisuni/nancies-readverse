@@ -176,8 +176,8 @@
 .physical-page-arrow { position: absolute; z-index: 18; top: 50%; width: 46px; height: 86px; transform: translateY(-50%); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: rgba(9,7,10,.66); color: white; font: 300 2rem/1 Georgia, serif; backdrop-filter: blur(12px); box-shadow: 0 16px 35px rgba(0,0,0,.3); }
 .physical-page-arrow.previous { left: 18px; }
 .physical-page-arrow.next { right: 18px; }
-.pdf-reader[data-direction="rtl"] .physical-page-arrow.previous { right: 18px; left: auto; }
-.pdf-reader[data-direction="rtl"] .physical-page-arrow.next { left: 18px; right: auto; }
+.physical-reader-stage[data-direction="rtl"] .physical-page-arrow.previous { right: 18px; left: auto; }
+.physical-reader-stage[data-direction="rtl"] .physical-page-arrow.next { left: 18px; right: auto; }
 
 .experience-comic .physical-book,
 .experience-manga .physical-book { width: min(780px, calc(100% - 130px)); }

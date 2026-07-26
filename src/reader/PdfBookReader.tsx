@@ -30,6 +30,7 @@ type Props = {
   title: string;
   format: string;
   fullscreen: boolean;
+  readerRef: React.RefObject<HTMLDivElement>;
   note: string;
   onClose: () => void;
   onFullscreen: () => void;
@@ -83,12 +84,12 @@ export default function PdfBookReader({
   title,
   format,
   fullscreen,
+  readerRef,
   note,
   onClose,
   onFullscreen,
   onNoteChange,
 }: Props) {
-  const stageRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,6 +111,7 @@ export default function PdfBookReader({
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{ page: number; preview: string }>>([]);
   const [outline, setOutline] = useState<Array<{ title: string; page: number }>>([]);
+  const touchStart = useRef<number | null>(null);
 
   const experience = requestedExperience === "auto" ? detectedExperience : requestedExperience;
   const rtl = experience === "manga";
@@ -132,10 +134,7 @@ export default function PdfBookReader({
     const task = getDocument({ url: sourceUrl, cMapPacked: true, useWorkerFetch: true });
     task.promise
       .then(async (document) => {
-        if (cancelled) {
-          await document.destroy();
-          return;
-        }
+        if (cancelled) return;
         setPdf(document);
         setPage((current) => clamp(current, 1, document.numPages));
         const sampleCount = Math.min(document.numPages, 3);
@@ -285,7 +284,7 @@ export default function PdfBookReader({
   const titleText = normaliseTitle(title) || "Untitled PDF";
 
   return (
-    <div className={`pdf-reader experience-${experience} ${fullscreen ? "is-fullscreen" : ""}`} ref={stageRef}>
+    <div className={`pdf-reader experience-${experience} ${fullscreen ? "is-fullscreen" : ""}`} ref={readerRef}>
       <header className="pdf-reader-toolbar">
         <button type="button" className="reader-back" onClick={onClose} aria-label="Close reader">←</button>
         <div className="reader-title-block">
@@ -371,7 +370,18 @@ export default function PdfBookReader({
           </aside>
         )}
 
-        <main className={`physical-reader-stage turn-${turning ?? "idle"}`} data-direction={rtl ? "rtl" : "ltr"}>
+        <main
+          className={`physical-reader-stage turn-${turning ?? "idle"}`}
+          data-direction={rtl ? "rtl" : "ltr"}
+          onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
+          onTouchEnd={(event) => {
+            if (touchStart.current === null) return;
+            const end = event.changedTouches[0]?.clientX ?? touchStart.current;
+            const delta = end - touchStart.current;
+            if (Math.abs(delta) > 55) turn(delta < 0 ? "next" : "previous");
+            touchStart.current = null;
+          }}
+        >
           <div className="reader-ambience" />
           {loading && <div className="reader-loading"><span /><p>Opening the real pages…</p></div>}
           {error && <div className="reader-error"><strong>This PDF could not be rendered.</strong><p>{error}</p><a href={sourceUrl} target="_blank" rel="noreferrer">Open the original file</a></div>}
@@ -496,7 +506,7 @@ function PdfPage({
       setViewportSize({ width: viewport.width, height: viewport.height });
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) return;
-      renderTask = page.render({ canvasContext: context, viewport: renderViewport });
+      renderTask = page.render({ canvas, canvasContext: context, viewport: renderViewport });
       await renderTask.promise;
       const text = await page.getTextContent();
       if (cancelled) return;
@@ -614,7 +624,7 @@ function Thumbnail({ pdf, pageNumber, active, onOpen }: { pdf: PDFDocumentProxy;
       canvas.height = Math.ceil(viewport.height);
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) return;
-      task = page.render({ canvasContext: context, viewport });
+      task = page.render({ canvas, canvasContext: context, viewport });
       await task.promise;
     })().catch(() => undefined);
     return () => { cancelled = true; task?.cancel(); };
