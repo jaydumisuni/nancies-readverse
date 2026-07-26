@@ -1,6 +1,6 @@
 import { ChangeEvent, MouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy, type PDFPageProxy } from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import "./pdf-book-reader.css";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -30,6 +30,7 @@ type Props = {
   title: string;
   format: string;
   fullscreen: boolean;
+  readerRef: React.RefObject<HTMLDivElement>;
   note: string;
   onClose: () => void;
   onFullscreen: () => void;
@@ -83,12 +84,12 @@ export default function PdfBookReader({
   title,
   format,
   fullscreen,
+  readerRef,
   note,
   onClose,
   onFullscreen,
   onNoteChange,
 }: Props) {
-  const stageRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,6 +111,7 @@ export default function PdfBookReader({
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{ page: number; preview: string }>>([]);
   const [outline, setOutline] = useState<Array<{ title: string; page: number }>>([]);
+  const touchStart = useRef<number | null>(null);
 
   const experience = requestedExperience === "auto" ? detectedExperience : requestedExperience;
   const rtl = experience === "manga";
@@ -132,10 +134,7 @@ export default function PdfBookReader({
     const task = getDocument({ url: sourceUrl, cMapPacked: true, useWorkerFetch: true });
     task.promise
       .then(async (document) => {
-        if (cancelled) {
-          await document.destroy();
-          return;
-        }
+        if (cancelled) return;
         setPdf(document);
         setPage((current) => clamp(current, 1, document.numPages));
         const sampleCount = Math.min(document.numPages, 3);
@@ -285,7 +284,7 @@ export default function PdfBookReader({
   const titleText = normaliseTitle(title) || "Untitled PDF";
 
   return (
-    <div className={`pdf-reader experience-${experience} ${fullscreen ? "is-fullscreen" : ""}`} ref={stageRef}>
+    <div className={`pdf-reader experience-${experience} ${fullscreen ? "is-fullscreen" : ""}`} ref={readerRef}>
       <header className="pdf-reader-toolbar">
         <button type="button" className="reader-back" onClick={onClose} aria-label="Close reader">←</button>
         <div className="reader-title-block">
@@ -344,11 +343,18 @@ export default function PdfBookReader({
               {panel === "thumbnails" && pdf && Array.from({ length: pdf.numPages }, (_, index) => (
                 <Thumbnail key={index + 1} pdf={pdf} pageNumber={index + 1} active={visiblePages.includes(index + 1)} onOpen={() => goToPage(index + 1)} />
               ))}
-              {panel === "bookmarks" && (bookmarks.length ? bookmarks.map((item) => (
-                <button type="button" className="outline-item" key={item.page} onClick={() => goToPage(item.page)}>
-                  <b>Ribbon bookmark</b><span>Page {item.page}</span>
-                </button>
-              )) : <p className="empty-panel">Place a ribbon bookmark on a page and it will appear here.</p>)}
+              {panel === "bookmarks" && (
+                <>
+                  <button type="button" className="bookmark-current" onClick={toggleBookmark}>
+                    {bookmarked ? "Remove ribbon from this page" : "Add ribbon to this page"}
+                  </button>
+                  {bookmarks.length ? bookmarks.map((item) => (
+                    <button type="button" className="outline-item" key={item.page} onClick={() => goToPage(item.page)}>
+                      <b>Ribbon bookmark</b><span>Page {item.page}</span>
+                    </button>
+                  )) : <p className="empty-panel">Place a ribbon bookmark on a page and it will appear here.</p>}
+                </>
+              )}
               {panel === "highlights" && (
                 <>
                   {highlights.length ? highlights.map((item) => (
@@ -371,7 +377,18 @@ export default function PdfBookReader({
           </aside>
         )}
 
-        <main className={`physical-reader-stage turn-${turning ?? "idle"}`} data-direction={rtl ? "rtl" : "ltr"}>
+        <main
+          className={`physical-reader-stage turn-${turning ?? "idle"}`}
+          data-direction={rtl ? "rtl" : "ltr"}
+          onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
+          onTouchEnd={(event) => {
+            if (touchStart.current === null) return;
+            const end = event.changedTouches[0]?.clientX ?? touchStart.current;
+            const delta = end - touchStart.current;
+            if (Math.abs(delta) > 55) turn(delta < 0 ? "next" : "previous");
+            touchStart.current = null;
+          }}
+        >
           <div className="reader-ambience" />
           {loading && <div className="reader-loading"><span /><p>Opening the real pages…</p></div>}
           {error && <div className="reader-error"><strong>This PDF could not be rendered.</strong><p>{error}</p><a href={sourceUrl} target="_blank" rel="noreferrer">Open the original file</a></div>}
@@ -421,7 +438,7 @@ export default function PdfBookReader({
         <div className="reader-tools">
           <button type="button" className={panel === "contents" ? "active" : ""} onClick={() => setPanel(panel === "contents" ? null : "contents")}><span>☷</span>Contents</button>
           <button type="button" className={panel === "thumbnails" ? "active" : ""} onClick={() => setPanel(panel === "thumbnails" ? null : "thumbnails")}><span>▦</span>Thumbnails</button>
-          <button type="button" className={bookmarked ? "active" : ""} onClick={toggleBookmark}><span>♧</span>Bookmark</button>
+          <button type="button" className={panel === "bookmarks" || bookmarked ? "active" : ""} onClick={() => setPanel(panel === "bookmarks" ? null : "bookmarks")}><span>♧</span>Bookmark</button>
           <button type="button" className={panel === "highlights" ? "active" : ""} onClick={() => setPanel(panel === "highlights" ? null : "highlights")}><span>✎</span>Highlights</button>
           <button type="button" className={panel === "notes" ? "active" : ""} onClick={() => setPanel(panel === "notes" ? null : "notes")}><span>▤</span>Notes</button>
           <button type="button" className={areaMode ? "active" : ""} onClick={() => setAreaMode((current) => !current)}><span>▱</span>Area marker</button>
@@ -494,9 +511,7 @@ function PdfPage({
       textLayer.style.width = `${viewport.width}px`;
       textLayer.style.height = `${viewport.height}px`;
       setViewportSize({ width: viewport.width, height: viewport.height });
-      const context = canvas.getContext("2d", { alpha: false });
-      if (!context) return;
-      renderTask = page.render({ canvasContext: context, viewport: renderViewport });
+      renderTask = page.render({ canvas, viewport: renderViewport, background: "#ffffff" });
       await renderTask.promise;
       const text = await page.getTextContent();
       if (cancelled) return;
@@ -515,7 +530,7 @@ function PdfPage({
         span.style.height = `${fontHeight * 1.18}px`;
         textLayer.appendChild(span);
       }
-    })().catch(() => undefined);
+    })().catch((error) => { if (!cancelled) console.error(`ReadVerse PDF page ${pageNumber} render failed`, error); });
     return () => {
       cancelled = true;
       renderTask?.cancel();
@@ -612,11 +627,9 @@ function Thumbnail({ pdf, pageNumber, active, onOpen }: { pdf: PDFDocumentProxy;
       if (!canvas || cancelled) return;
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      const context = canvas.getContext("2d", { alpha: false });
-      if (!context) return;
-      task = page.render({ canvasContext: context, viewport });
+      task = page.render({ canvas, viewport, background: "#ffffff" });
       await task.promise;
-    })().catch(() => undefined);
+    })().catch((error) => { if (!cancelled) console.error(`ReadVerse PDF thumbnail ${pageNumber} render failed`, error); });
     return () => { cancelled = true; task?.cancel(); };
   }, [pageNumber, pdf]);
   return <button type="button" className={`pdf-thumbnail ${active ? "active" : ""}`} onClick={onOpen}><canvas ref={canvasRef} /><span>Page {pageNumber}</span></button>;

@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { avatarImages, type AvatarId } from "./avatars";
+import PdfBookReader from "./reader/PdfBookReader";
 
 type Gender = "woman" | "man" | "nonbinary" | "prefer_not_to_say";
 type ThemeId =
@@ -890,10 +891,10 @@ export default function App() {
     }
   }
 
-  function saveNote(value: string) {
+  function saveNote(value: string, readerId = "demo-reader") {
     setNotes((current) => ({
       ...current,
-      "demo-reader": {
+      [readerId]: {
         text: value,
         updatedAt: new Date().toISOString(),
       },
@@ -1207,7 +1208,7 @@ export default function App() {
         <ReaderModal
           open
           fullscreen={readerFullscreen}
-          note={notes["demo-reader"]?.text ?? ""}
+          note={notes[readerSource?.id ?? "demo-reader"]?.text ?? ""}
           notesOpen={notesOpen}
           page={readerPage}
           pageTurning={pageTurning}
@@ -1218,7 +1219,7 @@ export default function App() {
           onNext={() => turnPage("next")}
           onPrevious={() => turnPage("previous")}
           onNotes={() => setNotesOpen((current) => !current)}
-          onNoteChange={saveNote}
+          onNoteChange={(value) => saveNote(value, readerSource?.id ?? "demo-reader")}
           onCloseNotes={() => setNotesOpen(false)}
         />
       )}
@@ -1867,18 +1868,11 @@ function SettingsModal({
 function ReaderModal({
   fullscreen,
   note,
-  notesOpen,
-  page,
-  pageTurning,
   readerRef,
   source,
   onClose,
   onFullscreen,
-  onNext,
-  onPrevious,
-  onNotes,
   onNoteChange,
-  onCloseNotes,
 }: {
   open: boolean;
   fullscreen: boolean;
@@ -1896,154 +1890,43 @@ function ReaderModal({
   onNoteChange: (value: string) => void;
   onCloseNotes: () => void;
 }) {
-  const touchStart = useRef<number | null>(null);
+  const activeSource: ReaderSource = source ?? {
+    id: "demo-reader",
+    title: "Nancy's ReadVerse Sample",
+    url: "/fixtures/sample.pdf",
+    format: "pdf",
+  };
+
+  if (activeSource.format.toLowerCase() !== "pdf") {
+    return (
+      <div className={`reader-overlay ${fullscreen ? "is-fullscreen" : ""}`}>
+        <div className="reader-window document-fallback">
+          <header className="reader-toolbar">
+            <button type="button" onClick={onClose} aria-label="Close reader"><Icon name="close" size={22} /></button>
+            <div><strong>{activeSource.title}</strong><small>Temporary {activeSource.format.toUpperCase()} session</small></div>
+            <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>
+          </header>
+          <div className="document-stage">
+            <iframe className="reader-document" src={activeSource.url} title={activeSource.title} />
+            <a className="document-open-link" href={activeSource.url} target="_blank" rel="noreferrer">Open the original file</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`reader-overlay ${fullscreen ? "is-fullscreen" : ""}`}>
-      <div
-        className="reader-window"
-        ref={readerRef}
-        onTouchStart={(event: ReactTouchEvent<HTMLDivElement>) => {
-          touchStart.current = event.touches[0]?.clientX ?? null;
-        }}
-        onTouchEnd={(event: ReactTouchEvent<HTMLDivElement>) => {
-          if (touchStart.current === null) return;
-          const end = event.changedTouches[0]?.clientX ?? touchStart.current;
-          const delta = end - touchStart.current;
-          if (Math.abs(delta) > 55) {
-            if (delta < 0) onNext();
-            else onPrevious();
-          }
-          touchStart.current = null;
-        }}
-      >
-        <header className="reader-toolbar">
-          <button type="button" onClick={onClose} aria-label="Close reader">
-            <Icon name="close" size={22} />
-          </button>
-          <div>
-            <strong>{source ? source.title : "Jujutsu Kaisen: Thorny Crown"}</strong>
-            <small>{source ? `Temporary ${source.format.toUpperCase()} session` : `Chapter 15 · Page ${page}`}</small>
-          </div>
-          <nav>
-            <button type="button">Aa</button>
-            <button type="button" onClick={onNotes}><Icon name="note" size={19} /></button>
-            <button type="button"><Icon name="bookmark" size={19} /></button>
-            <button type="button" onClick={onFullscreen}>
-              <Icon name="expand" size={19} />
-            </button>
-          </nav>
-        </header>
-
-        {source ? (
-          <div className="document-stage">
-            <iframe className="reader-document" src={source.url} title={source.title} />
-            <a className="document-open-link" href={source.url} target="_blank" rel="noreferrer">Open in a separate tab</a>
-            {notesOpen && (
-              <aside className="floating-notepad">
-                <header>
-                  <span>✎ My Note</span>
-                  <button type="button" onClick={onCloseNotes}><Icon name="close" size={18} /></button>
-                </header>
-                <textarea value={note} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onNoteChange(event.target.value)} placeholder="Write something worth remembering…" />
-                <footer><button type="button"><b>B</b></button><button type="button"><i>I</i></button><button type="button"><u>U</u></button><span>Saved locally · Drive sync later</span></footer>
-              </aside>
-            )}
-          </div>
-        ) : (
-        <div className={`book-stage ${pageTurning ? `turn-${pageTurning}` : ""}`}>
-          <button className="page-edge previous" type="button" onClick={onPrevious}>
-            ‹
-          </button>
-          <div className="book-spread">
-            <article className="paper-page left-page">
-              <span>Chapter 15</span>
-              <h2>Faint Light in the Rain</h2>
-              <div className="ornament">✦</div>
-              <p>
-                The rain had not stopped since the evening before. It drummed against
-                the windows of the old dormitory, like fingers tapping out a restless
-                song.
-              </p>
-              <p className="highlight pink">
-                Strength is not just what you have. It is what you choose to protect
-                when no one is watching.
-              </p>
-              <div className="highlight-tools">
-                {["#ff7eab", "#ffd75c", "#6ed68f", "#63a8ff", "#a875ff"].map((color) => (
-                  <i key={color} style={{ background: color }} />
-                ))}
-                <button type="button" onClick={onNotes}><Icon name="note" size={17} /></button>
-                <button type="button">Copy</button>
-                <button type="button">•••</button>
-              </div>
-              <p>
-                The words stayed with her, louder than the storm and far more difficult
-                to ignore.
-              </p>
-              <footer>{page}</footer>
-            </article>
-
-            <article className="paper-page right-page">
-              <span>Outside, somewhere beyond the glass</span>
-              <p>
-                The city glowed faintly—uncaring, relentless. But inside, even in the
-                darkest moments, a choice could still be made.
-              </p>
-              <div className="manga-panel-grid">
-                <div style={{ backgroundImage: `url(${avatarImages.gojo})` }} />
-                <div style={{ backgroundImage: `url(${avatarImages.megumi})` }} />
-                <div style={{ backgroundImage: `url(${avatarImages.nobara})` }} />
-              </div>
-              <div className="ornament">End of Chapter 15</div>
-              <footer>{page + 1}</footer>
-            </article>
-            <div className="book-fold" />
-          </div>
-          <button className="page-edge next" type="button" onClick={onNext}>
-            ›
-          </button>
-
-          {notesOpen && (
-            <aside className="floating-notepad">
-              <header>
-                <span>✎ My Note</span>
-                <button type="button" onClick={onCloseNotes}>
-                  <Icon name="close" size={18} />
-                </button>
-              </header>
-              <textarea
-                value={note}
-                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onNoteChange(event.target.value)}
-                placeholder="Write something worth remembering…"
-              />
-              <footer>
-                <button type="button"><b>B</b></button>
-                <button type="button"><i>I</i></button>
-                <button type="button"><u>U</u></button>
-                <span>Saved locally · Drive sync later</span>
-              </footer>
-            </aside>
-          )}
-        </div>
-        )}
-
-        <footer className="reader-footer">
-          {source ? (
-            <>
-              <span>Temporary session</span>
-              <div className="temporary-reader-line" />
-              <span>Not saved</span>
-            </>
-          ) : (
-            <>
-              <span>{page} / 240</span>
-              <input type="range" min="1" max="240" value={page} readOnly aria-label="Reading progress" />
-              <span>{Math.round((page / 240) * 100)}%</span>
-            </>
-          )}
-        </footer>
-      </div>
-    </div>
+    <PdfBookReader
+      sourceId={activeSource.id}
+      sourceUrl={activeSource.url}
+      title={activeSource.title}
+      format={activeSource.format}
+      fullscreen={fullscreen}
+      readerRef={readerRef}
+      note={note}
+      onClose={onClose}
+      onFullscreen={onFullscreen}
+      onNoteChange={onNoteChange}
+    />
   );
 }
