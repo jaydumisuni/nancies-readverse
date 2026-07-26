@@ -129,7 +129,6 @@ async function handleCompanion(request: Request, env: Env, ctx: ExecutionContext
   }
 }
 
-
 async function handleDiscoverySearch(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
   let body: DiscoveryBody;
@@ -446,13 +445,14 @@ async function resolveSourceRequest(request: Request): Promise<Response> {
     return json({
       ok: true,
       source: {
+        id: sourceId(resolved),
         sourceUrl: resolved.sourceUrl,
         directUrl: resolved.directUrl,
         title: resolved.title,
         format: resolved.format,
         streamUrl: `/api/source/stream?url=${encodeURIComponent(resolved.directUrl)}`,
         temporary: true,
-        domain: new URL(resolved.sourceUrl).hostname.replace(/^www./, ""),
+        domain: new URL(resolved.sourceUrl).hostname.replace(/^www\./, ""),
         sizeBytes: resolved.sizeBytes,
         sizeLabel: resolved.sizeBytes ? formatBytes(resolved.sizeBytes) : undefined,
         contentType: resolved.contentType,
@@ -610,7 +610,7 @@ async function fetchWithSafeRedirects(input: URL, init: RequestInit): Promise<Re
 }
 
 function validatePublicHttpUrl(url: URL): URL {
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error("Only HTTP and HTTPS sources are supported");
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only HTTP and HTTPS sources are supported");
   if (url.username || url.password) throw new Error("Source URLs cannot contain credentials");
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
@@ -723,7 +723,7 @@ function detectFormat(contentType: string, filename: string): string | null {
   if (type === "application/pdf") return "pdf";
   if (type === "application/epub+zip") return "epub";
   if (type === "text/plain") return "txt";
-  const extension = filename.toLowerCase().split('.').pop() || "";
+  const extension = filename.toLowerCase().split(".").pop() || "";
   return SUPPORTED_FORMATS.includes(extension as typeof SUPPORTED_FORMATS[number]) ? extension : null;
 }
 
@@ -741,7 +741,7 @@ function filenameFromResponse(response: Response, url: URL): string {
   if (encoded) { try { return decodeURIComponent(encoded); } catch { /* continue */ } }
   const plain = disposition.match(/filename\s*=\s*"?([^";]+)"?/i)?.[1];
   if (plain) return plain.trim();
-  return decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || "readverse-file");
+  return decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "readverse-file");
 }
 
 function safeFilename(value: string): string {
