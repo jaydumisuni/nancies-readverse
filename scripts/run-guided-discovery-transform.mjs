@@ -20,6 +20,7 @@ function escapeRegion(startMarker, endMarker) {
   if (opening <= 0 || closing < 0) throw new Error(`Transform boundary not found: ${startMarker}`);
   let body = text.slice(opening, closing);
   body = body.replaceAll("\\`", "__ESCAPED_TICK__").replaceAll("\\${", "__ESCAPED_EXPR__");
+  body = body.replaceAll("\\", "\\\\");
   body = body.replaceAll("`", "\\`").replaceAll("${", "\\${");
   body = body.replaceAll("__ESCAPED_TICK__", "\\`").replaceAll("__ESCAPED_EXPR__", "\\${");
   text = text.slice(0, opening) + body + text.slice(closing);
