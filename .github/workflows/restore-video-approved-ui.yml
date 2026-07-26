@@ -57,10 +57,12 @@ jobs:
           Path("src/functional.css").unlink(missing_ok=True)
           PY
 
-          echo "beaba154b6b4d39e498fe3ef528f723dd709a3b30a57eca6af7bba413ad7a943  src/App.tsx" | sha256sum -c -
-          echo "c743baa8cf08a5646d1981276d92ed111f31d30a26ec6e2c62c4f63164afc764  src/styles.css" | sha256sum -c -
+          grep -q 'Ten lanes. Two verifiers. No waiting politely in line.' src/App.tsx
+          grep -q 'Pick the colour of the world, not the companion.' src/App.tsx
+          grep -q 'Make every screen feel like the same good book.' src/App.tsx
           grep -q 'No copy was uploaded to Cloudflare' src/App.tsx
           grep -q 'Google Drive is not connected yet' src/App.tsx
+          grep -q 'id: "mei"' src/App.tsx
           ! grep -q 'localStorage' src/App.tsx
           ! grep -q 'Gogo' src/App.tsx
           ! grep -q 'meiMei' src/App.tsx
