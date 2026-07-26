@@ -65,6 +65,11 @@ type Book = {
   genre: string;
   cover: string;
   badge?: string;
+  sourceUrl?: string;
+  format?: string;
+  author?: string;
+  language?: string;
+  savedAt?: string;
 };
 
 type UploadItem = {
@@ -74,11 +79,64 @@ type UploadItem = {
   sizeLabel: string;
 };
 
+type DiscoveryCandidate = {
+  id: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  cover?: string;
+  description?: string;
+  whyMatch: string;
+  provider: string;
+  language?: string;
+  downloadUrl?: string;
+  identifiers?: Record<string, string>;
+};
+
+type SourceCandidate = {
+  id: string;
+  sourceUrl: string;
+  directUrl?: string;
+  title: string;
+  format: string;
+  streamUrl: string;
+  temporary: true;
+  domain: string;
+  sizeBytes?: number;
+  sizeLabel?: string;
+  contentType?: string;
+  author?: string;
+  language?: string;
+  cover?: string;
+  provider?: string;
+  verifiedAt?: string;
+};
+
+type SourceStage = {
+  id: "source" | "file" | "metadata" | "reader";
+  label: string;
+  status: "waiting" | "active" | "done" | "failed";
+};
+
+type SourceCard = {
+  source: SourceCandidate;
+  status: "found" | "preparing" | "ready" | "failed";
+  stages?: SourceStage[];
+  error?: string;
+};
+
+type DiscoveryCard = {
+  query: string;
+  candidates: DiscoveryCandidate[];
+};
+
 type ChatMessage = {
   id: string;
   role: ChatRole;
   text: string;
   upload?: UploadItem;
+  sourceCard?: SourceCard;
+  discovery?: DiscoveryCard;
   time: string;
 };
 
@@ -93,18 +151,29 @@ type ReaderSource = {
   url: string;
   format: string;
   sourceUrl?: string;
+  domain?: string;
+  author?: string;
+  language?: string;
+  cover?: string;
+  sizeLabel?: string;
 };
 
 type ResolveSourceResponse = {
   ok: boolean;
-  source?: {
-    sourceUrl: string;
-    title: string;
-    format: string;
-    streamUrl: string;
-    temporary: true;
-  };
+  source?: SourceCandidate;
+  sources?: SourceCandidate[];
   error?: string;
+  reason?: string;
+  next?: string[];
+};
+
+type DiscoveryResponse = {
+  ok: boolean;
+  query?: string;
+  candidates?: DiscoveryCandidate[];
+  error?: string;
+  reason?: string;
+  next?: string[];
 };
 
 const themes: Theme[] = [
@@ -562,6 +631,8 @@ export default function App() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceResolving, setSourceResolving] = useState(false);
   const [sourceError, setSourceError] = useState("");
+  const [pendingSource, setPendingSource] = useState<SourceCandidate | null>(null);
+  const [rejectedCandidates, setRejectedCandidates] = useStoredState<string[]>("readverse.rejected-discovery", []);
   const fileInputRef = useRef<HTMLInputElement>(null!);
   const readerRef = useRef<HTMLDivElement>(null!);
   const sessionFileUrls = useRef<Map<string, string>>(new Map());
@@ -654,64 +725,51 @@ export default function App() {
 
     const lower = cleanQuestion.toLowerCase();
     const directUrl = extractFirstHttpUrl(cleanQuestion);
-    const previousUrl = !directUrl && isSourceFollowUp(cleanQuestion)
-      ? lastSourceUrl(messages)
-      : null;
-    const sourceCandidate = directUrl ?? previousUrl;
 
-    if (sourceCandidate) {
+    if (pendingSource && isPrepareFollowUp(cleanQuestion)) {
+      await prepareSource(pendingSource);
+      setSending(false);
+      return;
+    }
+
+    if (directUrl) {
       setSearching(true);
+      setMessages((current) => [
+        ...current,
+        {
+          id: uid("source-checking"),
+          role: "companion",
+          text: characterise(companion, "Lemme get that for you. I am checking the source, following the public route and verifying the actual reading file."),
+          time: timeNow(),
+        },
+      ]);
       try {
-        const response = await fetch("/api/source/resolve", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url: sourceCandidate }),
-        });
-        const body = (await response.json()) as ResolveSourceResponse;
-        if (!response.ok || !body.ok || !body.source) {
-          throw new Error(body.error || "ReadVerse could not resolve that source.");
-        }
-        const source = body.source;
-        setReaderSource({
-          id: uid("source"),
-          title: source.title,
-          url: source.streamUrl,
-          format: source.format,
-          sourceUrl: source.sourceUrl,
-        });
-        setReaderOpen(true);
+        const source = await resolveSourceCandidate(directUrl);
+        setPendingSource(source);
         setSourceDialogOpen(false);
         setSourceUrl("");
         setMessages((current) => [
           ...current,
           {
-            id: uid("source-reply"),
+            id: uid("source-found"),
             role: "companion",
-            text: characterise(
-              companion,
-              `I tested the link, found “${source.title}”, and opened the verified ${source.format.toUpperCase()} temporarily. Nothing was saved permanently.`,
-            ),
+            text: characterise(companion, `I found it. This looks like “${source.title}”. Check the details, then tell me whether I should prepare it for reading.`),
+            sourceCard: { source, status: "found" },
             time: timeNow(),
           },
         ]);
       } catch (error) {
-        const reason = error instanceof Error ? error.message : "ReadVerse could not resolve that source.";
-        setMessages((current) => [
-          ...current,
-          {
-            id: uid("source-blocked"),
-            role: "companion",
-            text: characterise(
-              companion,
-              `I tested the link instead of guessing. It stopped here: ${reason} I did not open or save anything.`,
-            ),
-            time: timeNow(),
-          },
-        ]);
+        explainSourceFailure(error);
       } finally {
         setSearching(false);
         setSending(false);
       }
+      return;
+    }
+
+    if (looksLikeDiscoveryRequest(cleanQuestion)) {
+      await discoverFromMemory(cleanQuestion);
+      setSending(false);
       return;
     }
 
@@ -722,10 +780,7 @@ export default function App() {
         {
           id: uid("reply"),
           role: "companion",
-          text: characterise(
-            companion,
-            "Reader opened. Your page was exactly where you left it.",
-          ),
+          text: characterise(companion, "Reader opened. Your page was exactly where you left it."),
           time: timeNow(),
         },
       ]);
@@ -739,10 +794,7 @@ export default function App() {
         {
           id: uid("reply"),
           role: "companion",
-          text: characterise(
-            companion,
-            "Settings are open. Try not to spend twenty minutes choosing between two nearly identical shades. I will notice.",
-          ),
+          text: characterise(companion, "Settings are open. Try not to spend twenty minutes choosing between two nearly identical shades. I will notice."),
           time: timeNow(),
         },
       ]);
@@ -770,10 +822,7 @@ export default function App() {
         {
           id: uid("reply"),
           role: "companion",
-          text:
-            body.answer ??
-            body.error ??
-            characterise(companion, "That thought escaped. Ask me once more."),
+          text: body.answer ?? body.error ?? characterise(companion, "That thought escaped. Ask me once more."),
           time: timeNow(),
         },
       ]);
@@ -790,6 +839,256 @@ export default function App() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function resolveSourceCandidate(url: string): Promise<SourceCandidate> {
+    const response = await fetch("/api/source/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const body = (await response.json()) as ResolveSourceResponse;
+    if (!response.ok || !body.ok || !body.source) {
+      throw new Error(body.reason || body.error || "ReadVerse could not resolve that source.");
+    }
+    return body.source;
+  }
+
+  async function discoverFromMemory(query: string, exclude = rejectedCandidates) {
+    setSearching(true);
+    setMessages((current) => [
+      ...current,
+      {
+        id: uid("discovery-start"),
+        role: "companion",
+        text: characterise(companion, "Give me a moment. I am matching the title, story clues, cover details and likely editions instead of guessing from one word."),
+        time: timeNow(),
+      },
+    ]);
+    try {
+      const response = await fetch("/api/discovery/search", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query, exclude }),
+      });
+      const body = (await response.json()) as DiscoveryResponse;
+      if (!response.ok || !body.ok || !body.candidates?.length) {
+        const detail = body.reason || body.error || "I could not find a strong match yet.";
+        const next = body.next?.[0] || "Tell me one more detail: a character, cover colour, author, year, or part of the title.";
+        setMessages((current) => [
+          ...current,
+          {
+            id: uid("discovery-empty"),
+            role: "companion",
+            text: characterise(companion, `${detail} ${next}`),
+            time: timeNow(),
+          },
+        ]);
+        return;
+      }
+      setMessages((current) => [
+        ...current,
+        {
+          id: uid("discovery-results"),
+          role: "companion",
+          text: characterise(companion, `I found ${body.candidates!.length} likely matches. The first is strongest, but I kept alternatives because “close enough” is how the wrong book wins.`),
+          discovery: { query: body.query || query, candidates: body.candidates! },
+          time: timeNow(),
+        },
+      ]);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Discovery search failed.";
+      setMessages((current) => [
+        ...current,
+        {
+          id: uid("discovery-failed"),
+          role: "companion",
+          text: characterise(companion, `I could not finish the search because ${reason} Give me another clue or attach the file directly; I will not leave you waiting without a next move.`),
+          time: timeNow(),
+        },
+      ]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function selectDiscoveryCandidate(candidate: DiscoveryCandidate) {
+    setSearching(true);
+    setMessages((current) => [
+      ...current,
+      { id: uid("candidate-choice"), role: "user", text: `That is it — ${candidate.title}.`, time: timeNow() },
+      { id: uid("source-hunt"), role: "companion", text: characterise(companion, "Good. I have the title now. I am checking public reading sources and verifying the actual file before I offer it."), time: timeNow() },
+    ]);
+    try {
+      const response = await fetch("/api/discovery/source", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ candidate }),
+      });
+      const body = (await response.json()) as ResolveSourceResponse;
+      if (!response.ok || !body.ok || !body.sources?.length) {
+        const reason = body.reason || body.error || "I identified the book, but no accessible reading file passed verification.";
+        const next = body.next?.join(" ") || "You can give me another source, upload your copy, or ask me to search another edition.";
+        setMessages((current) => [
+          ...current,
+          { id: uid("source-none"), role: "companion", text: characterise(companion, `${reason} ${next}`), time: timeNow() },
+        ]);
+        return;
+      }
+      const source = body.sources[0];
+      setPendingSource(source);
+      setMessages((current) => [
+        ...current,
+        {
+          id: uid("source-found"),
+          role: "companion",
+          text: characterise(companion, `I found a verified ${source.format.toUpperCase()} for “${source.title}”. Check the source details, then choose whether I should prepare it.`),
+          sourceCard: { source, status: "found" },
+          time: timeNow(),
+        },
+      ]);
+    } catch (error) {
+      explainSourceFailure(error, candidate.title);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function rejectDiscoveryCandidate(candidate: DiscoveryCandidate) {
+    const nextRejected = rejectedCandidates.includes(candidate.id) ? rejectedCandidates : [...rejectedCandidates, candidate.id];
+    setRejectedCandidates(nextRejected);
+    setMessages((current) => [
+      ...current,
+      { id: uid("candidate-reject"), role: "user", text: `Not ${candidate.title}.`, time: timeNow() },
+      {
+        id: uid("candidate-clue"),
+        role: "companion",
+        text: characterise(companion, "Got it. I will not show that one again. Give me one detail that separates it: a character, cover colour, author, setting, year, or a word from the title."),
+        time: timeNow(),
+      },
+    ]);
+  }
+
+  async function showMoreDiscovery(query: string) {
+    await discoverFromMemory(query, rejectedCandidates);
+  }
+
+  function rejectSource(source: SourceCandidate) {
+    setPendingSource(null);
+    setMessages((current) => [
+      ...current,
+      { id: uid("source-reject"), role: "user", text: `That is not the right copy of ${source.title}.`, time: timeNow() },
+      {
+        id: uid("source-correction"),
+        role: "companion",
+        text: characterise(companion, "Good catch. Tell me what looked wrong—the title page, cover, language, edition, author, or content—and I will narrow the next search instead of repeating this result."),
+        time: timeNow(),
+      },
+    ]);
+  }
+
+  function updateSourceCard(sourceId: string, updater: (card: SourceCard) => SourceCard) {
+    setMessages((current) => current.map((message) => message.sourceCard?.source.id === sourceId
+      ? { ...message, sourceCard: updater(message.sourceCard) }
+      : message));
+  }
+
+  async function prepareSource(source: SourceCandidate) {
+    if (sending || source.id !== pendingSource?.id) return;
+    const stages: SourceStage[] = [
+      { id: "source", label: "Verified public source", status: "done" },
+      { id: "file", label: "Checking the readable file", status: "active" },
+      { id: "metadata", label: "Reading document details", status: "waiting" },
+      { id: "reader", label: "Preparing the temporary reader", status: "waiting" },
+    ];
+    updateSourceCard(source.id, (card) => ({ ...card, status: "preparing", stages }));
+    setSearching(true);
+    try {
+      const response = await fetch(source.streamUrl, { method: "HEAD", cache: "no-store" });
+      if (!response.ok) throw new Error(`the verified file returned HTTP ${response.status} while preparing`);
+      updateSourceCard(source.id, (card) => ({
+        ...card,
+        stages: card.stages?.map((stage) => stage.id === "file" ? { ...stage, status: "done" } : stage.id === "metadata" ? { ...stage, status: "active" } : stage),
+      }));
+      const sizeBytes = Number(response.headers.get("content-length") || source.sizeBytes || 0);
+      const prepared = { ...source, sizeBytes: sizeBytes || source.sizeBytes, sizeLabel: sizeBytes ? formatFileSize(sizeBytes) : source.sizeLabel };
+      setPendingSource(prepared);
+      updateSourceCard(source.id, (card) => ({
+        ...card,
+        source: prepared,
+        stages: card.stages?.map((stage) => stage.id === "metadata" ? { ...stage, status: "done" } : stage.id === "reader" ? { ...stage, status: "active" } : stage),
+      }));
+      setReaderSource({
+        id: prepared.id,
+        title: prepared.title,
+        url: prepared.streamUrl,
+        format: prepared.format,
+        sourceUrl: prepared.sourceUrl,
+        domain: prepared.domain,
+        author: prepared.author,
+        language: prepared.language,
+        cover: prepared.cover,
+        sizeLabel: prepared.sizeLabel,
+      });
+      updateSourceCard(source.id, (card) => ({
+        ...card,
+        status: "ready",
+        source: prepared,
+        stages: card.stages?.map((stage) => ({ ...stage, status: "done" })),
+      }));
+      setMessages((current) => [
+        ...current,
+        {
+          id: uid("source-ready"),
+          role: "companion",
+          text: characterise(companion, "Done. Open it and check the cover, title page and first few pages. If it is right, use Add to Library inside the reader so I keep the source and your reading record."),
+          time: timeNow(),
+        },
+      ]);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "the file could not be prepared";
+      updateSourceCard(source.id, (card) => ({
+        ...card,
+        status: "failed",
+        error: reason,
+        stages: card.stages?.map((stage) => stage.status === "active" ? { ...stage, status: "failed" } : stage),
+      }));
+      setMessages((current) => [
+        ...current,
+        { id: uid("prepare-failed"), role: "companion", text: characterise(companion, `I found the source, but preparation stopped because ${reason}. Nothing was saved. Try another source, another edition, or upload the file directly.`), time: timeNow() },
+      ]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function openPreparedSource(source: SourceCandidate) {
+    setReaderSource({
+      id: source.id,
+      title: source.title,
+      url: source.streamUrl,
+      format: source.format,
+      sourceUrl: source.sourceUrl,
+      domain: source.domain,
+      author: source.author,
+      language: source.language,
+      cover: source.cover,
+      sizeLabel: source.sizeLabel,
+    });
+    setReaderOpen(true);
+  }
+
+  function explainSourceFailure(error: unknown, title?: string) {
+    const reason = error instanceof Error ? error.message : "ReadVerse could not verify an accessible reading file.";
+    setMessages((current) => [
+      ...current,
+      {
+        id: uid("source-blocked"),
+        role: "companion",
+        text: characterise(companion, `${title ? `I identified “${title}”, but ` : ""}I could not prepare a reading source because ${reason} Nothing was opened or saved. Send another link, upload your copy, or give me another edition clue and I will keep looking.`),
+        time: timeNow(),
+      },
+    ]);
   }
 
   function chooseMood(mood: string) {
@@ -866,43 +1165,61 @@ export default function App() {
     if (!cleanUrl || sourceResolving) return;
     setSourceResolving(true);
     setSourceError("");
+    setChatOpen(true);
+    setMessages((current) => [
+      ...current,
+      { id: uid("source-user"), role: "user", text: cleanUrl, time: timeNow() },
+      { id: uid("source-checking"), role: "companion", text: characterise(companion, "Lemme get that for you. I am testing the source and verifying the real reading file."), time: timeNow() },
+    ]);
     try {
-      const response = await fetch("/api/source/resolve", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: cleanUrl }),
-      });
-      const body = (await response.json()) as ResolveSourceResponse;
-      if (!response.ok || !body.ok || !body.source) {
-        throw new Error(body.error || "ReadVerse could not resolve that source.");
-      }
-      const source = body.source;
-      setReaderSource({
-        id: uid("source"),
-        title: source.title,
-        url: source.streamUrl,
-        format: source.format,
-        sourceUrl: source.sourceUrl,
-      });
-      setReaderOpen(true);
+      const source = await resolveSourceCandidate(cleanUrl);
+      setPendingSource(source);
       setSourceDialogOpen(false);
       setSourceUrl("");
-      setChatOpen(true);
       setMessages((current) => [
         ...current,
-        { id: uid("source-user"), role: "user", text: cleanUrl, time: timeNow() },
         {
-          id: uid("source-reply"),
+          id: uid("source-found"),
           role: "companion",
-          text: characterise(companion, `I verified “${source.title}” and opened it temporarily. I kept the source link, not a permanent copy.`),
+          text: characterise(companion, `I found “${source.title}”. Check the details and choose Prepare to read when you are happy with the result.`),
+          sourceCard: { source, status: "found" },
           time: timeNow(),
         },
       ]);
     } catch (error) {
-      setSourceError(error instanceof Error ? error.message : "ReadVerse could not resolve that source.");
+      const reason = error instanceof Error ? error.message : "ReadVerse could not resolve that source.";
+      setSourceError(reason);
+      explainSourceFailure(error);
     } finally {
       setSourceResolving(false);
     }
+  }
+
+  function addReaderSourceToLibrary(source: ReaderSource) {
+    const newBook: Book = {
+      id: source.id,
+      title: source.title.replace(/\.[^.]+$/, ""),
+      subtitle: [source.author, source.format.toUpperCase(), source.domain].filter(Boolean).join(" · "),
+      progress: 0,
+      genre: "Saved source",
+      cover: source.cover || avatarImages[companion.id],
+      badge: "Saved",
+      sourceUrl: source.sourceUrl,
+      format: source.format,
+      author: source.author,
+      language: source.language,
+      savedAt: new Date().toISOString(),
+    };
+    setLibraryBooks((current) => current.some((book) => book.id === newBook.id || (book.sourceUrl && book.sourceUrl === newBook.sourceUrl)) ? current : [newBook, ...current]);
+    setMessages((current) => [
+      ...current,
+      {
+        id: uid("reader-library-added"),
+        role: "companion",
+        text: characterise(companion, "Added to your library. I kept the title, source, reading mode and progress record. The full file is still temporary until Google Drive saving is connected."),
+        time: timeNow(),
+      },
+    ]);
   }
 
   function addUploadedToLibrary(upload: UploadItem) {
@@ -1223,6 +1540,12 @@ export default function App() {
         onMood={chooseMood}
         onReadUpload={openUploadedFile}
         onAddUpload={addUploadedToLibrary}
+        onPrepareSource={prepareSource}
+        onOpenSource={openPreparedSource}
+        onRejectSource={rejectSource}
+        onSelectDiscovery={selectDiscoveryCandidate}
+        onRejectDiscovery={rejectDiscoveryCandidate}
+        onMoreDiscovery={showMoreDiscovery}
       />
 
       <input
@@ -1283,6 +1606,8 @@ export default function App() {
           onNotes={() => setNotesOpen((current) => !current)}
           onNoteChange={(value) => saveNote(value, readerSource?.id ?? "demo-reader")}
           onCloseNotes={() => setNotesOpen(false)}
+          inLibrary={Boolean(readerSource && libraryBooks.some((book) => book.id === readerSource.id || (book.sourceUrl && book.sourceUrl === readerSource.sourceUrl)))}
+          onAddToLibrary={() => readerSource && addReaderSourceToLibrary(readerSource)}
         />
       )}
 
@@ -1345,6 +1670,16 @@ function lastSourceUrl(messages: ChatMessage[]): string | null {
 
 function isSourceFollowUp(value: string) {
   return /^(?:ok(?:ay)?[,.!]?\s*)?(?:let me have it|lemme have it|open it|test it|try it|check it|read it|go ahead|proceed|yes|do it)[.!?]*$/i.test(value.trim());
+}
+
+function isPrepareFollowUp(value: string) {
+  return /^(?:ok(?:ay)?[,.!]?\s*)?(?:prepare it|prepare to read|let me have it|lemme have it|go ahead|proceed|yes|do it)[.!?]*$/i.test(value.trim());
+}
+
+function looksLikeDiscoveryRequest(value: string) {
+  const clean = value.toLowerCase();
+  return /(?:help me find|find me|search for|looking for|trying to remember|can(?:not|'t) remember|what(?:'s| is) the (?:book|manga|comic|novel)|title of|book called)/i.test(clean)
+    || /\b(book|manga|comic|novel|story|magazine)\b.{0,80}\b(about|where|with|called|remember|cover|character|author)\b/i.test(clean);
 }
 
 function localFallback(question: string, companion: Companion, history: ChatMessage[] = []) {
@@ -1432,6 +1767,73 @@ function BookCard({
   );
 }
 
+
+function DiscoveryResults({ card, onSelect, onReject, onMore }: {
+  card: DiscoveryCard;
+  onSelect: (candidate: DiscoveryCandidate) => void;
+  onReject: (candidate: DiscoveryCandidate) => void;
+  onMore: (query: string) => void;
+}) {
+  return (
+    <div className="discovery-results-card">
+      {card.candidates.map((candidate) => (
+        <article className="discovery-result" key={candidate.id}>
+          <span className="discovery-cover">
+            {candidate.cover ? <img src={candidate.cover} alt="" /> : <b>{candidate.title.slice(0, 1)}</b>}
+          </span>
+          <div className="discovery-copy">
+            <strong>{candidate.title}</strong>
+            <small>{candidate.authors.join(", ") || "Unknown creator"}{candidate.year ? ` · ${candidate.year}` : ""}</small>
+            {candidate.description && <p>{candidate.description}</p>}
+            <i>{candidate.whyMatch}</i>
+            <div className="discovery-actions">
+              <button type="button" onClick={() => onSelect(candidate)}>That&apos;s it</button>
+              <button type="button" onClick={() => onReject(candidate)}>Not this one</button>
+            </div>
+          </div>
+        </article>
+      ))}
+      <button className="show-more-discovery" type="button" onClick={() => onMore(card.query)}>Show more matches</button>
+    </div>
+  );
+}
+
+function SourceResultCard({ card, onPrepare, onOpen, onReject }: {
+  card: SourceCard;
+  onPrepare: (source: SourceCandidate) => void;
+  onOpen: (source: SourceCandidate) => void;
+  onReject: (source: SourceCandidate) => void;
+}) {
+  const source = card.source;
+  return (
+    <div className={`source-result-card status-${card.status}`}>
+      <header>
+        <span>{source.format.toUpperCase()}</span>
+        <div><strong>{source.title}</strong><small>{source.domain}</small></div>
+        <i>{card.status === "ready" ? "Ready" : card.status === "preparing" ? "Preparing" : card.status === "failed" ? "Stopped" : "Verified"}</i>
+      </header>
+      <dl>
+        {source.author && <><dt>Author</dt><dd>{source.author}</dd></>}
+        {source.language && <><dt>Language</dt><dd>{source.language}</dd></>}
+        <dt>Format</dt><dd>{source.format.toUpperCase()}</dd>
+        {source.sizeLabel && <><dt>Size</dt><dd>{source.sizeLabel}</dd></>}
+        <dt>Storage</dt><dd>Temporary until you save it</dd>
+      </dl>
+      {card.stages && (
+        <div className="source-stages">
+          {card.stages.map((stage) => <span className={stage.status} key={stage.id}><i />{stage.label}</span>)}
+        </div>
+      )}
+      {card.error && <p className="source-card-error">{card.error}</p>}
+      <div className="source-card-actions">
+        {card.status === "found" && <button type="button" onClick={() => onPrepare(source)}>Prepare to read</button>}
+        {card.status === "ready" && <button type="button" onClick={() => onOpen(source)}>Open and read</button>}
+        {card.status !== "preparing" && <button type="button" className="secondary" onClick={() => onReject(source)}>Not the right one</button>}
+      </div>
+    </div>
+  );
+}
+
 function CompanionPanel({
   companion,
   ringColor,
@@ -1447,6 +1849,12 @@ function CompanionPanel({
   onMood,
   onReadUpload,
   onAddUpload,
+  onPrepareSource,
+  onOpenSource,
+  onRejectSource,
+  onSelectDiscovery,
+  onRejectDiscovery,
+  onMoreDiscovery,
 }: {
   companion: Companion;
   ringColor: string;
@@ -1462,6 +1870,12 @@ function CompanionPanel({
   onMood: (mood: string) => void;
   onReadUpload: (upload: UploadItem) => void;
   onAddUpload: (upload: UploadItem) => void;
+  onPrepareSource: (source: SourceCandidate) => void;
+  onOpenSource: (source: SourceCandidate) => void;
+  onRejectSource: (source: SourceCandidate) => void;
+  onSelectDiscovery: (candidate: DiscoveryCandidate) => void;
+  onRejectDiscovery: (candidate: DiscoveryCandidate) => void;
+  onMoreDiscovery: (query: string) => void;
 }) {
   return (
     <aside className={`companion-panel ${open ? "open" : ""}`}>
@@ -1509,6 +1923,8 @@ function CompanionPanel({
                   </div>
                 </div>
               )}
+              {message.discovery && <DiscoveryResults card={message.discovery} onSelect={onSelectDiscovery} onReject={onRejectDiscovery} onMore={onMoreDiscovery} />}
+              {message.sourceCard && <SourceResultCard card={message.sourceCard} onPrepare={onPrepareSource} onOpen={onOpenSource} onReject={onRejectSource} />}
               <time>{message.time}</time>
             </div>
           </div>
@@ -1956,6 +2372,8 @@ function ReaderModal({
   onClose,
   onFullscreen,
   onNoteChange,
+  inLibrary,
+  onAddToLibrary,
 }: {
   open: boolean;
   fullscreen: boolean;
@@ -1972,6 +2390,8 @@ function ReaderModal({
   onNotes: () => void;
   onNoteChange: (value: string) => void;
   onCloseNotes: () => void;
+  inLibrary: boolean;
+  onAddToLibrary: () => void;
 }) {
   const activeSource: ReaderSource = source ?? {
     id: "demo-reader",
@@ -1986,8 +2406,7 @@ function ReaderModal({
         <div className="reader-window document-fallback">
           <header className="reader-toolbar">
             <button type="button" onClick={onClose} aria-label="Close reader"><Icon name="close" size={22} /></button>
-            <div><strong>{activeSource.title}</strong><small>Temporary {activeSource.format.toUpperCase()} session</small></div>
-            <nav><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>
+            <div><strong>{activeSource.title}</strong><small>Temporary {activeSource.format.toUpperCase()} session</small></div>             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>
           </header>
           <div className="document-stage">
             <iframe className="reader-document" src={activeSource.url} title={activeSource.title} />
@@ -2010,6 +2429,8 @@ function ReaderModal({
       onClose={onClose}
       onFullscreen={onFullscreen}
       onNoteChange={onNoteChange}
+      inLibrary={inLibrary}
+      onAddToLibrary={onAddToLibrary}
     />
   );
 }

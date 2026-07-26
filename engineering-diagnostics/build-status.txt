@@ -1,0 +1,4 @@
+install=0
+architecture=0
+types=2
+vite=0

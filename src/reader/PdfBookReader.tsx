@@ -32,9 +32,11 @@ type Props = {
   fullscreen: boolean;
   readerRef: React.RefObject<HTMLDivElement>;
   note: string;
+  inLibrary: boolean;
   onClose: () => void;
   onFullscreen: () => void;
   onNoteChange: (value: string) => void;
+  onAddToLibrary: () => void;
 };
 
 const highlightColors = ["#f5c95b", "#78d7a7", "#ff8eb9", "#73aef8", "#b68cff"];
@@ -86,9 +88,11 @@ export default function PdfBookReader({
   fullscreen,
   readerRef,
   note,
+  inLibrary,
   onClose,
   onFullscreen,
   onNoteChange,
+  onAddToLibrary,
 }: Props) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,6 +320,7 @@ export default function PdfBookReader({
           <span>{Math.round(zoom * 100)}%</span>
           <button type="button" onClick={() => setZoom((current) => clamp(Number((current + .1).toFixed(2)), .65, 2.4))}>+</button>
         </div>
+        <button type="button" className="reader-library-action" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button>
         <button type="button" className="reader-fullscreen" onClick={onFullscreen} aria-label="Toggle fullscreen">⛶</button>
       </header>
 
@@ -448,6 +453,7 @@ export default function PdfBookReader({
           <input type="range" min="1" max={pdf?.numPages ?? 1} value={visiblePages[0] ?? 1} onChange={(event) => goToPage(Number(event.target.value))} aria-label="Page position" />
           <span>{progress}%</span>
         </div>
+        <button type="button" className="reader-library-mobile" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button>
         <div className="marker-palette" aria-label="Marker colour">
           {highlightColors.map((color) => <button type="button" className={highlightColor === color ? "active" : ""} key={color} style={{ background: color }} onClick={() => setHighlightColor(color)} aria-label={`Marker ${color}`} />)}
         </div>

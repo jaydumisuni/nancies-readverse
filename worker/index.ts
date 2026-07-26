@@ -13,6 +13,22 @@ type CompanionBody = {
   history?: unknown;
 };
 type ResolveBody = { url?: unknown };
+type DiscoveryBody = { query?: unknown; exclude?: unknown };
+type DiscoverySourceBody = { candidate?: unknown };
+
+type DiscoveryCandidate = {
+  id: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  cover?: string;
+  description?: string;
+  whyMatch: string;
+  provider: string;
+  language?: string;
+  downloadUrl?: string;
+  identifiers?: Record<string, string>;
+};
 
 type ResolvedSource = {
   sourceUrl: string;
@@ -20,6 +36,11 @@ type ResolvedSource = {
   title: string;
   format: string;
   contentType: string;
+  sizeBytes?: number;
+  author?: string;
+  language?: string;
+  cover?: string;
+  provider?: string;
 };
 
 const MAX_REMOTE_BYTES = 80 * 1024 * 1024;
@@ -54,6 +75,8 @@ export default {
       });
     }
     if (url.pathname === "/api/companion/help") return handleCompanion(request, env, ctx);
+    if (url.pathname === "/api/discovery/search") return handleDiscoverySearch(request);
+    if (url.pathname === "/api/discovery/source") return handleDiscoverySource(request);
     if (url.pathname === "/api/source/resolve") return resolveSourceRequest(request);
     if (url.pathname === "/api/source/stream") return streamSourceRequest(request);
     if (url.pathname.startsWith("/api/")) return json({ ok: false, error: "Not found" }, 404);
@@ -106,6 +129,307 @@ async function handleCompanion(request: Request, env: Env, ctx: ExecutionContext
   }
 }
 
+
+async function handleDiscoverySearch(request: Request): Promise<Response> {
+  if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+  let body: DiscoveryBody;
+  try { body = await request.json() as DiscoveryBody; }
+  catch { return json({ ok: false, error: "Invalid JSON body" }, 400); }
+  const query = typeof body.query === "string" ? body.query.trim().slice(0, 500) : "";
+  const excluded = new Set(Array.isArray(body.exclude) ? body.exclude.filter((item): item is string => typeof item === "string") : []);
+  if (query.length < 3) return json({ ok: false, error: "Give me at least one useful clue" }, 400);
+
+  const [google, openLibrary] = await Promise.allSettled([
+    searchGoogleBooks(query),
+    searchOpenLibrary(query),
+  ]);
+  const candidates = [
+    ...(google.status === "fulfilled" ? google.value : []),
+    ...(openLibrary.status === "fulfilled" ? openLibrary.value : []),
+  ];
+  const deduped = dedupeDiscovery(candidates)
+    .filter((item) => !excluded.has(item.id))
+    .sort((a, b) => discoveryScore(b, query) - discoveryScore(a, query))
+    .slice(0, 6);
+
+  if (!deduped.length) {
+    const failed = [google, openLibrary].filter((item) => item.status === "rejected").length;
+    return json({
+      ok: false,
+      reason: failed === 2
+        ? "The discovery providers were unreachable, so I could not verify any candidates."
+        : "I searched the available catalogues but none matched those clues strongly enough.",
+      next: ["Add a character, author, cover colour, year, language, setting, or one word from the title."],
+    }, 404);
+  }
+  return json({ ok: true, query, candidates: deduped, providers: ["Google Books", "Open Library"] });
+}
+
+async function handleDiscoverySource(request: Request): Promise<Response> {
+  if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+  let body: DiscoverySourceBody;
+  try { body = await request.json() as DiscoverySourceBody; }
+  catch { return json({ ok: false, error: "Invalid JSON body" }, 400); }
+  const candidate = normalizeDiscoveryCandidate(body.candidate);
+  if (!candidate) return json({ ok: false, error: "Choose a valid discovery result" }, 400);
+
+  const verified: ResolvedSource[] = [];
+  if (candidate.downloadUrl) {
+    try {
+      const direct = await resolveSource(validatePublicHttpUrl(new URL(candidate.downloadUrl)));
+      verified.push({ ...direct, author: candidate.authors[0], language: candidate.language, cover: candidate.cover, provider: candidate.provider });
+    } catch {
+      // Continue into public archive discovery.
+    }
+  }
+
+  const archiveResults = await searchInternetArchive(candidate);
+  const lanes = archiveResults.slice(0, 10).map((item) => verifyArchiveItem(item, candidate));
+  const settled = await Promise.allSettled(lanes);
+  for (const item of settled) {
+    if (item.status === "fulfilled" && item.value) verified.push(item.value);
+    if (verified.length >= 3) break;
+  }
+  const unique = dedupeSources(verified).slice(0, 3);
+  if (!unique.length) {
+    return json({
+      ok: false,
+      reason: `I identified “${candidate.title}”, but the public sources I checked did not expose a supported file that passed both metadata and live-file verification.`,
+      next: ["Try another edition or language.", "Paste a source link you trust.", "Upload your own copy."],
+    }, 404);
+  }
+  return json({
+    ok: true,
+    sources: unique.map((source) => ({
+      sourceUrl: source.sourceUrl,
+      directUrl: source.directUrl,
+      title: source.title,
+      format: source.format,
+      streamUrl: `/api/source/stream?url=${encodeURIComponent(source.directUrl)}`,
+      temporary: true,
+      domain: new URL(source.sourceUrl).hostname.replace(/^www\./, ""),
+      sizeBytes: source.sizeBytes,
+      sizeLabel: source.sizeBytes ? formatBytes(source.sizeBytes) : undefined,
+      contentType: source.contentType,
+      author: source.author,
+      language: source.language,
+      cover: source.cover,
+      provider: source.provider,
+      verifiedAt: new Date().toISOString(),
+      id: sourceId(source),
+    })),
+  });
+}
+
+async function searchGoogleBooks(query: string): Promise<DiscoveryCandidate[]> {
+  const url = new URL("https://www.googleapis.com/books/v1/volumes");
+  url.searchParams.set("q", query);
+  url.searchParams.set("maxResults", "10");
+  url.searchParams.set("printType", "books");
+  const data = await fetchJson(url) as { items?: Array<Record<string, any>> };
+  return (data.items || []).map((item) => {
+    const info = item.volumeInfo || {};
+    const access = item.accessInfo || {};
+    const downloadUrl = access?.pdf?.downloadLink || access?.epub?.downloadLink || undefined;
+    return {
+      id: `google:${item.id}`,
+      title: String(info.title || "Untitled"),
+      authors: Array.isArray(info.authors) ? info.authors.map(String) : [],
+      year: parseYear(info.publishedDate),
+      cover: cleanCover(info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail),
+      description: cleanDescription(info.description),
+      whyMatch: "Matched against Google Books title, creator and description data.",
+      provider: "Google Books",
+      language: typeof info.language === "string" ? info.language : undefined,
+      downloadUrl: access.accessViewStatus === "FULL_PUBLIC" ? downloadUrl : undefined,
+      identifiers: Object.fromEntries((info.industryIdentifiers || []).map((entry: any) => [String(entry.type), String(entry.identifier)])),
+    };
+  });
+}
+
+async function searchOpenLibrary(query: string): Promise<DiscoveryCandidate[]> {
+  const url = new URL("https://openlibrary.org/search.json");
+  url.searchParams.set("q", query);
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("fields", "key,title,author_name,first_publish_year,cover_i,edition_key,language,subject,isbn");
+  const data = await fetchJson(url) as { docs?: Array<Record<string, any>> };
+  return (data.docs || []).map((item) => ({
+    id: `openlibrary:${String(item.key || item.edition_key?.[0] || item.title)}`,
+    title: String(item.title || "Untitled"),
+    authors: Array.isArray(item.author_name) ? item.author_name.map(String) : [],
+    year: typeof item.first_publish_year === "number" ? item.first_publish_year : undefined,
+    cover: item.cover_i ? `https://covers.openlibrary.org/b/id/${item.cover_i}-M.jpg` : undefined,
+    description: Array.isArray(item.subject) ? item.subject.slice(0, 5).join(" · ") : undefined,
+    whyMatch: "Matched against Open Library title, author, year and subject data.",
+    provider: "Open Library",
+    language: Array.isArray(item.language) ? item.language[0] : undefined,
+    identifiers: Array.isArray(item.isbn) && item.isbn[0] ? { ISBN: String(item.isbn[0]) } : undefined,
+  }));
+}
+
+async function searchInternetArchive(candidate: DiscoveryCandidate): Promise<Array<Record<string, any>>> {
+  const url = new URL("https://archive.org/advancedsearch.php");
+  const creator = candidate.authors[0] ? ` AND creator:("${escapeArchive(candidate.authors[0])}")` : "";
+  url.searchParams.set("q", `title:("${escapeArchive(candidate.title)}")${creator} AND mediatype:texts`);
+  for (const field of ["identifier", "title", "creator", "year", "language", "collection"]) url.searchParams.append("fl[]", field);
+  url.searchParams.set("rows", "10");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("output", "json");
+  const data = await fetchJson(url) as { response?: { docs?: Array<Record<string, any>> } };
+  return data.response?.docs || [];
+}
+
+async function verifyArchiveItem(item: Record<string, any>, candidate: DiscoveryCandidate): Promise<ResolvedSource | null> {
+  const identifier = typeof item.identifier === "string" ? item.identifier : "";
+  if (!identifier) return null;
+  const metadata = await fetchJson(new URL(`https://archive.org/metadata/${encodeURIComponent(identifier)}`)) as Record<string, any>;
+  const meta = metadata.metadata || {};
+  if (meta.private === "true" || meta.access_restricted_item === "true" || meta.is_dark === "true" || meta.noindex === "true") return null;
+  const files = Array.isArray(metadata.files) ? metadata.files : [];
+  const ranked = files
+    .filter((file: any) => file && typeof file.name === "string" && !file.private)
+    .map((file: any) => ({ file, format: detectFormat(String(file.format || ""), file.name) || detectFormat("", file.name) }))
+    .filter((entry: any) => entry.format && Number(entry.file.size || 0) <= MAX_REMOTE_BYTES)
+    .sort((a: any, b: any) => sourceFormatRank(a.format) - sourceFormatRank(b.format));
+  for (const entry of ranked.slice(0, 6)) {
+    const direct = new URL(`https://archive.org/download/${encodeURIComponent(identifier)}/${entry.file.name.split("/").map(encodeURIComponent).join("/")}`);
+    try {
+      const probe = await fetchWithSafeRedirects(direct, { method: "HEAD", headers: sourceHeaders() });
+      if (!probe.ok) continue;
+      const finalUrl = validatePublicHttpUrl(new URL(probe.url || direct.toString()));
+      const contentType = cleanContentType(probe.headers.get("content-type"));
+      const filename = filenameFromResponse(probe, finalUrl);
+      const format = detectFormat(contentType, filename);
+      if (!format) continue;
+      const sizeBytes = Number(probe.headers.get("content-length") || entry.file.size || 0) || undefined;
+      return {
+        sourceUrl: `https://archive.org/details/${identifier}`,
+        directUrl: stripTracking(finalUrl).toString(),
+        title: String(meta.title || item.title || candidate.title),
+        format,
+        contentType: contentType || mimeForFormat(format),
+        sizeBytes,
+        author: stringValue(meta.creator) || candidate.authors[0],
+        language: stringValue(meta.language) || candidate.language,
+        cover: candidate.cover,
+        provider: "Internet Archive",
+      };
+    } catch {
+      // Second verifier failed; continue to the next file.
+    }
+  }
+  return null;
+}
+
+function normalizeDiscoveryCandidate(value: unknown): DiscoveryCandidate | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const title = typeof item.title === "string" ? item.title.trim().slice(0, 300) : "";
+  if (!title) return null;
+  return {
+    id: typeof item.id === "string" ? item.id.slice(0, 300) : `candidate:${title}`,
+    title,
+    authors: Array.isArray(item.authors) ? item.authors.filter((author): author is string => typeof author === "string").slice(0, 8) : [],
+    year: typeof item.year === "number" ? item.year : undefined,
+    cover: typeof item.cover === "string" ? item.cover : undefined,
+    description: typeof item.description === "string" ? item.description.slice(0, 600) : undefined,
+    whyMatch: typeof item.whyMatch === "string" ? item.whyMatch.slice(0, 300) : "Selected by the reader.",
+    provider: typeof item.provider === "string" ? item.provider.slice(0, 80) : "Discovery",
+    language: typeof item.language === "string" ? item.language.slice(0, 40) : undefined,
+    downloadUrl: typeof item.downloadUrl === "string" ? item.downloadUrl : undefined,
+    identifiers: item.identifiers && typeof item.identifiers === "object" ? item.identifiers as Record<string, string> : undefined,
+  };
+}
+
+function dedupeDiscovery(items: DiscoveryCandidate[]): DiscoveryCandidate[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${normalise(item.title)}|${normalise(item.authors[0] || "")}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function discoveryScore(item: DiscoveryCandidate, query: string): number {
+  const tokens = tokenise(query);
+  const haystack = normalise(`${item.title} ${item.authors.join(" ")} ${item.description || ""}`);
+  const matched = tokens.filter((token) => haystack.includes(token)).length;
+  const titleBonus = tokens.filter((token) => normalise(item.title).includes(token)).length * 2;
+  return matched + titleBonus + (item.cover ? 0.35 : 0) + (item.authors.length ? 0.25 : 0);
+}
+
+function dedupeSources(items: ResolvedSource[]): ResolvedSource[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = stripTracking(new URL(item.directUrl)).toString();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function sourceId(source: ResolvedSource): string {
+  let hash = 2166136261;
+  for (const char of source.directUrl) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return `source-${(hash >>> 0).toString(16)}`;
+}
+
+async function fetchJson(url: URL): Promise<unknown> {
+  const response = await fetch(url.toString(), {
+    headers: { "user-agent": "NancyReadVerse/1.0", "accept": "application/json" },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!response.ok) throw new Error(`${url.hostname} returned HTTP ${response.status}`);
+  return response.json();
+}
+
+function cleanCover(value: unknown): string | undefined {
+  return typeof value === "string" ? value.replace(/^http:/, "https:") : undefined;
+}
+function cleanDescription(value: unknown): string | undefined {
+  return typeof value === "string" ? value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 260) : undefined;
+}
+function parseYear(value: unknown): number | undefined {
+  const match = typeof value === "string" ? value.match(/\d{4}/) : null;
+  return match ? Number(match[0]) : undefined;
+}
+function tokenise(value: string): string[] {
+  return [...new Set(normalise(value).split(" ").filter((token) => token.length > 2 && !["the", "and", "book", "manga", "comic", "novel", "story", "about", "with", "that", "this"].includes(token)))];
+}
+function normalise(value: string): string {
+  return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+}
+function escapeArchive(value: string): string {
+  return value.replace(/["\\]/g, " ").slice(0, 180);
+}
+function sourceFormatRank(format: string): number {
+  return ({ pdf: 0, epub: 1, cbz: 2, txt: 3 } as Record<string, number>)[format] ?? 9;
+}
+function stringValue(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) return value.find((item): item is string => typeof item === "string" && item.trim())?.trim();
+  return undefined;
+}
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function extractMeta(html: string, name: string): string | undefined {
+  const patterns = [
+    new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']+)["']`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${name}["']`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const value = html.match(pattern)?.[1]?.replace(/&amp;/g, "&").trim();
+    if (value) return value.slice(0, 180);
+  }
+  return undefined;
+}
+function extractLanguage(html: string): string | undefined {
+  return html.match(/<html[^>]+lang=["']([^"']+)["']/i)?.[1]?.slice(0, 20);
+}
+
 async function resolveSourceRequest(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
   let body: ResolveBody;
@@ -128,6 +452,15 @@ async function resolveSourceRequest(request: Request): Promise<Response> {
         format: resolved.format,
         streamUrl: `/api/source/stream?url=${encodeURIComponent(resolved.directUrl)}`,
         temporary: true,
+        domain: new URL(resolved.sourceUrl).hostname.replace(/^www./, ""),
+        sizeBytes: resolved.sizeBytes,
+        sizeLabel: resolved.sizeBytes ? formatBytes(resolved.sizeBytes) : undefined,
+        contentType: resolved.contentType,
+        author: resolved.author,
+        language: resolved.language,
+        cover: resolved.cover,
+        provider: resolved.provider,
+        verifiedAt: new Date().toISOString(),
       },
     });
   } catch (error) {
@@ -196,6 +529,7 @@ async function resolveSource(source: URL): Promise<ResolvedSource> {
       title: stripExtension(filename),
       format: directFormat,
       contentType: contentType || mimeForFormat(directFormat),
+      sizeBytes: Number(response.headers.get("content-length") || 0) || undefined,
     };
   }
 
@@ -225,6 +559,9 @@ async function resolveSource(source: URL): Promise<ResolvedSource> {
         title: stripExtension(candidateName),
         format,
         contentType: candidateType || mimeForFormat(format),
+        sizeBytes: size || undefined,
+        author: extractMeta(html, "author"),
+        language: extractLanguage(html),
       };
     } catch {
       // Try the next candidate. No source bytes are retained.
