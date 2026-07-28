@@ -24,9 +24,8 @@ jobs:
       - name: Materialise direct source changes once
         shell: bash
         run: |
-          if [ -f scripts/materialise-finished-readverse.py ]; then
-            python3 scripts/materialise-finished-readverse.py
-          fi
+          if [ -f scripts/materialise-finished-readverse.py ]; then python3 scripts/materialise-finished-readverse.py; fi
+          if [ -f scripts/fix-finished-readverse-types.py ]; then python3 scripts/fix-finished-readverse-types.py; fi
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Strict engineering build
@@ -61,6 +60,7 @@ jobs:
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
           if [ -f scripts/materialise-finished-readverse.py ]; then git rm -f scripts/materialise-finished-readverse.py; fi
-          git add package.json package-lock.json wrangler.jsonc worker/index.ts worker/platform.ts src public scripts engineering-evidence/finished-readverse
+          if [ -f scripts/fix-finished-readverse-types.py ]; then git rm -f scripts/fix-finished-readverse-types.py; fi
+          git add package.json package-lock.json wrangler.jsonc worker/index.ts worker/platform.ts src public scripts docs engineering-evidence/finished-readverse
           git commit -m "Finish persistence, native readers and Google Drive integration" || exit 0
           git push origin HEAD:finish-readverse-persistence-formats
