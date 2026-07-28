@@ -70,13 +70,15 @@ export async function cacheSourceForOffline(input: {
   if (!response.ok || !response.body) throw new Error(`The reading file returned HTTP ${response.status}`);
   const total = Number(response.headers.get("content-length") || 0);
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const chunks: ArrayBuffer[] = [];
   let received = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     if (value) {
-      chunks.push(value);
+      const copy = new Uint8Array(value.byteLength);
+      copy.set(value);
+      chunks.push(copy.buffer);
       received += value.byteLength;
       input.onProgress?.(total ? Math.min(100, Math.round((received / total) * 100)) : null);
     }
