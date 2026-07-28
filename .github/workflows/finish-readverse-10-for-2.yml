@@ -1,16 +1,16 @@
 name: Finish ReadVerse 10-for-2
 
 on:
-  push:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
     branches: [main]
-    paths:
-      - .github/workflows/finish-readverse-10-for-2.yml
 
 permissions:
   contents: write
 
 jobs:
   materialise-and-prove:
+    if: github.event.pull_request.head.ref == 'finish-readverse-persistence-formats'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -21,8 +21,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Materialise direct source changes
-        run: python3 scripts/materialise-finished-readverse.py
+      - name: Materialise direct source changes once
+        shell: bash
+        run: |
+          if [ -f scripts/materialise-finished-readverse.py ]; then
+            python3 scripts/materialise-finished-readverse.py
+          fi
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Strict engineering build
@@ -56,7 +60,7 @@ jobs:
           set -euo pipefail
           git config user.name "ReadVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
+          if [ -f scripts/materialise-finished-readverse.py ]; then git rm -f scripts/materialise-finished-readverse.py; fi
           git add package.json package-lock.json wrangler.jsonc worker/index.ts worker/platform.ts src public scripts engineering-evidence/finished-readverse
-          git rm -f scripts/materialise-finished-readverse.py
-          git commit -m "Finish persistence, native readers and Google Drive integration"
+          git commit -m "Finish persistence, native readers and Google Drive integration" || exit 0
           git push origin HEAD:finish-readverse-persistence-formats
