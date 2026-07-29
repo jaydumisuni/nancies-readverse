@@ -28,6 +28,7 @@ jobs:
 
       - name: Materialise canonical NoTVerse source
         run: |
+          python3 scripts/fix-notverse-types.py
           python3 scripts/materialise-notverse.py
           python3 scripts/materialise-notverse-metadata.py
           python3 scripts/fix-notverse-social.py
@@ -79,7 +80,7 @@ jobs:
           set -euo pipefail
           git config user.name "NoTVerse Engineering"
           git config user.email "actions@users.noreply.github.com"
-          git rm -f .notverse-10-for-2-trigger .github/workflows/notverse-10-for-2.yml scripts/materialise-notverse.py scripts/materialise-notverse-metadata.py scripts/fix-notverse-social.py
+          git rm -f .notverse-10-for-2-trigger .github/workflows/notverse-10-for-2.yml scripts/materialise-notverse.py scripts/materialise-notverse-metadata.py scripts/fix-notverse-social.py scripts/fix-notverse-types.py
           git add package.json package-lock.json wrangler.jsonc index.html public src worker social-worker docs scripts engineering-evidence/notverse
           git commit -m "Expand ReadVerse into the verified NoTVerse product"
           git push origin HEAD:notverse-product-expansion
