@@ -24,12 +24,14 @@ async function advanceSetup(page, targetPage) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = Number(await page.locator(".notverse-setup").getAttribute("data-page") || 0);
     if (current === targetPage) return;
-    await swipeUp(page);
+    const viewport = page.viewportSize();
+    await page.mouse.move(8, Math.round((viewport?.height || 844) / 2));
+    await page.mouse.wheel(0, 650);
     try {
       await page.waitForFunction((target) => Number(document.querySelector(".notverse-setup")?.getAttribute("data-page") || 0) === target, targetPage, { timeout: 2500 });
       return;
     } catch {
-      // Retry the physical gesture if the browser dropped one pointer sequence.
+      // Retry if the accumulated wheel threshold was not reached on the first event.
     }
   }
   throw new Error(`setup did not advance to page ${targetPage}`);
@@ -73,7 +75,7 @@ try {
   await setupPage.screenshot({ path: `${output}/setup-cover-mobile.png` });
   report.screenshots.push("setup-cover-mobile.png");
 
-  await advanceSetup(setupPage, 2);
+  await swipeUp(setupPage);
   await setupPage.locator(".setup-sheet-2").waitFor();
   await setupPage.screenshot({ path: `${output}/setup-profile-mobile.png` });
   report.screenshots.push("setup-profile-mobile.png");
