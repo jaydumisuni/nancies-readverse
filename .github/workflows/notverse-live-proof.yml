@@ -1,0 +1,74 @@
+name: Verify NoTVerse production live
+
+on:
+  push:
+    branches: [verify-notverse-production-20260729]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: verify-notverse-production-20260729
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wait for canonical Worker deployment
+        env:
+          LIVE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in $(seq 1 45); do
+            echo "Production probe $attempt/45"
+            if curl -fsSL --retry 2 --connect-timeout 15 --max-time 45 "$LIVE_URL/" -o /tmp/notverse-live.html; then
+              if grep -q "NoTVerse" /tmp/notverse-live.html; then
+                echo "NoTVerse deployment detected"
+                ready=1
+                break
+              fi
+              echo "Domain is reachable but still serves the previous frontend"
+            else
+              echo "Domain not reachable yet"
+            fi
+            sleep 20
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Production did not expose NoTVerse within the deployment window"
+            sed -n '1,80p' /tmp/notverse-live.html 2>/dev/null || true
+            exit 1
+          fi
+      - name: Install browser proof dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Verify complete desktop and mobile production experience
+        env:
+          NOTVERSE_TEST_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
+        run: node scripts/verify-notverse-ui.mjs
+      - name: Probe production health and custom domains
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-production
+          for url in \
+            https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/api/health \
+            https://nancyreadverse.1ink.online/ \
+            https://nancyreadverse.link.online/; do
+            echo "=== $url ===" | tee -a engineering-evidence/notverse-production/domain-probes.txt
+            curl -sSIL --connect-timeout 15 --max-time 45 "$url" 2>&1 | tee -a engineering-evidence/notverse-production/domain-probes.txt || true
+          done
+      - name: Upload production visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-live-production-evidence
+          path: |
+            engineering-evidence/notverse
+            engineering-evidence/notverse-production
+          if-no-files-found: error
