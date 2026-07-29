@@ -1,0 +1,78 @@
+name: NoTVerse focused workspace proof
+
+on:
+  push:
+    branches: [notverse-product-expansion]
+    paths:
+      - .notverse-focus-trigger
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-and-prove:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'notverse-product-expansion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: notverse-product-expansion
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply focused workspace correction
+        run: python3 scripts/apply-notverse-focus.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict build
+        run: npm run build
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Start local Reader Worker
+        shell: bash
+        run: |
+          mkdir -p engineering-evidence/notverse engineering-evidence/notverse-polish
+          npx wrangler dev --local --config dist/nancies_readverse/wrangler.json --ip 127.0.0.1 --port 4173 > engineering-evidence/notverse-polish/server.log 2>&1 &
+          echo $! > /tmp/notverse-focus-server.pid
+          READY=0
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:4173/api/health >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+      - name: Full NoTVerse browser proof
+        run: |
+          node scripts/verify-notverse-ui.mjs
+          node scripts/verify-notverse-polish.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+      - name: Stop local Worker
+        if: always()
+        run: kill $(cat /tmp/notverse-focus-server.pid) 2>/dev/null || true
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-focused-workspace-evidence
+          path: |
+            engineering-evidence/notverse
+            engineering-evidence/notverse-polish
+          if-no-files-found: error
+      - name: Commit canonical correction and remove temporary machinery
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "NoTVerse Engineering"
+          git config user.email "actions@users.noreply.github.com"
+          git rm -f .notverse-focus-trigger .github/workflows/notverse-focus-proof.yml scripts/apply-notverse-focus.py
+          git add src/App.tsx scripts/verify-notverse-polish.mjs
+          git commit -m "Keep NoTVerse workspaces focused and unobstructed"
+          git push origin HEAD:notverse-product-expansion
