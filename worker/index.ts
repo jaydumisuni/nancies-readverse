@@ -1,8 +1,15 @@
+import { handlePlatformRoute } from "./platform";
+
 interface Env {
   ASSETS: Fetcher;
   AI: Ai;
   APP_NAME: string;
   AI_MODEL: string;
+  SESSION_KV?: KVNamespace;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 }
 
 type ChatTurn = { role?: unknown; text?: unknown };
@@ -64,6 +71,8 @@ const personalityGuides: Record<string, string> = {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const platformResponse = await handlePlatformRoute(request, env);
+    if (platformResponse) return platformResponse;
 
     if (url.pathname === "/api/health") {
       return json({

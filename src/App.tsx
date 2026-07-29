@@ -11,6 +11,11 @@ import {
 } from "react";
 import { avatarImages, type AvatarId } from "./avatars";
 import PdfBookReader from "./reader/PdfBookReader";
+import UniversalReader, { type ReaderActionStatus } from "./reader/UniversalReader";
+import GoogleStoragePanel from "./platform/GoogleStoragePanel";
+import { useGoogleDriveSync } from "./platform/useGoogleDriveSync";
+import { cacheSourceForOffline, getOfflineFile, markSnapshotUpdated, saveOfflineBlob } from "./platform/storage";
+import { getGoogleAccountStatus, saveRemoteSourceToDrive, uploadBlobToDrive } from "./platform/google-client";
 
 type Gender = "woman" | "man" | "nonbinary" | "prefer_not_to_say";
 type ThemeId =
@@ -70,6 +75,12 @@ type Book = {
   author?: string;
   language?: string;
   savedAt?: string;
+  currentPage?: number;
+  totalPages?: number;
+  readerMode?: string;
+  lastOpened?: string;
+  offline?: boolean;
+  driveFileId?: string;
 };
 
 type UploadItem = {
@@ -156,6 +167,8 @@ type ReaderSource = {
   language?: string;
   cover?: string;
   sizeLabel?: string;
+  mimeType?: string;
+  blobId?: string;
 };
 
 type ResolveSourceResponse = {
@@ -493,7 +506,7 @@ const defaultRingColors = Object.fromEntries(
 function useStoredState<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(() => {
     try {
-      const saved = sessionStorage.getItem(key);
+      const saved = localStorage.getItem(key);
       return saved ? (JSON.parse(saved) as T) : initialValue;
     } catch {
       return initialValue;
@@ -501,7 +514,9 @@ function useStoredState<T>(key: string, initialValue: T) {
   });
 
   useEffect(() => {
-    sessionStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, JSON.stringify(value));
+    markSnapshotUpdated();
+    window.dispatchEvent(new Event("readverse:state-changed"));
   }, [key, value]);
 
   return [value, setValue] as const;
@@ -636,6 +651,10 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null!);
   const readerRef = useRef<HTMLDivElement>(null!);
   const sessionFileUrls = useRef<Map<string, string>>(new Map());
+  const sessionFileBlobs = useRef<Map<string, Blob>>(new Map());
+  const [offlineStatus, setOfflineStatus] = useState<Record<string, ReaderActionStatus>>({});
+  const [driveStatus, setDriveStatus] = useState<Record<string, ReaderActionStatus>>({});
+  useGoogleDriveSync();
 
   const theme = themes.find((item) => item.id === themeId) ?? themes[0];
   const companion =
@@ -1108,6 +1127,7 @@ export default function App() {
     };
     const objectUrl = URL.createObjectURL(file);
     sessionFileUrls.current.set(upload.id, objectUrl);
+    sessionFileBlobs.current.set(upload.id, file);
 
     setMessages((current) => [
       ...current,
@@ -1123,7 +1143,7 @@ export default function App() {
         role: "companion",
         text: characterise(
           companion,
-          `I found “${file.name}”. I can open it temporarily, add the title to your library, or keep it offline. Google Drive saving joins in the final account phase.`,
+          `I found “${file.name}”. I can open it temporarily, add the title to your library, or keep it offline. You can open it temporarily, save it offline, add it to the library, or save the full file to Drive after connecting Google.`,
         ),
         time: timeNow(),
       },
@@ -1146,14 +1166,14 @@ export default function App() {
       return;
     }
     const format = upload.name.split(".").pop()?.toLowerCase() || upload.type.toLowerCase();
-    setReaderSource({ id: upload.id, title: upload.name, url, format });
+    setReaderSource({ id: upload.id, title: upload.name, url, format, mimeType: upload.type, blobId: upload.id });
     setReaderOpen(true);
     setMessages((current) => [
       ...current,
       {
         id: uid("read-file"),
         role: "companion",
-        text: characterise(companion, `Opening “${upload.name}” in a temporary reading session. No copy was uploaded to Cloudflare. Google Drive is not connected yet, so the file remains in this browser session only.`),
+        text: characterise(companion, `Opening “${upload.name}” in a temporary reading session. No copy was uploaded to Cloudflare. Use Save offline or Save to Drive only when you want to keep it.`),
         time: timeNow(),
       },
     ]);
@@ -1209,6 +1229,11 @@ export default function App() {
       author: source.author,
       language: source.language,
       savedAt: new Date().toISOString(),
+      currentPage: 1,
+      totalPages: 1,
+      readerMode: source.format,
+      lastOpened: new Date().toISOString(),
+      offline: offlineStatus[source.id] === "done",
     };
     setLibraryBooks((current) => current.some((book) => book.id === newBook.id || (book.sourceUrl && book.sourceUrl === newBook.sourceUrl)) ? current : [newBook, ...current]);
     setMessages((current) => [
@@ -1216,7 +1241,7 @@ export default function App() {
       {
         id: uid("reader-library-added"),
         role: "companion",
-        text: characterise(companion, "Added to your library. I kept the title, source, reading mode and progress record. The full file is still temporary until Google Drive saving is connected."),
+        text: characterise(companion, "Added to your library. I kept the title, source, reading mode and progress record. The source record and progress are now durable. Use Save offline or Save to Drive when you want the full file kept."),
         time: timeNow(),
       },
     ]);
@@ -1245,6 +1270,70 @@ export default function App() {
         time: timeNow(),
       },
     ]);
+  }
+
+  function handleReaderProgress(progress: { page: number; totalPages: number; percent: number; mode: string }) {
+    if (!readerSource) return;
+    setLibraryBooks((current) => current.map((book) =>
+      book.id === readerSource.id || (book.sourceUrl && readerSource.sourceUrl && book.sourceUrl === readerSource.sourceUrl)
+        ? { ...book, currentPage: progress.page, totalPages: progress.totalPages, progress: progress.percent, readerMode: progress.mode, lastOpened: new Date().toISOString() }
+        : book,
+    ));
+  }
+
+  async function saveReaderOffline() {
+    const source = readerSource;
+    if (!source || offlineStatus[source.id] === "working") return;
+    setOfflineStatus((current) => ({ ...current, [source.id]: "working" }));
+    try {
+      const localBlob = source.blobId ? sessionFileBlobs.current.get(source.blobId) : null;
+      if (localBlob) {
+        await saveOfflineBlob({ id: source.id, title: source.title, format: source.format, mimeType: source.mimeType || localBlob.type, blob: localBlob });
+      } else {
+        await cacheSourceForOffline({ id: source.id, title: source.title, url: source.url, format: source.format, mimeType: source.mimeType });
+      }
+      setOfflineStatus((current) => ({ ...current, [source.id]: "done" }));
+      setLibraryBooks((current) => current.map((book) => book.id === source.id ? { ...book, offline: true } : book));
+      setMessages((current) => [...current, { id: uid("offline-saved"), role: "companion", text: characterise(companion, `“${source.title}” is available offline on this device.`), time: timeNow() }]);
+    } catch (error) {
+      setOfflineStatus((current) => ({ ...current, [source.id]: "error" }));
+      setMessages((current) => [...current, { id: uid("offline-error"), role: "companion", text: characterise(companion, `Offline saving stopped because ${error instanceof Error ? error.message : "the browser storage failed"}.`), time: timeNow() }]);
+    }
+  }
+
+  async function saveReaderToDrive() {
+    const source = readerSource;
+    if (!source || driveStatus[source.id] === "working") return;
+    setDriveStatus((current) => ({ ...current, [source.id]: "working" }));
+    try {
+      const account = await getGoogleAccountStatus();
+      if (!account.connected) {
+        setDriveStatus((current) => ({ ...current, [source.id]: "idle" }));
+        setSettingsTab("storage");
+        setSettingsOpen(true);
+        throw new Error(account.configured ? "connect Google Drive first" : "the Google OAuth secrets are not configured yet");
+      }
+      const localBlob = source.blobId ? sessionFileBlobs.current.get(source.blobId) : null;
+      const saved = localBlob
+        ? await uploadBlobToDrive({ blob: localBlob, title: source.title, format: source.format })
+        : await saveRemoteSourceToDrive({ sourceUrl: source.url, title: source.title, format: source.format });
+      setDriveStatus((current) => ({ ...current, [source.id]: "done" }));
+      setLibraryBooks((current) => current.map((book) => book.id === source.id ? { ...book, driveFileId: saved.id } : book));
+      setMessages((current) => [...current, { id: uid("drive-saved"), role: "companion", text: characterise(companion, `Saved “${saved.name}” in the Nancy's ReadVerse folder on Google Drive.`), time: timeNow() }]);
+    } catch (error) {
+      setDriveStatus((current) => ({ ...current, [source.id]: "error" }));
+      setMessages((current) => [...current, { id: uid("drive-error"), role: "companion", text: characterise(companion, `Drive saving stopped because ${error instanceof Error ? error.message : "Google Drive failed"}. Nothing was silently saved.`), time: timeNow() }]);
+    }
+  }
+
+  async function openOfflineReaderSource(source: ReaderSource) {
+    const record = await getOfflineFile(source.id);
+    if (!record) return false;
+    const url = URL.createObjectURL(record.blob);
+    sessionFileUrls.current.set(source.id, url);
+    setReaderSource({ ...source, url, blobId: source.id, mimeType: record.mimeType });
+    setOfflineStatus((current) => ({ ...current, [source.id]: "done" }));
+    return true;
   }
 
   function turnPage(direction: "next" | "previous") {
@@ -1608,6 +1697,11 @@ export default function App() {
           onCloseNotes={() => setNotesOpen(false)}
           inLibrary={Boolean(readerSource && libraryBooks.some((book) => book.id === readerSource.id || (book.sourceUrl && book.sourceUrl === readerSource.sourceUrl)))}
           onAddToLibrary={() => readerSource && addReaderSourceToLibrary(readerSource)}
+          offlineStatus={readerSource ? offlineStatus[readerSource.id] || "idle" : "idle"}
+          driveStatus={readerSource ? driveStatus[readerSource.id] || "idle" : "idle"}
+          onSaveOffline={saveReaderOffline}
+          onSaveToDrive={saveReaderToDrive}
+          onProgress={handleReaderProgress}
         />
       )}
 
@@ -2331,32 +2425,7 @@ function SettingsModal({
               </div>
             )}
 
-            {activeTab === "storage" && (
-              <div className="settings-pane storage-pane">
-                <div className="storage-card">
-                  <Icon name="cloud" size={28} />
-                  <div>
-                    <strong>Google Drive</strong>
-                    <p>
-                      Final integration phase: one ReadVerse folder for saved books,
-                      notes, highlights, progress and recovery data.
-                    </p>
-                  </div>
-                  <span>Planned</span>
-                </div>
-                <div className="storage-card">
-                  <Icon name="download" size={28} />
-                  <div>
-                    <strong>Offline storage</strong>
-                    <p>
-                      The PWA already keeps profile, theme, companion, notes and demo
-                      progress locally. Book caching follows with the reader engine.
-                    </p>
-                  </div>
-                  <span>Local</span>
-                </div>
-              </div>
-            )}
+            {activeTab === "storage" && <GoogleStoragePanel />}
           </div>
         </div>
       </section>
@@ -2374,6 +2443,11 @@ function ReaderModal({
   onNoteChange,
   inLibrary,
   onAddToLibrary,
+  offlineStatus,
+  driveStatus,
+  onSaveOffline,
+  onSaveToDrive,
+  onProgress,
 }: {
   open: boolean;
   fullscreen: boolean;
@@ -2392,6 +2466,11 @@ function ReaderModal({
   onCloseNotes: () => void;
   inLibrary: boolean;
   onAddToLibrary: () => void;
+  offlineStatus: ReaderActionStatus;
+  driveStatus: ReaderActionStatus;
+  onSaveOffline: () => void;
+  onSaveToDrive: () => void;
+  onProgress: (progress: { page: number; totalPages: number; percent: number; mode: string }) => void;
 }) {
   const activeSource: ReaderSource = source ?? {
     id: "demo-reader",
@@ -2402,18 +2481,25 @@ function ReaderModal({
 
   if (activeSource.format.toLowerCase() !== "pdf") {
     return (
-      <div className={`reader-overlay ${fullscreen ? "is-fullscreen" : ""}`}>
-        <div className="reader-window document-fallback">
-          <header className="reader-toolbar">
-            <button type="button" onClick={onClose} aria-label="Close reader"><Icon name="close" size={22} /></button>
-            <div><strong>{activeSource.title}</strong><small>Temporary {activeSource.format.toUpperCase()} session</small></div>             <nav><button type="button" className="reader-add-library" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button><button type="button" onClick={onFullscreen}><Icon name="expand" size={19} /></button></nav>
-          </header>
-          <div className="document-stage">
-            <iframe className="reader-document" src={activeSource.url} title={activeSource.title} />
-            <a className="document-open-link" href={activeSource.url} target="_blank" rel="noreferrer">Open the original file</a>
-          </div>
-        </div>
-      </div>
+      <UniversalReader
+        sourceId={activeSource.id}
+        sourceUrl={activeSource.url}
+        title={activeSource.title}
+        format={activeSource.format}
+        fullscreen={fullscreen}
+        readerRef={readerRef}
+        note={note}
+        inLibrary={inLibrary}
+        offlineStatus={offlineStatus}
+        driveStatus={driveStatus}
+        onClose={onClose}
+        onFullscreen={onFullscreen}
+        onNoteChange={onNoteChange}
+        onAddToLibrary={onAddToLibrary}
+        onSaveOffline={onSaveOffline}
+        onSaveToDrive={onSaveToDrive}
+        onProgress={onProgress}
+      />
     );
   }
 
@@ -2431,6 +2517,11 @@ function ReaderModal({
       onNoteChange={onNoteChange}
       inLibrary={inLibrary}
       onAddToLibrary={onAddToLibrary}
+      offlineStatus={offlineStatus}
+      driveStatus={driveStatus}
+      onSaveOffline={onSaveOffline}
+      onSaveToDrive={onSaveToDrive}
+      onProgress={onProgress}
     />
   );
 }
