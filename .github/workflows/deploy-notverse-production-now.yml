@@ -3,12 +3,16 @@ name: Deploy NoTVerse production now
 on:
   push:
     branches: [deploy-notverse-production-now]
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'deploy-notverse-production-now'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
