@@ -1,0 +1,73 @@
+name: NoTVerse polish proof
+
+on:
+  push:
+    branches: [notverse-product-expansion]
+    paths:
+      - .notverse-polish-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: notverse-product-expansion
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict build
+        run: npm run build
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Start local Reader Worker
+        shell: bash
+        run: |
+          mkdir -p engineering-evidence/notverse engineering-evidence/notverse-polish
+          npx wrangler dev --local --config dist/nancies_readverse/wrangler.json --ip 127.0.0.1 --port 4173 > engineering-evidence/notverse-polish/server.log 2>&1 &
+          echo $! > /tmp/notverse-polish-server.pid
+          READY=0
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:4173/api/health >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+      - name: Existing NoTVerse browser proof
+        run: node scripts/verify-notverse-ui.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+      - name: Focused setup and Notes polish proof
+        run: node scripts/verify-notverse-polish.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+      - name: Stop local Worker
+        if: always()
+        run: kill $(cat /tmp/notverse-polish-server.pid) 2>/dev/null || true
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-polish-visual-evidence
+          path: |
+            engineering-evidence/notverse
+            engineering-evidence/notverse-polish
+          if-no-files-found: error
+      - name: Remove one-time proof machinery
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "NoTVerse Engineering"
+          git config user.email "actions@users.noreply.github.com"
+          git rm -f .notverse-polish-trigger .github/workflows/notverse-polish-proof.yml
+          git commit -m "Freeze verified NoTVerse presentation polish"
+          git push origin HEAD:notverse-product-expansion
