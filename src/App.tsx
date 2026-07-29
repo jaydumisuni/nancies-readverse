@@ -633,7 +633,7 @@ export default function App() {
     "readverse.chat",
     [],
   );
-  const [chatOpen, setChatOpen] = useState(() => window.innerWidth >= 1280);
+  const [chatOpen, setChatOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("companion");
   const [readerOpen, setReaderOpen] = useState(false);
@@ -718,6 +718,10 @@ export default function App() {
     const timer = window.setTimeout(() => setNudgeVisible(false), 7500);
     return () => window.clearTimeout(timer);
   }, [selectedCompanionId]);
+
+  useEffect(() => {
+    if (activeSection !== "home") setChatOpen(false);
+  }, [activeSection]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();

@@ -100,6 +100,9 @@ try {
   const desktopPaper = await appPage.locator(".note-flip-stage").boundingBox();
   assert(desktopPaper && desktopPaper.width >= 560, `desktop Note paper is too small: ${desktopPaper?.width ?? 0}px`);
   assert(!(await appPage.locator(".floating-companion").isVisible()), "floating companion covers the desktop Notes workspace");
+  await appPage.waitForTimeout(120);
+  const companionPanelOpen = await appPage.locator(".companion-panel").evaluate((node) => node.classList.contains("open"));
+  assert(!companionPanelOpen, "companion panel remains open over desktop Notes");
   await appPage.screenshot({ path: `${output}/notes-desktop-focused.png` });
   report.screenshots.push("notes-desktop-focused.png");
   report.checks.push("desktop Notes is focused and paper-sized");
