@@ -1,0 +1,37 @@
+name: NoTVerse production proof
+
+on:
+  push:
+    branches: [verify-notverse-production]
+    paths:
+      - .notverse-production-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  verify-live-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: verify-notverse-production
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser proof dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Verify both production domains visually
+        run: node scripts/verify-notverse-production.mjs
+      - name: Upload live visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-production-evidence
+          path: engineering-evidence/notverse-production
+          if-no-files-found: error
