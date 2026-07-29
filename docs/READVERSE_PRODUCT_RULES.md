@@ -1,4 +1,4 @@
-# Nancy’s ReadVerse — Canonical Product Rules
+# NoTVerse — Canonical Product Rules
 
 Recovery baseline: 2026-07-28
 Canonical architecture: local-first-google-owned-v2
@@ -74,3 +74,12 @@ A release is not complete until the live deployed site has been tested with:
 - multi-turn conversations with all twelve companions;
 - desktop, tablet and mobile visual checks matching the intended design;
 - confirmation that no obsolete Gogo or old ReadVerse implementation remains.
+
+
+## NoTVerse product expansion
+
+- Exact visible name: **NoTVerse**.
+- Exact origin line: **Created for Nancy. Shared with the world.**
+- Setup is swipe-only and uses the existing twelve approved companions.
+- Notes are physical notebook pages flipped up and down, never an endless social-card feed.
+- Social data belongs in the isolated `social-worker` service; copied reading books never belong in its R2 bucket.

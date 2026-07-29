@@ -1,19 +1,21 @@
 {
-  "name": "nancies-readverse",
-  "version": "1.1.0",
+  "name": "notverse",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:guided": "node scripts/verify-guided-discovery-build.mjs",
-    "build": "npm run verify:architecture && tsc --noEmit && vite build && npm run verify:guided && npm run verify:finish",
+    "build": "npm run verify:architecture && tsc --noEmit && vite build && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/nancies_readverse/wrangler.json",
     "deploy:preview": "npm run build && wrangler versions upload --config dist/nancies_readverse/wrangler.json",
     "check": "npm run verify:architecture && tsc --noEmit",
     "cf-typegen": "wrangler types",
-    "verify:finish": "node scripts/verify-finished-readverse.mjs"
+    "verify:finish": "node scripts/verify-finished-readverse.mjs",
+    "verify:notverse": "node scripts/verify-notverse-build.mjs",
+    "check:social": "tsc --noEmit -p social-worker/tsconfig.json"
   },
   "dependencies": {
     "pdfjs-dist": "^6.1.200",

@@ -16,6 +16,11 @@ import GoogleStoragePanel from "./platform/GoogleStoragePanel";
 import { useGoogleDriveSync } from "./platform/useGoogleDriveSync";
 import { cacheSourceForOffline, getOfflineFile, markSnapshotUpdated, saveOfflineBlob } from "./platform/storage";
 import { getGoogleAccountStatus, saveRemoteSourceToDrive, uploadBlobToDrive } from "./platform/google-client";
+import SetupWizard from "./notverse/SetupWizard";
+import NoTVerseViews from "./notverse/NoTVerseViews";
+import { defaultNoTVersePreferences } from "./notverse/storage";
+import type { NoTVerseNav, NoTVersePreferences, PresenceReader } from "./notverse/types";
+import "./notverse/notverse.css";
 
 type Gender = "woman" | "man" | "nonbinary" | "prefer_not_to_say";
 type ThemeId =
@@ -628,7 +633,7 @@ export default function App() {
     "readverse.chat",
     [],
   );
-  const [chatOpen, setChatOpen] = useState(() => window.innerWidth >= 1280);
+  const [chatOpen, setChatOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("companion");
   const [readerOpen, setReaderOpen] = useState(false);
@@ -640,7 +645,8 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [searching, setSearching] = useState(false);
   const [nudgeVisible, setNudgeVisible] = useState(true);
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState<NoTVerseNav>("home");
+  const [notversePreferences, setNoTVersePreferences] = useStoredState<NoTVersePreferences>("notverse.preferences", defaultNoTVersePreferences);
   const [readerSource, setReaderSource] = useState<ReaderSource | null>(null);
   const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
   const [sourceUrl, setSourceUrl] = useState("");
@@ -660,6 +666,13 @@ export default function App() {
   const companion =
     companions.find((item) => item.id === selectedCompanionId) ?? companions[0];
   const ringColor = ringColors[companion.id] ?? companion.defaultRing;
+  const presenceReaders = useMemo<PresenceReader[]>(() => companions.slice(0, 8).map((item, index) => ({
+    id: `presence-${item.id}`,
+    name: item.name,
+    avatar: avatarImages[item.id],
+    book: libraryBooks[index % Math.max(1, libraryBooks.length)]?.title || "One Piece",
+    nearProgress: index < 4,
+  })), [libraryBooks]);
 
   const companionMessages = useMemo(() => {
     if (messages.length > 0) return messages;
@@ -705,6 +718,10 @@ export default function App() {
     const timer = window.setTimeout(() => setNudgeVisible(false), 7500);
     return () => window.clearTimeout(timer);
   }, [selectedCompanionId]);
+
+  useEffect(() => {
+    if (activeSection !== "home") setChatOpen(false);
+  }, [activeSection]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -868,7 +885,7 @@ export default function App() {
     });
     const body = (await response.json()) as ResolveSourceResponse;
     if (!response.ok || !body.ok || !body.source) {
-      throw new Error(body.reason || body.error || "ReadVerse could not resolve that source.");
+      throw new Error(body.reason || body.error || "NoTVerse could not resolve that source.");
     }
     return body.source;
   }
@@ -1098,7 +1115,7 @@ export default function App() {
   }
 
   function explainSourceFailure(error: unknown, title?: string) {
-    const reason = error instanceof Error ? error.message : "ReadVerse could not verify an accessible reading file.";
+    const reason = error instanceof Error ? error.message : "NoTVerse could not verify an accessible reading file.";
     setMessages((current) => [
       ...current,
       {
@@ -1112,6 +1129,48 @@ export default function App() {
 
   function chooseMood(mood: string) {
     setQuestion(`Find something ${mood.toLowerCase()}`);
+  }
+
+  function launchNoTVerseDiscovery(query: string) {
+    const clean = query.trim();
+    if (!clean) return;
+    setActiveSection("search");
+    setChatOpen(true);
+    setMessages((current) => [...current, { id: uid("notverse-search-user"), role: "user", text: clean, time: timeNow() }]);
+    void discoverFromMemory(clean);
+  }
+
+  async function openNoTVerseBook(book: Pick<Book, "id" | "title" | "sourceUrl" | "format" | "author" | "offline">) {
+    if (book.format) {
+      const source: ReaderSource = {
+        id: book.id,
+        title: book.title,
+        url: book.sourceUrl || "/fixtures/sample.pdf",
+        format: book.format,
+        sourceUrl: book.sourceUrl,
+        author: book.author,
+      };
+      if (book.offline && await openOfflineReaderSource(source)) {
+        setReaderOpen(true);
+        return;
+      }
+      if (book.sourceUrl) {
+        try {
+          const resolved = await resolveSourceCandidate(book.sourceUrl);
+          setReaderSource({ id: resolved.id, title: resolved.title, url: resolved.streamUrl, format: resolved.format, sourceUrl: resolved.sourceUrl, domain: resolved.domain, author: resolved.author, language: resolved.language, cover: resolved.cover, sizeLabel: resolved.sizeLabel });
+          setReaderOpen(true);
+          return;
+        } catch (error) {
+          explainSourceFailure(error, book.title);
+          setChatOpen(true);
+          return;
+        }
+      }
+      setReaderSource(source);
+    } else {
+      setReaderSource(null);
+    }
+    setReaderOpen(true);
   }
 
   function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -1134,7 +1193,7 @@ export default function App() {
       {
         id: uid("upload-user"),
         role: "user",
-        text: "I attached this for ReadVerse.",
+        text: "I attached this for NoTVerse.",
         upload,
         time: timeNow(),
       },
@@ -1207,7 +1266,7 @@ export default function App() {
         },
       ]);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "ReadVerse could not resolve that source.";
+      const reason = error instanceof Error ? error.message : "NoTVerse could not resolve that source.";
       setSourceError(reason);
       explainSourceFailure(error);
     } finally {
@@ -1319,7 +1378,7 @@ export default function App() {
         : await saveRemoteSourceToDrive({ sourceUrl: source.url, title: source.title, format: source.format });
       setDriveStatus((current) => ({ ...current, [source.id]: "done" }));
       setLibraryBooks((current) => current.map((book) => book.id === source.id ? { ...book, driveFileId: saved.id } : book));
-      setMessages((current) => [...current, { id: uid("drive-saved"), role: "companion", text: characterise(companion, `Saved “${saved.name}” in the Nancy's ReadVerse folder on Google Drive.`), time: timeNow() }]);
+      setMessages((current) => [...current, { id: uid("drive-saved"), role: "companion", text: characterise(companion, `Saved “${saved.name}” in the NoTVerse folder on Google Drive.`), time: timeNow() }]);
     } catch (error) {
       setDriveStatus((current) => ({ ...current, [source.id]: "error" }));
       setMessages((current) => [...current, { id: uid("drive-error"), role: "companion", text: characterise(companion, `Drive saving stopped because ${error instanceof Error ? error.message : "Google Drive failed"}. Nothing was silently saved.`), time: timeNow() }]);
@@ -1389,44 +1448,44 @@ export default function App() {
   }
 
   return (
-    <div className="readverse-app">
+    <div className="readverse-app notverse-app">
       <div className="cosmic-grid" />
+      {!notversePreferences.setupComplete && (
+        <SetupWizard
+          profile={profile}
+          preferences={notversePreferences}
+          selectedTheme={themeId}
+          selectedCompanion={selectedCompanionId}
+          themes={themes}
+          companions={companions.map((item) => ({ id: item.id, name: item.name, summary: item.summary, avatar: avatarImages[item.id], ring: ringColors[item.id] || item.defaultRing }))}
+          onProfile={setProfile}
+          onPreferences={setNoTVersePreferences}
+          onTheme={(id) => setThemeId(id as ThemeId)}
+          onCompanion={(id) => updateCompanion(id as AvatarId)}
+          onComplete={() => { setChatOpen(false); setNoTVersePreferences((current) => ({ ...current, setupComplete: true })); }}
+        />
+      )}
       <aside className="sidebar">
-        <a className="brand" href="#home" onClick={() => setActiveSection("home")}>
-          <span>Nancy&apos;s</span>
-          <strong>ReadVerse</strong>
-          <small>Your stories. Your world.</small>
+        <a className="brand notverse-brand" href="#home" onClick={() => setActiveSection("home")}>
+          <span>▤</span>
+          <strong>NoTVerse</strong>
+          <small className="notverse-origin">Created for Nancy.<br />Shared with the world.</small>
         </a>
 
         <nav className="side-nav" aria-label="Main navigation">
           {[
             ["home", "home", "Home"],
+            ["search", "search", "Search"],
+            ["notes", "note", "Notes"],
             ["library", "book", "Library"],
-            ["continue", "clock", "Continue Reading"],
-            ["favourites", "heart", "Favourites"],
-            ["discover", "search", "Discover"],
-            ["sources", "sparkle", "Sources"],
-            ["notes", "note", "Notes & Highlights"],
-            ["downloads", "download", "Downloads"],
+            ["inbox", "send", "Inbox"],
+            ["me", "user", "Me"],
           ].map(([id, icon, label]) => (
             <button
               className={activeSection === id ? "active" : ""}
               key={id}
               type="button"
-              onClick={() => {
-                setActiveSection(id);
-                if (id === "sources") {
-                  setSourceError("");
-                  setSourceDialogOpen(true);
-                } else if (id === "continue") {
-                  setReaderSource(null);
-                  setReaderOpen(true);
-                } else if (id === "notes") {
-                  setReaderSource(null);
-                  setReaderOpen(true);
-                  setNotesOpen(true);
-                }
-              }}
+              onClick={() => { setActiveSection(id as NoTVerseNav); setChatOpen(false); }}
             >
               <Icon name={icon as Parameters<typeof Icon>[0]["name"]} />
               <span>{label}</span>
@@ -1462,14 +1521,14 @@ export default function App() {
         </button>
       </aside>
 
-      <main className={`main-shell ${chatOpen ? "with-chat" : ""}`}>
+      <main className={`main-shell notverse-shell ${chatOpen ? "with-chat" : ""}`}>
         <header className="utility-bar">
-          <div className="mobile-brand"><span>Nancy’s</span><strong>READVERSE</strong></div>
+          <div className="mobile-brand"><span>▤</span><strong>NoTVerse</strong></div>
           <label className="global-search">
             <Icon name="search" size={18} />
             <input
-              placeholder="Search manga, comics, novels..."
-              onFocus={() => setActiveSection("discover")}
+              placeholder="Search books, manga, comics, PDFs…"
+              onFocus={() => setActiveSection("search")}
             />
             <kbd>⌘ K</kbd>
           </label>
@@ -1495,108 +1554,23 @@ export default function App() {
           </div>
         </header>
 
-        <section className="dashboard" id="home">
-          <div className="welcome-copy">
-            <span className="kicker">Your shelf is ready</span>
-            <h1>{greeting}! <em>✨</em></h1>
-            <p>What shall we read today?</p>
-          </div>
-
-          <article className="companion-overview">
-            <div className="overview-ring" style={{ "--ring": ringColor } as React.CSSProperties}>
-              <img src={avatarImages[companion.id]} alt="" />
-            </div>
-            <div className="overview-copy">
-              <span className="kicker">My companion</span>
-              <h2>{companion.name}</h2>
-              <p>{companion.traits.slice(0, 3).join(" · ")}</p>
-            </div>
-            <button type="button" onClick={() => setChatOpen(true)}>
-              Chat now
-            </button>
-            <div className="overview-actions">
-              <button type="button" onClick={() => fileInputRef.current?.click()}>
-                <Icon name="upload" size={15} /> Upload a file
-              </button>
-              <button type="button" onClick={() => {
-                setSettingsTab("companion");
-                setSettingsOpen(true);
-              }}>
-                <Icon name="palette" size={15} /> Customise
-              </button>
-            </div>
-          </article>
-
-          <section className="continue-section">
-            <SectionHeader title="Continue Reading" action="View all" />
-            <div className="book-row">
-              {libraryBooks.slice(0, 5).map((book) => (
-                <BookCard
-                  book={book}
-                  key={book.id}
-                  onOpen={() => { setReaderSource(null); setReaderOpen(true); }}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="recent-section">
-            <SectionHeader title="Recently Added" action="Fresh stories" />
-            <div className="recent-grid">
-              {recentBooks.map((book) => (
-                <BookCard
-                  book={book}
-                  key={book.id}
-                  compact
-                  onOpen={() => { setReaderSource(null); setReaderOpen(true); }}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="feature-grid">
-            <article className="feature-card">
-              <span className="kicker">Personal search</span>
-              <h2>Ten lanes. Two verifiers. No waiting politely in line.</h2>
-              <p>
-                ReadVerse searches sources in parallel and shows verified results as
-                they arrive.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearching(true);
-                  setChatOpen(true);
-                  setMessages((current) => [
-                    ...current,
-                    {
-                      id: uid("search"),
-                      role: "companion",
-                      text: companion.searchLine,
-                      time: timeNow(),
-                    },
-                  ]);
-                  window.setTimeout(() => setSearching(false), 2400);
-                }}
-              >
-                <Icon name="search" size={17} />
-                Start smart search
-              </button>
-            </article>
-            <article className="feature-card upload-feature">
-              <span className="kicker">Drop it in chat</span>
-              <h2>PDF, EPUB or CBZ—your companion can open it.</h2>
-              <p>
-                Read temporarily, add it to the library, or keep it offline. Nothing
-                permanent happens without a clear choice.
-              </p>
-              <button type="button" onClick={() => fileInputRef.current?.click()}>
-                <Icon name="upload" size={17} />
-                Upload a reading file
-              </button>
-            </article>
-          </section>
-        </section>
+        <NoTVerseViews
+          active={activeSection}
+          displayName={profile.displayName || profile.name}
+          avatar={profile.avatarDataUrl}
+          status={profile.status}
+          greeting={greeting}
+          companion={{ name: companion.name, avatar: avatarImages[companion.id], ring: ringColor, summary: companion.summary }}
+          books={libraryBooks}
+          preferences={notversePreferences}
+          presence={presenceReaders}
+          onDiscover={launchNoTVerseDiscovery}
+          onSource={() => { setSourceError(""); setSourceDialogOpen(true); }}
+          onUpload={() => fileInputRef.current?.click()}
+          onChat={() => setChatOpen(true)}
+          onSettings={() => setSettingsOpen(true)}
+          onOpenBook={openNoTVerseBook}
+        />
 
         <button
           className="floating-companion"
@@ -1705,22 +1679,20 @@ export default function App() {
         />
       )}
 
-      <nav className="mobile-nav" aria-label="Mobile navigation">
+      <nav className="mobile-nav notverse-mobile-nav" aria-label="Mobile navigation">
         {[
           ["home", "home", "Home"],
+          ["search", "search", "Search"],
+          ["notes", "note", "Notes"],
           ["library", "book", "Library"],
-          ["discover", "search", "Search"],
-          ["companion", "sparkle", companion.name],
-          ["settings", "settings", "Settings"],
+          ["inbox", "send", "Inbox"],
+          ["me", "user", "Me"],
         ].map(([id, icon, label]) => (
           <button
             type="button"
             key={id}
-            onClick={() => {
-              if (id === "companion") setChatOpen(true);
-              else if (id === "settings") setSettingsOpen(true);
-              else setActiveSection(id);
-            }}
+            className={activeSection === id ? "active" : ""}
+            onClick={() => { setActiveSection(id as NoTVerseNav); setChatOpen(false); }}
           >
             <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={18} />
             <span>{label}</span>
@@ -2094,7 +2066,7 @@ function SourceDialog({
             <Icon name="close" size={21} />
           </button>
         </header>
-        <p>Paste a public PDF, EPUB, CBZ or TXT link, or a page containing an accessible reading file. ReadVerse verifies it before opening it and keeps no permanent Cloudflare copy.</p>
+        <p>Paste a public PDF, EPUB, CBZ or TXT link, or a page containing an accessible reading file. NoTVerse verifies it before opening it and keeps no permanent Cloudflare copy.</p>
         <form onSubmit={onSubmit}>
           <label>
             Source URL
@@ -2156,7 +2128,7 @@ function SettingsModal({
         <header>
           <div>
             <span className="kicker">Make it yours</span>
-            <h2>ReadVerse Settings</h2>
+            <h2>NoTVerse Settings</h2>
           </div>
           <button type="button" onClick={onClose}>
             <Icon name="close" size={22} />
@@ -2474,7 +2446,7 @@ function ReaderModal({
 }) {
   const activeSource: ReaderSource = source ?? {
     id: "demo-reader",
-    title: "Nancy's ReadVerse Sample",
+    title: "NoTVerse Sample",
     url: "/fixtures/sample.pdf",
     format: "pdf",
   };
