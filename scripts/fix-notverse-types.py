@@ -12,3 +12,8 @@ materialiser = Path("scripts/materialise-notverse.py")
 text = materialiser.read_text()
 text = text.replace('  async function openNoTVerseBook(book: Book) {', '  async function openNoTVerseBook(book: Pick<Book, "id" | "title" | "sourceUrl" | "format" | "author" | "offline">) {', 1)
 materialiser.write_text(text)
+
+ui_test = Path("scripts/verify-notverse-ui.mjs")
+text = ui_test.read_text()
+text = text.replace('assert(await page.getByText("Created for Nancy.").isVisible(), "complete origin line is not visible on setup cover");', 'assert(await page.locator(".setup-cover-page h2").filter({ hasText: "Created for Nancy. Shared with the world." }).isVisible(), "complete origin line is not visible on setup cover");')
+ui_test.write_text(text)
