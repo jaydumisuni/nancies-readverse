@@ -40,9 +40,9 @@ async function uploadAndOpen(name, mimeType, buffer, expectedSelector) {
 }
 
 async function closeReader() {
-  const close = page.locator(".reader-toolbar > button").first();
+  const close = page.getByRole("button", { name: "Close reader" }).first();
   await close.click();
-  await page.locator(".reader-overlay").waitFor({ state: "detached", timeout: 10000 });
+  await page.locator(".reader-overlay, .pdf-reader").waitFor({ state: "detached", timeout: 10000 });
 }
 
 try {
