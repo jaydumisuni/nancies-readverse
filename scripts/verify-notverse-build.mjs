@@ -33,7 +33,7 @@ const checks = [
   [app.includes("NoTVerse Settings"), "settings still expose the old product name"],
   [setup.includes(exactOrigin), "setup does not preserve the complete origin line"],
   [setup.includes("Swipe up to enter"), "swipe-only final entry is missing"],
-  [setup.includes("setupComplete"), "setup completion state is missing"],
+  [app.includes("notversePreferences.setupComplete") && app.includes("setupComplete: true"), "setup completion state is missing"],
   [setup.includes("companions.map"), "setup does not use the real companion roster"],
   [notes.includes("note-flip-stage"), "Notes page-flip stage is missing"],
   [notes.includes("Swipe up to flip forward"), "Notes swipe direction is missing"],
