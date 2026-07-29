@@ -20,6 +20,21 @@ async function swipeUp(page, selector = ".notverse-setup") {
   await page.waitForTimeout(570);
 }
 
+async function advanceSetup(page, targetPage) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = Number(await page.locator(".notverse-setup").getAttribute("data-page") || 0);
+    if (current === targetPage) return;
+    await swipeUp(page);
+    try {
+      await page.waitForFunction((target) => Number(document.querySelector(".notverse-setup")?.getAttribute("data-page") || 0) === target, targetPage, { timeout: 2500 });
+      return;
+    } catch {
+      // Retry the physical gesture if the browser dropped one pointer sequence.
+    }
+  }
+  throw new Error(`setup did not advance to page ${targetPage}`);
+}
+
 async function noHorizontalOverflow(page, label) {
   const metrics = await page.evaluate(() => ({
     inner: window.innerWidth,
@@ -58,12 +73,12 @@ try {
   await setupPage.screenshot({ path: `${output}/setup-cover-mobile.png` });
   report.screenshots.push("setup-cover-mobile.png");
 
-  await swipeUp(setupPage);
+  await advanceSetup(setupPage, 2);
   await setupPage.locator(".setup-sheet-2").waitFor();
   await setupPage.screenshot({ path: `${output}/setup-profile-mobile.png` });
   report.screenshots.push("setup-profile-mobile.png");
 
-  for (let step = 0; step < 5; step += 1) await swipeUp(setupPage);
+  for (let target = 3; target <= 7; target += 1) await advanceSetup(setupPage, target);
   await setupPage.locator(".setup-sheet-7").waitFor();
   const mobileRoster = await setupPage.locator(".setup-companion-grid strong").allTextContents();
   assert(mobileRoster.length === 12, `mobile setup expected 12 companions, found ${mobileRoster.length}`);
