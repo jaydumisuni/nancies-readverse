@@ -1,4 +1,4 @@
-name: Deploy and verify ReadVerse live
+name: Deploy and verify NoTVerse live
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 jobs:
   deploy-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -15,24 +15,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run build
-      - name: Deploy Worker and frontend assets
-        run: npx wrangler deploy
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict build
+        run: npm run build
+      - name: Deploy canonical Worker and frontend assets
+        run: npx wrangler deploy --config dist/nancies_readverse/wrangler.json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
       - name: Wait for deployment propagation
-        run: sleep 15
-      - name: Verify deployed website visually
-        run: node scripts/visual-verify.mjs
+        run: sleep 20
+      - name: Verify deployed NoTVerse visually
+        run: node scripts/verify-notverse-live.mjs
         env:
-          READVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
+          NOTVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: readverse-live-visual-evidence
-          path: visual-evidence
+          name: notverse-live-visual-evidence
+          path: engineering-evidence/notverse-live
           if-no-files-found: warn
