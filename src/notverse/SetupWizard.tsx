@@ -5,7 +5,7 @@ type SetupProfile = {
   name: string;
   displayName: string;
   birthday: string;
-  gender: string;
+  gender: "woman" | "man" | "nonbinary" | "prefer_not_to_say";
   pronouns: string;
   status: string;
   avatarDataUrl: string;
@@ -76,8 +76,12 @@ export default function SetupWizard({ profile, preferences, selectedTheme, selec
   }, [page, preferences.reducedMotion]);
 
   function pointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,textarea,select,label,a")) {
+      pointerStart.current = null;
+      return;
+    }
     pointerStart.current = event.clientY;
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
   function pointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     const start = pointerStart.current;
@@ -127,11 +131,11 @@ export default function SetupWizard({ profile, preferences, selectedTheme, selec
 }
 
 function SetupCover() {
-  return <div className="setup-cover-page"><span className="cover-notebook">▤</span><h1>NoTVerse</h1><h2>Created for Nancy.<br />Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
+  return <div className="setup-cover-page"><span className="cover-notebook">▤</span><h1>NoTVerse</h1><h2>Created for Nancy. Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
 }
 
 function ProfilePage({ profile, onProfile, onPhoto }: { profile: SetupProfile; onProfile: (profile: SetupProfile) => void; onPhoto: (event: ChangeEvent<HTMLInputElement>) => void }) {
-  return <div className="setup-form-page"><h1>Let&apos;s get to know you</h1><label className="setup-photo">{profile.avatarDataUrl ? <img src={profile.avatarDataUrl} alt="" /> : <span>{(profile.displayName || "N").slice(0, 1)}</span>}<input type="file" accept="image/*" onChange={onPhoto} /><b>Profile picture</b></label><div className="setup-form-grid"><label>Display name<input value={profile.displayName} onChange={(event) => onProfile({ ...profile, displayName: event.target.value })} /></label><label>Nickname <small>optional</small><input value={profile.name} onChange={(event) => onProfile({ ...profile, name: event.target.value })} /></label><label>Birthday <small>optional</small><input type="date" value={profile.birthday} onChange={(event) => onProfile({ ...profile, birthday: event.target.value })} /></label><label>Gender <small>optional</small><select value={profile.gender} onChange={(event) => onProfile({ ...profile, gender: event.target.value })}><option value="prefer_not_to_say">Prefer not to say</option><option value="woman">Woman</option><option value="man">Man</option><option value="nonbinary">Non-binary</option></select></label><label>Pronouns <small>optional</small><input value={profile.pronouns} onChange={(event) => onProfile({ ...profile, pronouns: event.target.value })} /></label><label className="wide">Short status <small>optional</small><textarea value={profile.status} onChange={(event) => onProfile({ ...profile, status: event.target.value })} /></label></div></div>;
+  return <div className="setup-form-page"><h1>Let&apos;s get to know you</h1><label className="setup-photo">{profile.avatarDataUrl ? <img src={profile.avatarDataUrl} alt="" /> : <span>{(profile.displayName || "N").slice(0, 1)}</span>}<input type="file" accept="image/*" onChange={onPhoto} /><b>Profile picture</b></label><div className="setup-form-grid"><label>Display name<input value={profile.displayName} onChange={(event) => onProfile({ ...profile, displayName: event.target.value })} /></label><label>Nickname <small>optional</small><input value={profile.name} onChange={(event) => onProfile({ ...profile, name: event.target.value })} /></label><label>Birthday <small>optional</small><input type="date" value={profile.birthday} onChange={(event) => onProfile({ ...profile, birthday: event.target.value })} /></label><label>Gender <small>optional</small><select value={profile.gender} onChange={(event) => onProfile({ ...profile, gender: event.target.value as SetupProfile["gender"] })}><option value="prefer_not_to_say">Prefer not to say</option><option value="woman">Woman</option><option value="man">Man</option><option value="nonbinary">Non-binary</option></select></label><label>Pronouns <small>optional</small><input value={profile.pronouns} onChange={(event) => onProfile({ ...profile, pronouns: event.target.value })} /></label><label className="wide">Short status <small>optional</small><textarea value={profile.status} onChange={(event) => onProfile({ ...profile, status: event.target.value })} /></label></div></div>;
 }
 
 function ChoicePage({ title, subtitle, values, selected, onToggle }: { title: string; subtitle: string; values: readonly string[]; selected: readonly string[]; onToggle: (value: string) => void }) {
@@ -162,5 +166,5 @@ function CommunityPage({ preferences, onPreferences }: { preferences: NoTVersePr
 }
 
 function SetupComplete() {
-  return <div className="setup-complete-page"><span className="cover-notebook">▤</span><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy.<br />Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
+  return <div className="setup-complete-page"><span className="cover-notebook">▤</span><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy. Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
 }

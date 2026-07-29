@@ -1,11 +1,15 @@
 {
-  "name": "Nancy's ReadVerse",
-  "short_name": "ReadVerse",
-  "description": "Nancy's private universe for comics, manga, novels, and books.",
+  "name": "NoTVerse",
+  "short_name": "NoTVerse",
+  "description": "Created for Nancy. Shared with the world. Find it, verify it, read it, write a Note and meet readers in the same Verse.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050408",
   "theme_color": "#050408",
   "orientation": "any",
-  "categories": ["books", "entertainment", "lifestyle"]
+  "categories": [
+    "books",
+    "entertainment",
+    "lifestyle"
+  ]
 }

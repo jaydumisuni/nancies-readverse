@@ -116,12 +116,12 @@ async function handleCompanion(request: Request, env: Env, ctx: ExecutionContext
         {
           role: "system",
           content:
-            `You are the ${companion}-inspired reading companion selected in Nancy's ReadVerse. ` +
+            `You are the ${companion}-inspired reading companion selected in NoTVerse. ` +
             `Use only broad personality traits: ${personality}. ${customVibe}. ` +
             "Maintain the same voice across the whole conversation. Do not claim to be the canonical copyrighted character, quote catchphrases, or reproduce copyrighted dialogue. " +
             "Hold a normal human conversation first. Reply naturally to greetings, jokes, acknowledgements and follow-up messages. Use the recent conversation to resolve words like it, that, yes and go ahead. Do not reset to a generic product description. " +
             "When the user supplies a source URL, the client tests it; do not pretend you tested it yourself. Never claim that a file opened, a source resolved, a setting saved, or a Google action completed unless the client supplied a confirmed result. " +
-            "ReadVerse keeps fetched files temporary. Permanent files, settings, notes and progress belong in the user's Google account only after explicit consent. " +
+            "NoTVerse keeps fetched files temporary. Permanent files, settings, notes and progress belong in the user's Google account only after explicit consent. " +
             "Do not provide instructions to defeat DRM, paywalls, authentication, CAPTCHAs or access controls. Only mention this restriction when it is actually relevant; never inject it into greetings or ordinary conversation. " +
             "Be concise, useful, spoiler-aware, context-aware and honest. Avoid repeating the same sentence structure or signature line in consecutive replies.",
         },
@@ -385,7 +385,7 @@ function sourceId(source: ResolvedSource): string {
 
 async function fetchJson(url: URL): Promise<unknown> {
   const response = await fetch(url.toString(), {
-    headers: { "user-agent": "NancyReadVerse/1.0", "accept": "application/json" },
+    headers: { "user-agent": "NoTVerse/1.0", "accept": "application/json" },
     signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) throw new Error(`${url.hostname} returned HTTP ${response.status}`);
@@ -645,7 +645,7 @@ function stripTracking(url: URL): URL {
 
 function sourceHeaders(range?: string | null): Headers {
   const headers = new Headers({
-    "user-agent": "Mozilla/5.0 (compatible; NancysReadVerse/1.0; +https://nancyreadverse.1ink.online)",
+    "user-agent": "Mozilla/5.0 (compatible; NoTVerse/1.0; +https://nancyreadverse.1ink.online)",
     "accept": "application/pdf,application/epub+zip,application/zip,text/plain,text/html;q=0.9,*/*;q=0.5",
     "accept-language": "en-US,en;q=0.8",
   });
@@ -698,7 +698,7 @@ function quickConversation(
     return companionFlourish(companion, "You are welcome. Keep going.");
   }
   if (/what can you do|what are you capable of/.test(value)) {
-    return companionFlourish(companion, "I can chat normally, help choose what to read, inspect a public source through ReadVerse, explain exact failures, and control the reading workflow.");
+    return companionFlourish(companion, "I can chat normally, help choose what to read, inspect a public source through NoTVerse, explain exact failures, and control the reading workflow.");
   }
   if (/^(yes|yeah|yep|okay|ok|go ahead|continue|do it)[.!?]*$/.test(value) && history.length) {
     return companionFlourish(companion, "I have the context. The client will carry out the last clear action; if it needs a link or file, I will ask for only that missing piece.");
@@ -713,10 +713,10 @@ function conversationalFallback(
 ): string {
   const value = question.toLowerCase();
   if (/upload|file|pdf|epub|cbz/.test(value)) {
-    return companionFlourish(companion, "Attach the file or paste its public link. ReadVerse will test it before opening it temporarily.");
+    return companionFlourish(companion, "Attach the file or paste its public link. NoTVerse will test it before opening it temporarily.");
   }
   if (/link|source|url|ad/.test(value)) {
-    return companionFlourish(companion, "Paste the link directly. ReadVerse will inspect public redirects and file candidates, then open a verified file or report the exact blocker.");
+    return companionFlourish(companion, "Paste the link directly. NoTVerse will inspect public redirects and file candidates, then open a verified file or report the exact blocker.");
   }
   if (/save|drive|setting|note|progress/.test(value)) {
     return companionFlourish(companion, "Temporary reading works now. Permanent saving waits for an explicit Google action, so the app will not pretend it saved anything.");
@@ -724,7 +724,7 @@ function conversationalFallback(
   if (history.length) {
     return companionFlourish(companion, "I am following. Tell me the next action in plain words and I will keep the current context instead of starting over.");
   }
-  return companionFlourish(companion, "Talk to me normally. Ask about a book, tell me what mood you want, or paste a source for ReadVerse to test.");
+  return companionFlourish(companion, "Talk to me normally. Ask about a book, tell me what mood you want, or paste a source for NoTVerse to test.");
 }
 
 function detectFormat(contentType: string, filename: string): string | null {

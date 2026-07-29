@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "screenshots": [
+    "setup-cover-desktop.png",
+    "setup-profile-desktop.png",
+    "setup-interests-desktop.png",
+    "setup-companions-desktop.png",
+    "setup-complete-desktop.png",
+    "home-desktop.png",
+    "search-desktop.png",
+    "notes-desktop.png",
+    "notes-flipped-desktop.png",
+    "note-composer-desktop.png",
+    "inbox-desktop.png",
+    "profile-desktop.png",
+    "home-mobile.png",
+    "notes-mobile.png",
+    "note-composer-mobile.png"
+  ],
+  "checks": [
+    "setup swipe back",
+    "approved twelve companions",
+    "desktop Home",
+    "search discovery tools",
+    "Notes physical flip",
+    "Note composer persistence",
+    "Inbox layout",
+    "My Notebook profile",
+    "mobile Home, navigation and Notes"
+  ],
+  "errors": []
+}

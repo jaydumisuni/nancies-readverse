@@ -47,13 +47,13 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
 
   await page.locator(".notverse-setup").waitFor({ state: "visible" });
-  assert(await page.getByText("Created for Nancy.").isVisible(), "complete origin line is not visible on setup cover");
+  assert(await page.locator(".setup-cover-page h2").filter({ hasText: "Created for Nancy. Shared with the world." }).isVisible(), "complete origin line is not visible on setup cover");
   await page.screenshot({ path: `${output}/setup-cover-desktop.png`, fullPage: true });
   report.screenshots.push("setup-cover-desktop.png");
 
   await swipeUp(page);
   await page.locator(".setup-sheet-2").waitFor();
-  await page.locator('.setup-sheet-2 input').first().fill("Nancy");
+  await page.locator('.setup-sheet-2 input:not([type="file"])').first().fill("Nancy");
   await page.screenshot({ path: `${output}/setup-profile-desktop.png`, fullPage: true });
   report.screenshots.push("setup-profile-desktop.png");
 
@@ -127,7 +127,7 @@ try {
   report.screenshots.push("inbox-desktop.png");
   report.checks.push("Inbox layout");
 
-  await page.locator(".side-nav button").filter({ hasText: "Me" }).click();
+  await page.getByRole("button", { name: "Me", exact: true }).click();
   await page.locator(".profile-notebook").waitFor();
   await page.screenshot({ path: `${output}/profile-desktop.png`, fullPage: true });
   report.screenshots.push("profile-desktop.png");

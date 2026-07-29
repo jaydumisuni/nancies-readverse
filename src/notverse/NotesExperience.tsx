@@ -54,8 +54,12 @@ export default function NotesExperience({ displayName, avatar, libraryTitles, no
   }
 
   function pointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,textarea,select,label,a")) {
+      pointerStart.current = null;
+      return;
+    }
     pointerStart.current = event.clientY;
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
   function pointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     const start = pointerStart.current;

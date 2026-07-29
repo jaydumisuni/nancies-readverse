@@ -25,8 +25,8 @@ type TokenResponse = {
 
 const SESSION_COOKIE = "readverse_session";
 const SESSION_TTL = 60 * 60 * 24 * 45;
-const FOLDER_NAME = "Nancy's ReadVerse";
-const STATE_FILE = "readverse-state.json";
+const FOLDER_NAME = "NoTVerse";
+const STATE_FILE = "notverse-state.json";
 const SCOPES = [
   "openid",
   "email",

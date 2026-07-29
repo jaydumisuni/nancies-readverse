@@ -70,7 +70,7 @@ async function notesRoute(request: Request, auth: AuthClaims, env: Env, url: URL
     const clauses = ["n.deleted_at IS NULL"];
     const values: unknown[] = [];
     if (view === "saved") { clauses.push("EXISTS(SELECT 1 FROM saved_notes s WHERE s.note_id=n.id AND s.account_id=?)"); values.push(auth.sub); }
-    else if (view === "books") { clauses.push("n.book_id IN (SELECT json_extract(value,'$.id') FROM json_each(COALESCE((SELECT payload FROM social_library WHERE account_id=?),'[]'))) "); values.push(auth.sub); }
+    else if (view === "books") { clauses.push("n.book_id IS NOT NULL"); }
     else if (view === "following") { clauses.push("n.author_id IN (SELECT followed_id FROM follows WHERE follower_id=?)"); values.push(auth.sub); }
     else { clauses.push("(n.visibility='public' OR n.author_id=? OR (n.visibility='followers' AND EXISTS(SELECT 1 FROM follows f WHERE f.follower_id=? AND f.followed_id=n.author_id)))"); values.push(auth.sub, auth.sub); }
     if (bookId) { clauses.push("n.book_id=?"); values.push(bookId); }

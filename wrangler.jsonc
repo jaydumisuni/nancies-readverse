@@ -20,7 +20,7 @@
     "binding": "AI"
   },
   "vars": {
-    "APP_NAME": "Nancy's ReadVerse",
+    "APP_NAME": "NoTVerse",
     "AI_MODEL": "@cf/ibm-granite/granite-4.0-h-micro"
   },
   "kv_namespaces": [
