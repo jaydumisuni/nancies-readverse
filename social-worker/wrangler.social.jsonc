@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "notverse-social",
+  "main": "index.ts",
+  "compatibility_date": "2026-07-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "notverse-social",
+      "database_id": "REPLACE_WITH_NOTVERSE_D1_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "notverse-social-media"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SOCIAL_KV",
+      "id": "REPLACE_WITH_NOTVERSE_SOCIAL_KV_ID"
+    }
+  ]
+}
