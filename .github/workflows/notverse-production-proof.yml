@@ -5,12 +5,16 @@ on:
     branches: [verify-notverse-production]
     paths:
       - .notverse-production-trigger
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify-live-production:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'verify-notverse-production'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
