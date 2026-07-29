@@ -116,7 +116,7 @@ export default function UniversalReader({
           if (!cancelled) setPages(loaded);
         } else if (normalisedFormat === "epub") {
           const data = await response.arrayBuffer();
-          if (cancelled || !renditionHost.current) return;
+          if (cancelled || !renditionHost.current) throw new Error("The EPUB reading surface was not ready");
           const factory = ePub as unknown as (input: ArrayBuffer) => any;
           book.current = factory(data);
           rendition.current = book.current.renderTo(renditionHost.current, {
@@ -198,7 +198,7 @@ export default function UniversalReader({
         <main className={`universal-stage format-${normalisedFormat} ${manga ? "rtl" : "ltr"}`}>
           {loading && <div className="reader-loading">Preparing the physical {normalisedFormat === "cbz" ? "comic" : normalisedFormat} reader…</div>}
           {error && <div className="reader-error"><strong>ReadVerse could not open this file.</strong><span>{error}</span></div>}
-          {!loading && !error && normalisedFormat === "epub" && <div className="epub-page" ref={renditionHost} />}
+          {!error && normalisedFormat === "epub" && <div className="epub-page" ref={renditionHost} />}
           {!loading && !error && normalisedFormat === "cbz" && visible?.url && <div className="comic-page"><img src={visible.url} alt={`Page ${activePage}`} /></div>}
           {!loading && !error && normalisedFormat === "txt" && <article className="text-book-page"><small>{title}</small>{visible?.text?.split(/\n\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}<b>{activePage}</b></article>}
           {!loading && !error && <><button className="universal-edge previous" type="button" onClick={() => turn("previous")} aria-label="Previous page" /><button className="universal-edge next" type="button" onClick={() => turn("next")} aria-label="Next page" /></>}
