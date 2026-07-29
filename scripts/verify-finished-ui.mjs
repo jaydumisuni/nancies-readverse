@@ -90,12 +90,15 @@ try {
   await page.getByText("Offline reading").waitFor();
   await page.screenshot({ path: `${evidence}/storage-settings.png`, fullPage: true });
 
-  const localLibrary = await page.evaluate(() => JSON.parse(localStorage.getItem("readverse.library") || "[]"));
-  assert(localLibrary.some((book) => book.title?.includes("readverse-story")), "Add to Library did not persist locally");
-  assert(localStorage.getItem("readverse.snapshot-updated-at"), "snapshot timestamp is missing");
+  const browserState = await page.evaluate(() => ({
+    library: JSON.parse(localStorage.getItem("readverse.library") || "[]"),
+    snapshotUpdatedAt: localStorage.getItem("readverse.snapshot-updated-at"),
+  }));
+  assert(browserState.library.some((book) => book.title?.includes("readverse-story")), "Add to Library did not persist locally");
+  assert(browserState.snapshotUpdatedAt, "snapshot timestamp is missing");
   assert(errors.length === 0, `Browser errors: ${errors.join(" | ")}`);
 
-  const report = { ok: true, offlineCount, libraryCount: localLibrary.length, formats: ["pdf", "epub", "cbz", "txt"], errors, viewport: { width: 1440, height: 1000 } };
+  const report = { ok: true, offlineCount, libraryCount: browserState.library.length, formats: ["pdf", "epub", "cbz", "txt"], errors, viewport: { width: 1440, height: 1000 } };
   await writeFile(`${evidence}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } catch (error) {
