@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   verify-production:
@@ -25,13 +26,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Inspect main deployment workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN_DEPLOY_SHA: c2b7e2f87fdd73fe97969f8f9de411f3e26579bd
+        run: |
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$MAIN_DEPLOY_SHA" \
+            | jq '{total_count, runs: [.workflow_runs[] | {id, name, event, status, conclusion, head_sha, html_url}]}' \
+            | tee /tmp/main-deployment-runs.json
       - name: Install browser proof dependencies
         run: |
           npm install --no-audit --no-fund
           npm install --no-save playwright
           npx playwright install --with-deps chromium
-      - name: Wait for Cloudflare Git deployment propagation
-        run: sleep 45
       - name: Verify both production domains visually
         run: node scripts/verify-notverse-production.mjs
       - name: Upload live visual evidence
