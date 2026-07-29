@@ -37,6 +37,11 @@ type Props = {
   onFullscreen: () => void;
   onNoteChange: (value: string) => void;
   onAddToLibrary: () => void;
+  offlineStatus: "idle" | "working" | "done" | "error";
+  driveStatus: "idle" | "working" | "done" | "error";
+  onSaveOffline: () => void;
+  onSaveToDrive: () => void;
+  onProgress: (progress: { page: number; totalPages: number; percent: number; mode: string }) => void;
 };
 
 const highlightColors = ["#f5c95b", "#78d7a7", "#ff8eb9", "#73aef8", "#b68cff"];
@@ -47,7 +52,7 @@ function storageKey(sourceId: string, suffix: string) {
 
 function readSessionValue<T>(key: string, fallback: T): T {
   try {
-    const value = sessionStorage.getItem(key);
+    const value = localStorage.getItem(key);
     return value ? (JSON.parse(value) as T) : fallback;
   } catch {
     return fallback;
@@ -93,6 +98,11 @@ export default function PdfBookReader({
   onFullscreen,
   onNoteChange,
   onAddToLibrary,
+  offlineStatus,
+  driveStatus,
+  onSaveOffline,
+  onSaveToDrive,
+  onProgress,
 }: Props) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,20 +200,30 @@ export default function PdfBookReader({
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem(storageKey(sourceId, "page"), JSON.stringify(page));
+    localStorage.setItem(storageKey(sourceId, "page"), JSON.stringify(page));
   }, [page, sourceId]);
 
   useEffect(() => {
-    sessionStorage.setItem(storageKey(sourceId, "experience"), JSON.stringify(requestedExperience));
+    localStorage.setItem(storageKey(sourceId, "experience"), JSON.stringify(requestedExperience));
   }, [requestedExperience, sourceId]);
 
   useEffect(() => {
-    sessionStorage.setItem(storageKey(sourceId, "highlights"), JSON.stringify(highlights));
+    localStorage.setItem(storageKey(sourceId, "highlights"), JSON.stringify(highlights));
   }, [highlights, sourceId]);
 
   useEffect(() => {
-    sessionStorage.setItem(storageKey(sourceId, "bookmarks"), JSON.stringify(bookmarks));
+    localStorage.setItem(storageKey(sourceId, "bookmarks"), JSON.stringify(bookmarks));
   }, [bookmarks, sourceId]);
+
+  useEffect(() => {
+    if (!pdf) return;
+    onProgress({
+      page: visiblePages[0] ?? page,
+      totalPages: pdf.numPages,
+      percent: Math.round(((visiblePages[0] ?? page) / pdf.numPages) * 100),
+      mode: experience,
+    });
+  }, [experience, page, pdf, visiblePages]);
 
   const goToPage = useCallback((nextPage: number) => {
     if (!pdf) return;
@@ -321,6 +341,8 @@ export default function PdfBookReader({
           <button type="button" onClick={() => setZoom((current) => clamp(Number((current + .1).toFixed(2)), .65, 2.4))}>+</button>
         </div>
         <button type="button" className="reader-library-action" onClick={onAddToLibrary} disabled={inLibrary}>{inLibrary ? "✓ In Library" : "+ Add to Library"}</button>
+        <button type="button" className="reader-persist-action" onClick={onSaveOffline} disabled={offlineStatus === "working" || offlineStatus === "done"}>{offlineStatus === "working" ? "Saving offline…" : offlineStatus === "done" ? "✓ Offline" : offlineStatus === "error" ? "Retry offline" : "Save offline"}</button>
+        <button type="button" className="reader-persist-action" onClick={onSaveToDrive} disabled={driveStatus === "working" || driveStatus === "done"}>{driveStatus === "working" ? "Saving to Drive…" : driveStatus === "done" ? "✓ In Drive" : driveStatus === "error" ? "Retry Drive" : "Save to Drive"}</button>
         <button type="button" className="reader-fullscreen" onClick={onFullscreen} aria-label="Toggle fullscreen">⛶</button>
       </header>
 

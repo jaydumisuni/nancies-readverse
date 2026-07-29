@@ -7,17 +7,20 @@
     "dev": "vite",
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:guided": "node scripts/verify-guided-discovery-build.mjs",
-    "build": "npm run verify:architecture && tsc --noEmit && vite build && npm run verify:guided",
+    "build": "npm run verify:architecture && tsc --noEmit && vite build && npm run verify:guided && npm run verify:finish",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy --config dist/nancies_readverse/wrangler.json",
     "deploy:preview": "npm run build && wrangler versions upload --config dist/nancies_readverse/wrangler.json",
     "check": "npm run verify:architecture && tsc --noEmit",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "verify:finish": "node scripts/verify-finished-readverse.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "^6.1.200",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "epubjs": "^0.3.93",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.26.1",

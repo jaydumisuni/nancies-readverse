@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "offlineCount": 1,
+  "libraryCount": 5,
+  "formats": [
+    "pdf",
+    "epub",
+    "cbz",
+    "txt"
+  ],
+  "errors": [],
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  }
+}
