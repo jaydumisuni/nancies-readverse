@@ -29,6 +29,19 @@ export const defaultNoTVersePreferences: NoTVersePreferences = {
   },
 };
 
+const starterSketch = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 210">
+  <rect width="320" height="210" fill="#eee8de"/>
+  <g fill="none" stroke="#514943" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 172c36-24 67-30 100-24 36 7 70 4 107-13 20-9 39-12 57-8"/>
+    <path d="M97 145c-12-28-8-57 13-77 21-20 55-25 82-8 24 15 36 43 30 70"/>
+    <path d="M115 82c21 2 34-5 48-20 5 13 15 24 31 34"/>
+    <path d="M135 104l12 2m31 0 12-3m-47 27c13 8 28 8 44-1"/>
+    <path d="M103 149l-31 39m144-50 42 48M41 42l57 44m177-48-57 49"/>
+  </g>
+  <text x="20" y="28" font-family="Georgia" font-style="italic" font-size="18" fill="#77706b">a moment worth keeping</text>
+</svg>`)} `;
+
 export const starterNotes: NoTVerseNote[] = [
   {
     id: "note-zoro-growth",
@@ -42,6 +55,7 @@ export const starterNotes: NoTVerseNote[] = [
     chapter: "Wano Arc",
     spoilerBoundary: "No spoilers beyond the reader’s progress",
     tags: ["WanoArc", "Zoro"],
+    image: { id: "starter-sketch", name: "chapter-sketch.svg", dataUrl: starterSketch.trim() },
     reactions: 124,
     replies: 28,
     saved: false,
