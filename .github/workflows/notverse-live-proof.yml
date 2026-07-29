@@ -24,27 +24,28 @@ jobs:
           node-version: 22
       - name: Wait for canonical Worker deployment
         env:
-          LIVE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev
+          HEALTH_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/api/health
         run: |
           set -euo pipefail
           ready=0
           for attempt in $(seq 1 45); do
-            echo "Production probe $attempt/45"
-            if curl -fsSL --retry 2 --connect-timeout 15 --max-time 45 "$LIVE_URL/" -o /tmp/notverse-live.html; then
-              if grep -q "NoTVerse" /tmp/notverse-live.html; then
-                echo "NoTVerse deployment detected"
+            echo "Production health probe $attempt/45"
+            if curl -fsSL --retry 2 --connect-timeout 15 --max-time 45 "$HEALTH_URL" -o /tmp/notverse-health.json; then
+              cat /tmp/notverse-health.json
+              if jq -e '.ok == true and .app == "NoTVerse"' /tmp/notverse-health.json >/dev/null; then
+                echo "Canonical NoTVerse Worker deployment detected"
                 ready=1
                 break
               fi
-              echo "Domain is reachable but still serves the previous frontend"
+              echo "Worker is reachable but still reports the previous application"
             else
-              echo "Domain not reachable yet"
+              echo "Worker domain not reachable yet"
             fi
             sleep 20
           done
           if [ "$ready" -ne 1 ]; then
-            echo "Production did not expose NoTVerse within the deployment window"
-            sed -n '1,80p' /tmp/notverse-live.html 2>/dev/null || true
+            echo "Production did not report NoTVerse within the deployment window"
+            cat /tmp/notverse-health.json 2>/dev/null || true
             exit 1
           fi
       - name: Install browser proof dependencies
