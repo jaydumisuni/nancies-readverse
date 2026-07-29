@@ -1,0 +1,81 @@
+name: NoTVerse 10-for-2 implementation
+
+on:
+  push:
+    branches: [notverse-product-expansion]
+    paths:
+      - .notverse-10-for-2-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  materialise-build-and-prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: notverse-product-expansion
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Materialise canonical NoTVerse source
+        run: |
+          python3 scripts/materialise-notverse.py
+          python3 scripts/materialise-notverse-metadata.py
+          python3 scripts/fix-notverse-social.py
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Gate 1 — strict build and architecture proof
+        run: npm run build
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start local Reader Worker
+        shell: bash
+        run: |
+          mkdir -p engineering-evidence/notverse
+          npx wrangler dev --local --config dist/nancies_readverse/wrangler.json --ip 127.0.0.1 --port 4173 > engineering-evidence/notverse/server.log 2>&1 &
+          echo $! > /tmp/notverse-server.pid
+          READY=0
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:4173/api/health >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+
+      - name: Gate 2 — desktop and mobile visual proof
+        run: node scripts/verify-notverse-ui.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+
+      - name: Stop local Worker
+        if: always()
+        run: kill $(cat /tmp/notverse-server.pid) 2>/dev/null || true
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-visual-evidence
+          path: engineering-evidence/notverse
+          if-no-files-found: warn
+
+      - name: Commit clean canonical implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "NoTVerse Engineering"
+          git config user.email "actions@users.noreply.github.com"
+          git rm -f .notverse-10-for-2-trigger .github/workflows/notverse-10-for-2.yml scripts/materialise-notverse.py scripts/materialise-notverse-metadata.py scripts/fix-notverse-social.py
+          git add package.json package-lock.json wrangler.jsonc index.html public src worker social-worker docs scripts engineering-evidence/notverse
+          git commit -m "Expand ReadVerse into the verified NoTVerse product"
+          git push origin HEAD:notverse-product-expansion
