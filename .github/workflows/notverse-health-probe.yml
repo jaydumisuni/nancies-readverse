@@ -1,0 +1,23 @@
+name: Probe NoTVerse production health
+
+on:
+  push:
+    branches: [verify-notverse-production-20260729]
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'verify-notverse-production-20260729'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read canonical Worker health now
+        run: |
+          set -x
+          curl -sS -D - --connect-timeout 20 --max-time 60 https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/api/health
+          echo
+          curl -sS -D - --connect-timeout 20 --max-time 60 https://nancyreadverse.1ink.online/ | head -80 || true
