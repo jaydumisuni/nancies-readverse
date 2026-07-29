@@ -31,7 +31,7 @@ app_path.write_text(app)
 proof_path = Path("scripts/verify-notverse-polish.mjs")
 proof = proof_path.read_text()
 old_assert = '  assert(!(await appPage.locator(".floating-companion").isVisible()), "floating companion covers the desktop Notes workspace");'
-new_assert = old_assert + '\n  assert(!(await appPage.locator(".companion-panel").isVisible()), "companion panel remains open over desktop Notes");'
+new_assert = old_assert + '\n  await appPage.waitForTimeout(120);\n  const companionPanelOpen = await appPage.locator(".companion-panel").evaluate((node) => node.classList.contains("open"));\n  assert(!companionPanelOpen, "companion panel remains open over desktop Notes");'
 if new_assert not in proof:
     if old_assert not in proof:
         raise SystemExit("NoTVerse desktop focus proof target missing")
