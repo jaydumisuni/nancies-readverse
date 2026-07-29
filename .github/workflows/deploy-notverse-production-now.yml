@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 35
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: d292542aa90a811fdbe0459459c365f8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,12 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Confirm Cloudflare deployment credentials exist
+      - name: Confirm Cloudflare deployment token exists
         run: |
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "Missing CLOUDFLARE_API_TOKEN/CF_API_TOKEN repository secret"; exit 2; }
-          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "Missing CLOUDFLARE_ACCOUNT_ID/CF_ACCOUNT_ID repository secret"; exit 3; }
-          echo "Cloudflare deployment credentials are available"
+          echo "Cloudflare account and deployment token are available"
       - name: Install and build canonical NoTVerse
         run: |
           npm install --no-audit --no-fund
