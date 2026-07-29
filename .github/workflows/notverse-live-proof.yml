@@ -3,12 +3,16 @@ name: Verify NoTVerse production live
 on:
   push:
     branches: [verify-notverse-production-20260729]
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   verify-live:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'verify-notverse-production-20260729'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
