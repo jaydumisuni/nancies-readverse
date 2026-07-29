@@ -17,7 +17,7 @@ jobs:
   verify-production:
     if: github.event_name == 'push' || github.event.pull_request.head.ref == 'verify-notverse-production'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,17 +26,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Inspect main deployment workflow
+      - name: Wait for main build and deployment attempt
         env:
           GH_TOKEN: ${{ github.token }}
-          MAIN_DEPLOY_SHA: c2b7e2f87fdd73fe97969f8f9de411f3e26579bd
+          MAIN_DEPLOY_SHA: 0ab3a4822c8fbba2d5d97f41e8709a3a039f9685
         run: |
-          curl -fsSL \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$MAIN_DEPLOY_SHA" \
-            | jq '{total_count, runs: [.workflow_runs[] | {id, name, event, status, conclusion, head_sha, html_url}]}' \
-            | tee /tmp/main-deployment-runs.json
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$MAIN_DEPLOY_SHA" \
+              > /tmp/main-deployment-runs-raw.json
+            jq '{total_count, runs: [.workflow_runs[] | {id, name, event, status, conclusion, head_sha, html_url}]}' /tmp/main-deployment-runs-raw.json \
+              | tee /tmp/main-deployment-runs.json
+            DEPLOY_STATUS=$(jq -r '[.workflow_runs[] | select(.name == "Deploy and verify NoTVerse live")][0].status // "missing"' /tmp/main-deployment-runs-raw.json)
+            if [ "$DEPLOY_STATUS" = "completed" ]; then break; fi
+            sleep 10
+          done
+          sleep 60
       - name: Install browser proof dependencies
         run: |
           npm install --no-audit --no-fund
