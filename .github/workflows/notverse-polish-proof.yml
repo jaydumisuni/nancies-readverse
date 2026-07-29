@@ -5,12 +5,16 @@ on:
     branches: [notverse-product-expansion]
     paths:
       - .notverse-polish-trigger
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   build-and-prove:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'notverse-product-expansion'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
