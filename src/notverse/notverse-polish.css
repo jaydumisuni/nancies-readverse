@@ -1,0 +1,128 @@
+/* Final presentation safeguards derived from the approved NoTVerse setup and Notes visuals. */
+html:has(.notverse-setup),
+body:has(.notverse-setup) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.notverse-setup {
+  height: 100dvh;
+  max-height: 100dvh;
+  isolation: isolate;
+}
+
+.notverse-setup .setup-paper-stack {
+  max-height: calc(100dvh - 150px);
+}
+
+/* Notes, Search, Inbox and Me are focused workspaces. The companion stays available
+   through Home/chat but must not cover paper, controls or messages. */
+.main-shell:has(.notes-experience) .floating-companion,
+.main-shell:has(.search-view) .floating-companion,
+.main-shell:has(.inbox-view) .floating-companion,
+.main-shell:has(.profile-notebook) .floating-companion {
+  display: none !important;
+}
+
+.notes-experience {
+  min-height: calc(100dvh - 70px);
+}
+
+.note-modal-backdrop {
+  z-index: 6000 !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+}
+
+.note-composer,
+.note-filter-sheet,
+.note-options,
+.replies-drawer {
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+
+body:has(.note-modal-backdrop) .notverse-mobile-nav,
+body:has(.note-modal-backdrop) .floating-companion {
+  display: none !important;
+}
+
+@media (min-width: 900px) {
+  .notes-experience .note-flip-stage {
+    width: min(620px, 70vw);
+    min-height: 610px;
+    margin-inline: auto;
+  }
+
+  .notes-experience .note-position,
+  .notes-experience .note-swipe-controls {
+    width: min(620px, 70vw);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .notverse-setup {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
+  .notverse-setup .setup-brand {
+    padding: 12px 14px 8px;
+  }
+
+  .notverse-setup .setup-paper-stack {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 142px);
+    max-height: none;
+  }
+
+  .notverse-setup .setup-sheet {
+    padding: 38px 22px 42px 44px;
+  }
+
+  .notverse-setup .setup-cover-page h1,
+  .notverse-setup .setup-complete-page h1 {
+    font-size: clamp(42px, 14vw, 62px);
+  }
+
+  .notverse-setup .setup-cover-page h2 {
+    font-size: clamp(20px, 6vw, 28px);
+  }
+
+  .notverse-setup .setup-companion-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .notes-experience {
+    min-height: 100dvh;
+    padding-bottom: 96px !important;
+  }
+
+  .notes-experience .note-flip-stage {
+    width: 100%;
+    min-height: calc(100dvh - 320px);
+    margin-inline: auto;
+  }
+
+  .notes-experience .note-position {
+    padding-bottom: 12px;
+  }
+
+  .notes-experience .note-swipe-controls {
+    margin-bottom: 12px;
+  }
+
+  .note-composer,
+  .note-filter-sheet,
+  .replies-drawer {
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+    max-height: none;
+    margin: 10px auto;
+  }
+
+  .note-composer .composer-paper {
+    min-height: 330px;
+  }
+}
