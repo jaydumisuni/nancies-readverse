@@ -1,0 +1,58 @@
+name: Create compact NoTVerse proof thumbnails
+
+on:
+  push:
+    branches: [verify-notverse-before-deploy-20260730]
+
+jobs:
+  thumbnails:
+    if: ${{ !contains(github.event.head_commit.message, '[thumbs]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build compact contact sheet from fresh screenshots
+        run: |
+          python -m pip install --quiet pillow
+          python - <<'PY'
+          from PIL import Image, ImageOps, ImageDraw
+          from pathlib import Path
+
+          src = Path('engineering-evidence/current-notverse')
+          out = src / 'compact-proof'
+          out.mkdir(parents=True, exist_ok=True)
+          names = [
+              'setup-cover-desktop.png',
+              'home-desktop.png',
+              'search-desktop.png',
+              'notes-desktop.png',
+              'home-mobile.png',
+              'note-composer-mobile.png',
+          ]
+          tiles = []
+          for name in names:
+              image = Image.open(src / name).convert('RGB')
+              image.thumbnail((300, 190))
+              tile = Image.new('RGB', (320, 230), '#09070c')
+              x = (320 - image.width) // 2
+              y = 28 + (190 - image.height) // 2
+              tile.paste(image, (x, y))
+              draw = ImageDraw.Draw(tile)
+              draw.text((10, 8), name.replace('.png',''), fill='white')
+              tiles.append(tile)
+              image.save(out / name.replace('.png','.jpg'), 'JPEG', quality=48, optimize=True)
+
+          sheet = Image.new('RGB', (640, 690), '#050408')
+          for index, tile in enumerate(tiles):
+              sheet.paste(tile, ((index % 2) * 320, (index // 2) * 230))
+          sheet.save(out / 'contact-sheet.jpg', 'JPEG', quality=42, optimize=True)
+          PY
+      - name: Commit compact visual proof
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add engineering-evidence/current-notverse/compact-proof
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m '[thumbs] Add compact NoTVerse proof images'
+          git push
