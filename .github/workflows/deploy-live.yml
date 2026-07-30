@@ -47,6 +47,8 @@ jobs:
           mkdir -p engineering-evidence/current-notverse
           cp -f engineering-evidence/notverse/* engineering-evidence/current-notverse/ 2>/dev/null || true
           cp -f /tmp/notverse-preview.log engineering-evidence/current-notverse/preview.log 2>/dev/null || true
+          printf '%s\n' "$GITHUB_RUN_ID" > engineering-evidence/current-notverse/run-id.txt
+          printf '%s\n' "$GITHUB_SHA" > engineering-evidence/current-notverse/source-commit.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add engineering-evidence/current-notverse
