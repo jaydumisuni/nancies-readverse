@@ -1,8 +1,8 @@
 name: Verify NoTVerse locally before deployment
 
 on:
-  push:
-    branches: [verify-notverse-before-deploy-20260730]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
