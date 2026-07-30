@@ -12,7 +12,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build compact contact sheet from fresh screenshots
+      - name: Build readable proof images from fresh screenshots
         run: |
           python -m pip install --quiet pillow
           python - <<'PY'
@@ -22,6 +22,35 @@ jobs:
           src = Path('engineering-evidence/current-notverse')
           out = src / 'compact-proof'
           out.mkdir(parents=True, exist_ok=True)
+
+          def fit_width(name, output, width, quality=28):
+              image = Image.open(src / name).convert('RGB')
+              height = round(image.height * width / image.width)
+              image = image.resize((width, height), Image.Resampling.LANCZOS)
+              image.save(out / output, 'JPEG', quality=quality, optimize=True)
+
+          def crop_mobile(name, prefix, width=340, quality=30):
+              image = Image.open(src / name).convert('RGB')
+              target_height = round(image.height * width / image.width)
+              image = image.resize((width, target_height), Image.Resampling.LANCZOS)
+              segment = min(560, target_height)
+              top = image.crop((0, 0, width, segment))
+              bottom = image.crop((0, max(0, target_height-segment), width, target_height))
+              top.save(out / f'{prefix}-top.jpg', 'JPEG', quality=quality, optimize=True)
+              bottom.save(out / f'{prefix}-bottom.jpg', 'JPEG', quality=quality, optimize=True)
+
+          for name, output in [
+              ('setup-cover-desktop.png', 'setup-cover-readable.jpg'),
+              ('home-desktop.png', 'home-desktop-readable.jpg'),
+              ('search-desktop.png', 'search-desktop-readable.jpg'),
+              ('notes-desktop.png', 'notes-desktop-readable.jpg'),
+          ]:
+              fit_width(name, output, 560)
+
+          crop_mobile('home-mobile.png', 'home-mobile')
+          crop_mobile('notes-mobile.png', 'notes-mobile')
+          crop_mobile('note-composer-mobile.png', 'composer-mobile')
+
           names = [
               'setup-cover-desktop.png',
               'home-desktop.png',
@@ -30,42 +59,24 @@ jobs:
               'home-mobile.png',
               'note-composer-mobile.png',
           ]
-          tiles = []
           micro_tiles = []
           for name in names:
-              image = Image.open(src / name).convert('RGB')
-              image.thumbnail((300, 190))
-              tile = Image.new('RGB', (320, 230), '#09070c')
-              x = (320 - image.width) // 2
-              y = 28 + (190 - image.height) // 2
-              tile.paste(image, (x, y))
-              draw = ImageDraw.Draw(tile)
-              draw.text((10, 8), name.replace('.png',''), fill='white')
-              tiles.append(tile)
-              image.save(out / name.replace('.png','.jpg'), 'JPEG', quality=48, optimize=True)
-
               micro = Image.open(src / name).convert('RGB')
               micro.thumbnail((150, 92))
-              micro_tile = Image.new('RGB', (160, 115), '#09070c')
-              micro_tile.paste(micro, ((160-micro.width)//2, 17+(92-micro.height)//2))
-              ImageDraw.Draw(micro_tile).text((5, 3), name.split('.')[0][:19], fill='white')
-              micro_tiles.append(micro_tile)
-
-          sheet = Image.new('RGB', (640, 690), '#050408')
-          for index, tile in enumerate(tiles):
-              sheet.paste(tile, ((index % 2) * 320, (index // 2) * 230))
-          sheet.save(out / 'contact-sheet.jpg', 'JPEG', quality=42, optimize=True)
-
-          micro_sheet = Image.new('RGB', (320, 345), '#050408')
+              tile = Image.new('RGB', (160, 115), '#09070c')
+              tile.paste(micro, ((160-micro.width)//2, 17+(92-micro.height)//2))
+              ImageDraw.Draw(tile).text((5, 3), name.split('.')[0][:19], fill='white')
+              micro_tiles.append(tile)
+          sheet = Image.new('RGB', (320, 345), '#050408')
           for index, tile in enumerate(micro_tiles):
-              micro_sheet.paste(tile, ((index % 2) * 160, (index // 2) * 115))
-          micro_sheet.save(out / 'micro-proof.jpg', 'JPEG', quality=24, optimize=True)
+              sheet.paste(tile, ((index % 2) * 160, (index // 2) * 115))
+          sheet.save(out / 'micro-proof.jpg', 'JPEG', quality=24, optimize=True)
           PY
-      - name: Commit compact visual proof
+      - name: Commit readable visual proof
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add engineering-evidence/current-notverse/compact-proof
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m '[thumbs] Add compact NoTVerse proof images'
+          git commit -m '[thumbs] Add readable NoTVerse proof images'
           git push
