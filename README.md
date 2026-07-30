@@ -4,7 +4,7 @@ A personal reading universe for comics, manga, graphic novels, light novels, nov
 
 ReadVerse is designed as a polished, mobile-first space where Nancy can discover stories, continue reading, build her library, save favourites, and choose which files she wants to keep.
 
-## Gogo
+## Gojo
 
 Gogo is the sweet, playful reading companion who helps around the site. She can explain how ReadVerse works, help search approved sources, inspect book links, organise favourites, guide reading settings, and offer spoiler-safe hints along the way.
 
