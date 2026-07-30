@@ -1,57 +1,11 @@
-name: Verify current NoTVerse before deployment
+name: Verification disabled — workspace first
 
 on:
-  push:
-    branches: [verify-notverse-before-deploy-20260730]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  verify-current-ui:
+  blocked:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Install project
-        run: npm ci
-
-      - name: Install browser proof tools
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
-
-      - name: Build exact branch
-        run: npm run build
-
-      - name: Start built application
-        run: |
-          nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/notverse-preview.log 2>&1 &
-          for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat /tmp/notverse-preview.log
-          exit 1
-
-      - name: Run full desktop and mobile visual proof
-        run: node scripts/verify-notverse-ui.mjs
-
-      - name: Upload visual evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: current-notverse-visual-evidence
-          path: |
-            engineering-evidence/notverse
-            /tmp/notverse-preview.log
-          if-no-files-found: warn
-          retention-days: 7
+      - run: echo "NoTVerse must be built and visually verified in the local workspace before any GitHub Action runs."
