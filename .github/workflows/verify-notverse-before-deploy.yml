@@ -1,0 +1,11 @@
+name: Verification disabled — workspace first
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blocked:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "NoTVerse must be built and visually verified in the local workspace before any GitHub Action runs."
