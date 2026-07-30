@@ -16,7 +16,7 @@ jobs:
         run: |
           python -m pip install --quiet pillow
           python - <<'PY'
-          from PIL import Image, ImageOps, ImageDraw
+          from PIL import Image, ImageDraw
           from pathlib import Path
 
           src = Path('engineering-evidence/current-notverse')
@@ -31,6 +31,7 @@ jobs:
               'note-composer-mobile.png',
           ]
           tiles = []
+          micro_tiles = []
           for name in names:
               image = Image.open(src / name).convert('RGB')
               image.thumbnail((300, 190))
@@ -43,10 +44,22 @@ jobs:
               tiles.append(tile)
               image.save(out / name.replace('.png','.jpg'), 'JPEG', quality=48, optimize=True)
 
+              micro = Image.open(src / name).convert('RGB')
+              micro.thumbnail((150, 92))
+              micro_tile = Image.new('RGB', (160, 115), '#09070c')
+              micro_tile.paste(micro, ((160-micro.width)//2, 17+(92-micro.height)//2))
+              ImageDraw.Draw(micro_tile).text((5, 3), name.split('.')[0][:19], fill='white')
+              micro_tiles.append(micro_tile)
+
           sheet = Image.new('RGB', (640, 690), '#050408')
           for index, tile in enumerate(tiles):
               sheet.paste(tile, ((index % 2) * 320, (index // 2) * 230))
           sheet.save(out / 'contact-sheet.jpg', 'JPEG', quality=42, optimize=True)
+
+          micro_sheet = Image.new('RGB', (320, 345), '#050408')
+          for index, tile in enumerate(micro_tiles):
+              micro_sheet.paste(tile, ((index % 2) * 160, (index // 2) * 115))
+          micro_sheet.save(out / 'micro-proof.jpg', 'JPEG', quality=24, optimize=True)
           PY
       - name: Commit compact visual proof
         run: |
