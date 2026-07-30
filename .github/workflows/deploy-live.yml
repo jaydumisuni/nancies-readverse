@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,3 +64,8 @@ jobs:
             engineering-evidence/notverse
           if-no-files-found: warn
           retention-days: 7
+      - name: Publish run identifier to PR 38
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 38 --body "Fresh local NoTVerse visual proof run: $GITHUB_RUN_ID. Commit: $GITHUB_SHA. No production deployment was performed."
