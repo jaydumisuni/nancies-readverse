@@ -1,11 +1,12 @@
-name: Deploy and verify NoTVerse live
+name: Verify NoTVerse locally before deployment
 
 on:
   push:
-    branches: [main]
+    branches: [verify-notverse-before-deploy-20260730]
+  workflow_dispatch:
 
 jobs:
-  deploy-and-verify:
+  build-and-visual-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -15,28 +16,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Strict build
-        run: npm run build
-      - name: Deploy canonical Worker and frontend assets
-        run: npx wrangler deploy --config dist/nancies_readverse/wrangler.json
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm ci
       - name: Install Chromium
         run: |
-          npm install --no-save playwright
+          npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Wait for deployment propagation
-        run: sleep 20
-      - name: Verify deployed NoTVerse visually
-        run: node scripts/verify-notverse-live.mjs
-        env:
-          NOTVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
+      - name: Strict build
+        run: npm run build
+      - name: Start exact built app
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/notverse-preview.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/notverse-preview.log
+          exit 1
+      - name: Verify current NoTVerse visually
+        run: node scripts/verify-notverse-ui.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: notverse-live-visual-evidence
-          path: engineering-evidence/notverse-live
+          name: current-notverse-visual-evidence
+          path: |
+            engineering-evidence/notverse
+            /tmp/notverse-preview.log
           if-no-files-found: warn
+          retention-days: 7
