@@ -127,11 +127,15 @@ try {
   const mobileReader = await openTextFile(mobile, "Mobile Proof.txt");
   const metrics = await mobile.evaluate(() => ({ inner: window.innerWidth, scroll: document.documentElement.scrollWidth }));
   assert(metrics.scroll <= metrics.inner + 2, `mobile reader overflow: ${metrics.scroll} > ${metrics.inner}`);
-  await assertInsideViewport(mobileReader.getByRole("button", { name: "+ Add to Library" }), metrics.inner, "mobile Add to Library");
-  await assertInsideViewport(mobileReader.getByRole("button", { name: "Save offline" }), metrics.inner, "mobile Save offline");
-  await assertInsideViewport(mobileReader.getByRole("button", { name: "Save to Drive" }), metrics.inner, "mobile Save to Drive");
-  await assertInsideViewport(mobileReader.getByRole("button", { name: "Notes", exact: true }), metrics.inner, "mobile Notes");
-  await assertInsideViewport(mobileReader.getByRole("button", { name: "Fullscreen reader" }), metrics.inner, "mobile fullscreen");
+
+  const mobileActions = mobileReader.locator(".universal-toolbar nav button");
+  assert(await mobileActions.count() === 5, "mobile reader does not expose all five toolbar actions");
+  await assertInsideViewport(mobileActions.nth(0), metrics.inner, "mobile Library action");
+  await assertInsideViewport(mobileActions.nth(1), metrics.inner, "mobile offline action");
+  await assertInsideViewport(mobileActions.nth(2), metrics.inner, "mobile Drive action");
+  await assertInsideViewport(mobileActions.nth(3), metrics.inner, "mobile Notes action");
+  await assertInsideViewport(mobileActions.nth(4), metrics.inner, "mobile fullscreen action");
+
   await mobile.screenshot({ path: `${output}/reader-txt-mobile.png` });
   report.screenshots.push("reader-txt-mobile.png");
   report.checks.push("mobile reader fits the viewport");
