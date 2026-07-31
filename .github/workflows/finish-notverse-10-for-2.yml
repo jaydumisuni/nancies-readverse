@@ -84,6 +84,11 @@ jobs:
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
+      - name: Proof gate 2C — persistent Inbox messaging
+        run: node scripts/verify-notverse-inbox-ui.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+
       - name: Preserve proof report and server log
         if: always()
         run: |
