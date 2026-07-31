@@ -46,8 +46,11 @@ const checks = [
 ];
 for (const [condition, message] of checks) assert(condition, message);
 
-await stat("dist/nancies_readverse/index.js");
-const module = await import(`${pathToFileURL("dist/nancies_readverse/index.js").href}?finish=${Date.now()}`);
+const workerName = JSON.parse(wrangler).name;
+assert(workerName, "wrangler.jsonc does not define the Worker name");
+const builtWorker = `dist/${workerName}/index.js`;
+await stat(builtWorker);
+const module = await import(`${pathToFileURL(builtWorker).href}?finish=${Date.now()}`);
 const handler = module.default;
 assert(handler && typeof handler.fetch === "function", "built Worker is not callable");
 
@@ -61,27 +64,27 @@ class MemoryKV {
   async delete(key) { this.values.delete(key); }
 }
 const envBase = {
-  APP_NAME: "Nancy's ReadVerse",
+  APP_NAME: "NoTVerse",
   AI_MODEL: "fixture",
   ASSETS: { fetch: async () => new Response("asset") },
   AI: { run: async () => ({ response: "fixture" }) },
 };
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-const unconfigured = await handler.fetch(new Request("https://readverse.test/api/auth/google/status"), envBase, ctx);
+const unconfigured = await handler.fetch(new Request("https://notverse.test/api/auth/google/status"), envBase, ctx);
 const unconfiguredBody = await unconfigured.json();
 assert(unconfiguredBody.configured === false && unconfiguredBody.connected === false, "unconfigured Google status is unsafe or incorrect");
 
 const kv = new MemoryKV();
 const configuredEnv = { ...envBase, SESSION_KV: kv, GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret", TOKEN_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef" };
-const configured = await handler.fetch(new Request("https://readverse.test/api/auth/google/status"), configuredEnv, ctx);
+const configured = await handler.fetch(new Request("https://notverse.test/api/auth/google/status"), configuredEnv, ctx);
 const configuredBody = await configured.json();
 assert(configuredBody.configured === true && configuredBody.connected === false, "configured account status is incorrect");
-const start = await handler.fetch(new Request("https://readverse.test/api/auth/google/start"), configuredEnv, ctx);
+const start = await handler.fetch(new Request("https://notverse.test/api/auth/google/start"), configuredEnv, ctx);
 assert(start.status === 302, "Google OAuth start does not redirect");
 const target = new URL(start.headers.get("location"));
 assert(target.hostname === "accounts.google.com", "Google OAuth redirect target is incorrect");
 assert(target.searchParams.get("scope")?.includes("drive.file"), "Google OAuth requests excessive or missing Drive scope");
 assert([...kv.values.keys()].some((key) => key.startsWith("oauth:")), "OAuth state was not stored");
 
-console.log(JSON.stringify({ ok: true, checks: checks.length + 7, tracks: { persistence: 10, readers: 10 }, message: "Finished ReadVerse 10-for-2 verification passed" }, null, 2));
+console.log(JSON.stringify({ ok: true, checks: checks.length + 7, tracks: { persistence: 10, readers: 10 }, message: "Finished NoTVerse 10-for-2 verification passed" }, null, 2));
