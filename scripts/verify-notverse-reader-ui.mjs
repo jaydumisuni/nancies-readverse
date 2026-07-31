@@ -71,8 +71,10 @@ async function openTextFile(page, name) {
   await uploadCard.waitFor({ state: "visible", timeout: 10000 });
   await uploadCard.getByRole("button", { name: "Read now" }).click();
 
-  await page.locator(".universal-overlay").waitFor({ state: "visible", timeout: 15000 });
-  await page.locator(".reader-loading").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  const reader = page.locator(".universal-overlay");
+  await reader.waitFor({ state: "visible", timeout: 15000 });
+  await reader.locator(".reader-loading").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  return reader;
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -82,32 +84,33 @@ try {
   const desktopContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
   const desktop = await desktopContext.newPage();
   report.errors.push(...(await prepare(desktop)).map((value) => `desktop: ${value}`));
-  await openTextFile(desktop, "NoTVerse Proof.txt");
+  const desktopReader = await openTextFile(desktop, "NoTVerse Proof.txt");
 
-  assert(await desktop.getByText("NoTVerse Proof.txt", { exact: true }).isVisible(), "reader title is missing");
-  assert(await desktop.getByRole("button", { name: "+ Add to Library" }).isVisible(), "Add to Library is missing");
-  assert(await desktop.getByRole("button", { name: "Save offline" }).isVisible(), "Save offline is missing");
-  assert(await desktop.getByRole("button", { name: "Save to Drive" }).isVisible(), "Save to Drive is missing");
-  assert(await desktop.getByText("This file proves that a local reading file stays temporary", { exact: false }).isVisible(), "TXT content did not render");
+  assert(await desktopReader.locator(".universal-toolbar strong").filter({ hasText: "NoTVerse Proof.txt" }).isVisible(), "reader title is missing");
+  assert(await desktopReader.getByRole("button", { name: "+ Add to Library" }).isVisible(), "Add to Library is missing");
+  assert(await desktopReader.getByRole("button", { name: "Save offline" }).isVisible(), "Save offline is missing");
+  assert(await desktopReader.getByRole("button", { name: "Save to Drive" }).isVisible(), "Save to Drive is missing");
+  assert(await desktopReader.getByText("This file proves that a local reading file stays temporary", { exact: false }).isVisible(), "TXT content did not render");
   await desktop.screenshot({ path: `${output}/reader-txt-desktop.png`, fullPage: true });
   report.screenshots.push("reader-txt-desktop.png");
 
-  await desktop.getByRole("button", { name: "+ Add to Library" }).click();
-  await desktop.getByRole("button", { name: "✓ In Library" }).waitFor();
+  await desktopReader.getByRole("button", { name: "+ Add to Library" }).click();
+  await desktopReader.getByRole("button", { name: "✓ In Library" }).waitFor();
   report.checks.push("temporary upload required explicit Read now confirmation");
   report.checks.push("temporary file opened and added deliberately");
 
-  await desktop.getByRole("button", { name: "Notes", exact: true }).click();
-  await desktop.locator(".universal-notes textarea").fill("Verified reader Note attached to this temporary title.");
+  await desktopReader.getByRole("button", { name: "Notes", exact: true }).click();
+  await desktopReader.locator(".universal-notes textarea").fill("Verified reader Note attached to this temporary title.");
   await desktop.screenshot({ path: `${output}/reader-note-desktop.png`, fullPage: true });
   report.screenshots.push("reader-note-desktop.png");
   report.checks.push("reader Note persisted in the active title");
 
-  await desktop.getByRole("button", { name: "Close reader" }).click();
-  await desktop.locator(".universal-overlay").waitFor({ state: "detached" });
+  await desktopReader.getByRole("button", { name: "Close reader" }).click();
+  await desktopReader.waitFor({ state: "detached" });
   await desktop.getByRole("button", { name: "Library", exact: true }).first().click();
-  await desktop.locator(".library-view").waitFor();
-  assert(await desktop.getByText("NoTVerse Proof.txt", { exact: true }).isVisible(), "added title is missing from Library");
+  const library = desktop.locator(".library-view");
+  await library.waitFor();
+  assert(await library.getByText("NoTVerse Proof.txt", { exact: true }).isVisible(), "added title is missing from Library");
   await desktop.screenshot({ path: `${output}/reader-library-desktop.png`, fullPage: true });
   report.screenshots.push("reader-library-desktop.png");
   report.checks.push("added title appears in Library");
