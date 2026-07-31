@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
 
-const url = process.env.NOTVERSE_URL || "https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/";
+const url = process.env.NOTVERSE_URL || "https://notverse.pharrtechnolgiescoltd.workers.dev/";
 const output = "engineering-evidence/notverse-live";
 await mkdir(output, { recursive: true });
 
@@ -36,7 +36,7 @@ try {
     });
     page.on("pageerror", (error) => errors.push(error.message));
 
-    const response = await page.goto(url, { waitUntil: "networkidle", timeout: 90000 });
+    const response = await page.goto(`${url}?proof=${Date.now()}`, { waitUntil: "networkidle", timeout: 90000 });
     assert(response && response.status() < 400, `${viewport.name}: HTTP ${response?.status() ?? "no response"}`);
     await page.locator("body").waitFor({ state: "visible", timeout: 30000 });
 
@@ -56,7 +56,7 @@ try {
     assert(errors.length === 0, `${viewport.name}: browser errors: ${errors.join(" | ")}`);
 
     const screenshot = `${viewport.name}.png`;
-    await page.screenshot({ path: `${output}/${screenshot}`, fullPage: false });
+    await page.screenshot({ path: `${output}/${screenshot}`, fullPage: true });
     report.viewports.push({
       ...viewport,
       status: response.status(),
