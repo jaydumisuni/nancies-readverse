@@ -75,7 +75,11 @@ export default function UniversalReader({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pages, setPages] = useState<PageContent[]>([]);
-  const [page, setPage] = useState(() => Number(localStorage.getItem(`readverse.reader.${sourceId}.page`) || 1));
+  const [page, setPage] = useState(() => Number(
+    localStorage.getItem(`notverse.reader.${sourceId}.page`)
+      || localStorage.getItem(`readverse.reader.${sourceId}.page`)
+      || 1,
+  ));
   const [notesOpen, setNotesOpen] = useState(false);
   const [manga, setManga] = useState(normalisedFormat === "cbz" && /manga|naruto|jujutsu|volume/i.test(title));
   const renditionHost = useRef<HTMLDivElement>(null);
@@ -145,7 +149,7 @@ export default function UniversalReader({
         if (!cancelled) setLoading(false);
       } catch (reason) {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : "ReadVerse could not open this file");
+          setError(reason instanceof Error ? reason.message : "NoTVerse could not open this file");
           setLoading(false);
         }
       }
@@ -163,7 +167,7 @@ export default function UniversalReader({
   }, [format, normalisedFormat, sourceUrl, title]);
 
   useEffect(() => {
-    localStorage.setItem(`readverse.reader.${sourceId}.page`, String(activePage));
+    localStorage.setItem(`notverse.reader.${sourceId}.page`, String(activePage));
     onProgress({ page: activePage, totalPages, percent, mode: normalisedFormat === "cbz" ? (manga ? "manga" : "comic") : normalisedFormat });
   }, [activePage, manga, normalisedFormat, onProgress, percent, sourceId, totalPages]);
 
@@ -191,21 +195,21 @@ export default function UniversalReader({
             <button type="button" onClick={onSaveOffline} disabled={offlineStatus === "working" || offlineStatus === "done"}>{actionLabel("offline", offlineStatus)}</button>
             <button type="button" onClick={onSaveToDrive} disabled={driveStatus === "working" || driveStatus === "done"}>{actionLabel("drive", driveStatus)}</button>
             <button type="button" onClick={() => setNotesOpen((value) => !value)}>Notes</button>
-            <button type="button" onClick={onFullscreen}>⛶</button>
+            <button type="button" onClick={onFullscreen} aria-label="Fullscreen reader">⛶</button>
           </nav>
         </header>
 
         <main className={`universal-stage format-${normalisedFormat} ${manga ? "rtl" : "ltr"}`}>
           {loading && <div className="reader-loading">Preparing the physical {normalisedFormat === "cbz" ? "comic" : normalisedFormat} reader…</div>}
-          {error && <div className="reader-error"><strong>ReadVerse could not open this file.</strong><span>{error}</span></div>}
+          {error && <div className="reader-error"><strong>NoTVerse could not open this file.</strong><span>{error}</span></div>}
           {!error && normalisedFormat === "epub" && <div className="epub-page" ref={renditionHost} />}
           {!loading && !error && normalisedFormat === "cbz" && visible?.url && <div className="comic-page"><img src={visible.url} alt={`Page ${activePage}`} /></div>}
           {!loading && !error && normalisedFormat === "txt" && <article className="text-book-page"><small>{title}</small>{visible?.text?.split(/\n\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}<b>{activePage}</b></article>}
           {!loading && !error && <><button className="universal-edge previous" type="button" onClick={() => turn("previous")} aria-label="Previous page" /><button className="universal-edge next" type="button" onClick={() => turn("next")} aria-label="Next page" /></>}
-          {notesOpen && <aside className="universal-notes"><header><strong>My Note</strong><button type="button" onClick={() => setNotesOpen(false)}>×</button></header><textarea value={note} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onNoteChange(event.target.value)} placeholder="Write something worth remembering…" /><small>Saved with this title and included in Google sync.</small></aside>}
+          {notesOpen && <aside className="universal-notes"><header><strong>My Note</strong><button type="button" onClick={() => setNotesOpen(false)} aria-label="Close Note">×</button></header><textarea value={note} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onNoteChange(event.target.value)} placeholder="Write something worth remembering…" /><small>Saved with this title and included in Google sync.</small></aside>}
         </main>
 
-        <footer className="reader-footer universal-footer"><button type="button" onClick={() => turn("previous")}>←</button><span>{activePage} / {totalPages}</span><input type="range" min="1" max={totalPages} value={activePage} onChange={(event) => { if (normalisedFormat !== "epub") setPage(Number(event.target.value)); }} disabled={normalisedFormat === "epub"} /><span>{percent}%</span><button type="button" onClick={() => turn("next")}>→</button></footer>
+        <footer className="reader-footer universal-footer"><button type="button" onClick={() => turn("previous")} aria-label="Previous page">←</button><span>{activePage} / {totalPages}</span><input type="range" min="1" max={totalPages} value={activePage} onChange={(event) => { if (normalisedFormat !== "epub") setPage(Number(event.target.value)); }} disabled={normalisedFormat === "epub"} /><span>{percent}%</span><button type="button" onClick={() => turn("next")} aria-label="Next page">→</button></footer>
       </div>
     </div>
   );
