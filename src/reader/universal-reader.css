@@ -150,6 +150,15 @@ body:has(.universal-overlay) { overflow: hidden; }
     overflow: visible;
     padding: 0;
   }
+  .universal-toolbar nav button,
+  .universal-toolbar nav button:nth-child(1),
+  .universal-toolbar nav button:nth-child(2),
+  .universal-toolbar nav button:nth-child(3),
+  .universal-toolbar nav button:nth-child(4),
+  .universal-toolbar nav button:nth-child(5) {
+    display: grid !important;
+    visibility: visible !important;
+  }
   .universal-toolbar nav button {
     width: 40px;
     min-width: 40px;
@@ -157,7 +166,6 @@ body:has(.universal-overlay) { overflow: hidden; }
     min-height: 38px;
     padding: 0;
     font-size: 0;
-    display: grid;
     place-items: center;
   }
   .universal-toolbar nav button:first-child {
