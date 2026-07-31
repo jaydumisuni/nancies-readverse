@@ -1,7 +1,13 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 
-const generatedConfig = resolve("dist/nancies_readverse/wrangler.json");
+const sourceConfig = JSON.parse(await readFile(resolve("wrangler.jsonc"), "utf8"));
+const workerName = String(sourceConfig.name || "").trim();
+if (!workerName) {
+  throw new Error("wrangler.jsonc does not define a Worker name");
+}
+
+const generatedConfig = resolve("dist", workerName, "wrangler.json");
 const redirectFile = resolve(".wrangler/deploy/config.json");
 
 await access(generatedConfig);
