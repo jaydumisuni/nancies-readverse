@@ -110,7 +110,7 @@ try {
   await desktop.getByRole("button", { name: "Library", exact: true }).first().click();
   const library = desktop.locator(".library-view");
   await library.waitFor();
-  assert(await library.getByText("NoTVerse Proof.txt", { exact: true }).isVisible(), "added title is missing from Library");
+  assert(await library.getByText("NoTVerse Proof", { exact: true }).isVisible(), "normalized added title is missing from Library");
   await desktop.screenshot({ path: `${output}/reader-library-desktop.png`, fullPage: true });
   report.screenshots.push("reader-library-desktop.png");
   report.checks.push("added title appears in Library");
