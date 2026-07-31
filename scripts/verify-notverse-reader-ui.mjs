@@ -63,6 +63,14 @@ async function openTextFile(page, name) {
       "utf8",
     ),
   });
+
+  // Uploads are intentionally not opened automatically. The companion first
+  // confirms the temporary file and presents the explicit Read now handoff.
+  await page.locator(".companion-panel.open").waitFor({ state: "visible", timeout: 10000 });
+  const uploadCard = page.locator(".upload-card").filter({ hasText: name }).last();
+  await uploadCard.waitFor({ state: "visible", timeout: 10000 });
+  await uploadCard.getByRole("button", { name: "Read now" }).click();
+
   await page.locator(".universal-overlay").waitFor({ state: "visible", timeout: 15000 });
   await page.locator(".reader-loading").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
 }
@@ -86,6 +94,7 @@ try {
 
   await desktop.getByRole("button", { name: "+ Add to Library" }).click();
   await desktop.getByRole("button", { name: "✓ In Library" }).waitFor();
+  report.checks.push("temporary upload required explicit Read now confirmation");
   report.checks.push("temporary file opened and added deliberately");
 
   await desktop.getByRole("button", { name: "Notes", exact: true }).click();
