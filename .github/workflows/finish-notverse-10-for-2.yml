@@ -74,8 +74,13 @@ jobs:
           cat /tmp/notverse-preview.log
           exit 1
 
-      - name: Proof gate 2 — desktop and mobile visual interaction
+      - name: Proof gate 2A — setup, navigation and social workspaces
         run: node scripts/verify-notverse-ui.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+
+      - name: Proof gate 2B — temporary reader, Notes and Library handoff
+        run: node scripts/verify-notverse-reader-ui.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
