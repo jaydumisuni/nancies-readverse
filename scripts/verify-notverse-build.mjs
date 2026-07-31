@@ -6,7 +6,7 @@ function assert(condition, message) {
 }
 
 const read = (path) => readFile(path, "utf8");
-const [app, setup, views, notes, css, worker, platform, social, schema, socialConfig, manifest, index, packageJson] = await Promise.all([
+const [app, setup, views, notes, css, worker, platform, social, schema, socialConfig, manifest, index, packageJson, wrangler] = await Promise.all([
   read("src/App.tsx"),
   read("src/notverse/SetupWizard.tsx"),
   read("src/notverse/NoTVerseViews.tsx"),
@@ -20,6 +20,7 @@ const [app, setup, views, notes, css, worker, platform, social, schema, socialCo
   read("public/manifest.webmanifest"),
   read("index.html"),
   read("package.json"),
+  read("wrangler.jsonc"),
 ]);
 
 const exactOrigin = "Created for Nancy. Shared with the world.";
@@ -83,8 +84,11 @@ assert(packageData.name === "notverse", "package identity is not NoTVerse");
 assert(packageData.scripts.build.includes("verify:notverse"), "NoTVerse verification is not part of the strict build");
 assert(packageData.scripts.build.includes("check:social"), "social Worker type-check is not part of the strict build");
 
-await stat("dist/nancies_readverse/index.js");
-const module = await import(`${pathToFileURL("dist/nancies_readverse/index.js").href}?notverse=${Date.now()}`);
+const workerName = JSON.parse(wrangler).name;
+assert(workerName, "wrangler.jsonc does not define the Worker name");
+const builtWorker = `dist/${workerName}/index.js`;
+await stat(builtWorker);
+const module = await import(`${pathToFileURL(builtWorker).href}?notverse=${Date.now()}`);
 const handler = module.default;
 assert(handler && typeof handler.fetch === "function", "built Reader Worker is not callable");
 const health = await handler.fetch(new Request("https://notverse.test/api/health"), {
