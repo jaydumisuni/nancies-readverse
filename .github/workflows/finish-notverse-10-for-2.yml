@@ -1,0 +1,64 @@
+name: Finish NoTVerse 10-for-2 proof
+
+on:
+  push:
+    branches:
+      - finish-notverse-10-for-2-20260731
+
+permissions:
+  contents: read
+
+jobs:
+  strict-build-and-visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Proof gate 1 — strict build and architecture
+        run: npm run build
+
+      - name: Install browser proof tooling
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start exact production client locally
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/notverse-preview.log 2>&1 &
+          echo $! > /tmp/notverse-preview.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/notverse-preview.log
+          exit 1
+
+      - name: Proof gate 2 — desktop and mobile visual interaction
+        run: node scripts/verify-notverse-ui.mjs
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+
+      - name: Preserve proof report and server log
+        if: always()
+        run: |
+          cp /tmp/notverse-preview.log engineering-evidence/notverse/preview.log 2>/dev/null || true
+          printf '%s\n' '${{ github.sha }}' > engineering-evidence/notverse/verified-commit.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: finish-notverse-10-for-2-evidence
+          path: engineering-evidence/notverse
+          if-no-files-found: error
+          retention-days: 14
