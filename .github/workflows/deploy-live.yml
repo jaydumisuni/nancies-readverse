@@ -1,42 +1,80 @@
-name: Deploy and verify NoTVerse live
+name: Verify NoTVerse live deployment
 
 on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  deploy-and-verify:
+  verify-cloudflare-build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Strict build
+        run: npm ci --no-audit --no-fund
+
+      - name: Reproduce the exact production build
         run: npm run build
-      - name: Deploy canonical Worker and frontend assets
-        run: npx wrangler deploy --config dist/nancies_readverse/wrangler.json
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Install Chromium
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
-      - name: Wait for deployment propagation
-        run: sleep 20
+
+      - name: Wait until Cloudflare serves this exact client bundle
+        env:
+          NOTVERSE_URL: https://notverse.pharrtechnolgiescoltd.workers.dev
+        run: |
+          set -euo pipefail
+          local_html="$(cat dist/client/index.html)"
+          script_asset="$(printf '%s' "$local_html" | grep -oE '/assets/[^" ]+\.js' | head -1)"
+          style_asset="$(printf '%s' "$local_html" | grep -oE '/assets/[^" ]+\.css' | head -1)"
+          test -n "$script_asset"
+          test -n "$style_asset"
+
+          for attempt in $(seq 1 90); do
+            live_html="$(curl -fsS --max-time 20 "$NOTVERSE_URL/?commit=${GITHUB_SHA}" || true)"
+            live_health="$(curl -fsS --max-time 20 "$NOTVERSE_URL/api/health?commit=${GITHUB_SHA}" || true)"
+            if printf '%s' "$live_html" | grep -Fq "$script_asset" \
+              && printf '%s' "$live_html" | grep -Fq "$style_asset" \
+              && printf '%s' "$live_health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$live_health" > /tmp/notverse-live-health.json
+              printf '%s\n' "$GITHUB_SHA" > /tmp/notverse-live-commit.txt
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Cloudflare did not serve the exact built assets within 15 minutes."
+          echo "Expected script: $script_asset"
+          echo "Expected style: $style_asset"
+          exit 1
+
       - name: Verify deployed NoTVerse visually
         run: node scripts/verify-notverse-live.mjs
         env:
-          NOTVERSE_URL: https://nancies-readverse.pharrtechnolgiescoltd.workers.dev/
+          NOTVERSE_URL: https://notverse.pharrtechnolgiescoltd.workers.dev/
+
+      - name: Preserve exact deployment proof
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-live
+          cp /tmp/notverse-live-health.json engineering-evidence/notverse-live/health.json 2>/dev/null || true
+          cp /tmp/notverse-live-commit.txt engineering-evidence/notverse-live/verified-commit.txt 2>/dev/null || true
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: notverse-live-visual-evidence
           path: engineering-evidence/notverse-live
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 14
