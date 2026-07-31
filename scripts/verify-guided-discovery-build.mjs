@@ -9,11 +9,12 @@ async function text(path) {
   return readFile(path, "utf8");
 }
 
-const [app, reader, styles, workerSource] = await Promise.all([
+const [app, reader, styles, workerSource, wranglerSource] = await Promise.all([
   text("src/App.tsx"),
   text("src/reader/PdfBookReader.tsx"),
   text("src/styles.css"),
   text("worker/index.ts"),
+  text("wrangler.jsonc"),
 ]);
 
 const sourceChecks = [
@@ -34,7 +35,9 @@ const sourceChecks = [
 ];
 for (const [condition, message] of sourceChecks) assert(condition, message);
 
-const builtWorker = "dist/nancies_readverse/index.js";
+const workerName = JSON.parse(wranglerSource).name;
+assert(workerName, "wrangler.jsonc does not define the Worker name");
+const builtWorker = `dist/${workerName}/index.js`;
 await stat(builtWorker);
 const module = await import(`${pathToFileURL(builtWorker).href}?verification=${Date.now()}`);
 const handler = module.default;
@@ -45,7 +48,7 @@ const fixturePdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x3
 
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-  if (url === "https://fixture.readverse.test/book.pdf") {
+  if (url === "https://fixture.notverse.test/book.pdf") {
     return new Response(init.method === "HEAD" ? null : fixturePdf, {
       status: 200,
       headers: {
@@ -66,7 +69,7 @@ globalThis.fetch = async (input, init = {}) => {
           publishedDate: "1997",
           description: "A personal finance book contrasting two approaches to money.",
           language: "en",
-          imageLinks: { thumbnail: "https://fixture.readverse.test/cover.jpg" },
+          imageLinks: { thumbnail: "https://fixture.notverse.test/cover.jpg" },
         },
         accessInfo: { accessViewStatus: "NONE" },
       }],
@@ -79,7 +82,7 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 const env = {
-  APP_NAME: "Nancy's ReadVerse",
+  APP_NAME: "NoTVerse",
   AI_MODEL: "fixture-model",
   ASSETS: { fetch: async () => new Response("asset") },
   AI: { run: async () => ({ response: "fixture" }) },
@@ -87,7 +90,7 @@ const env = {
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
 async function call(path, body) {
-  const response = await handler.fetch(new Request(`https://readverse.test${path}`, {
+  const response = await handler.fetch(new Request(`https://notverse.test${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -105,7 +108,7 @@ try {
   assert(greeting.response.ok && greeting.body.ok, "normal greeting route failed");
   assert(typeof greeting.body.answer === "string" && /here|hey|welcome/i.test(greeting.body.answer), "greeting is generic or empty");
 
-  const resolved = await call("/api/source/resolve", { url: "https://fixture.readverse.test/book.pdf" });
+  const resolved = await call("/api/source/resolve", { url: "https://fixture.notverse.test/book.pdf" });
   assert(resolved.response.ok && resolved.body.ok, "direct source resolution failed");
   assert(/^source-[a-z0-9]+$/i.test(resolved.body.source?.id || ""), "direct source has no stable ID");
   assert(resolved.body.source?.format === "pdf", "direct source format was not detected as PDF");
