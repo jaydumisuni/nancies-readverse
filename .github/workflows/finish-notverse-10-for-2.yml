@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - finish-notverse-10-for-2-20260731
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
