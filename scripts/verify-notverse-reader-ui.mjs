@@ -64,8 +64,6 @@ async function openTextFile(page, name) {
     ),
   });
 
-  // Uploads are intentionally not opened automatically. The companion first
-  // confirms the temporary file and presents the explicit Read now handoff.
   await page.locator(".companion-panel.open").waitFor({ state: "visible", timeout: 10000 });
   const uploadCard = page.locator(".upload-card").filter({ hasText: name }).last();
   await uploadCard.waitFor({ state: "visible", timeout: 10000 });
@@ -75,6 +73,13 @@ async function openTextFile(page, name) {
   await reader.waitFor({ state: "visible", timeout: 15000 });
   await reader.locator(".reader-loading").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
   return reader;
+}
+
+async function assertInsideViewport(locator, viewportWidth, label) {
+  assert(await locator.isVisible(), `${label} is not visible`);
+  const box = await locator.boundingBox();
+  assert(box, `${label} has no layout box`);
+  assert(box.x >= -1 && box.x + box.width <= viewportWidth + 1, `${label} is outside the mobile viewport`);
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -91,7 +96,7 @@ try {
   assert(await desktopReader.getByRole("button", { name: "Save offline" }).isVisible(), "Save offline is missing");
   assert(await desktopReader.getByRole("button", { name: "Save to Drive" }).isVisible(), "Save to Drive is missing");
   assert(await desktopReader.getByText("This file proves that a local reading file stays temporary", { exact: false }).isVisible(), "TXT content did not render");
-  await desktop.screenshot({ path: `${output}/reader-txt-desktop.png`, fullPage: true });
+  await desktop.screenshot({ path: `${output}/reader-txt-desktop.png` });
   report.screenshots.push("reader-txt-desktop.png");
 
   await desktopReader.getByRole("button", { name: "+ Add to Library" }).click();
@@ -101,7 +106,7 @@ try {
 
   await desktopReader.getByRole("button", { name: "Notes", exact: true }).click();
   await desktopReader.locator(".universal-notes textarea").fill("Verified reader Note attached to this temporary title.");
-  await desktop.screenshot({ path: `${output}/reader-note-desktop.png`, fullPage: true });
+  await desktop.screenshot({ path: `${output}/reader-note-desktop.png` });
   report.screenshots.push("reader-note-desktop.png");
   report.checks.push("reader Note persisted in the active title");
 
@@ -119,12 +124,18 @@ try {
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   const mobile = await mobileContext.newPage();
   report.errors.push(...(await prepare(mobile)).map((value) => `mobile: ${value}`));
-  await openTextFile(mobile, "Mobile Proof.txt");
+  const mobileReader = await openTextFile(mobile, "Mobile Proof.txt");
   const metrics = await mobile.evaluate(() => ({ inner: window.innerWidth, scroll: document.documentElement.scrollWidth }));
   assert(metrics.scroll <= metrics.inner + 2, `mobile reader overflow: ${metrics.scroll} > ${metrics.inner}`);
-  await mobile.screenshot({ path: `${output}/reader-txt-mobile.png`, fullPage: true });
+  await assertInsideViewport(mobileReader.getByRole("button", { name: "+ Add to Library" }), metrics.inner, "mobile Add to Library");
+  await assertInsideViewport(mobileReader.getByRole("button", { name: "Save offline" }), metrics.inner, "mobile Save offline");
+  await assertInsideViewport(mobileReader.getByRole("button", { name: "Save to Drive" }), metrics.inner, "mobile Save to Drive");
+  await assertInsideViewport(mobileReader.getByRole("button", { name: "Notes", exact: true }), metrics.inner, "mobile Notes");
+  await assertInsideViewport(mobileReader.getByRole("button", { name: "Fullscreen reader" }), metrics.inner, "mobile fullscreen");
+  await mobile.screenshot({ path: `${output}/reader-txt-mobile.png` });
   report.screenshots.push("reader-txt-mobile.png");
   report.checks.push("mobile reader fits the viewport");
+  report.checks.push("all five mobile reader actions remain visible");
   await mobileContext.close();
 
   assert(report.errors.length === 0, `browser errors: ${report.errors.join(" | ")}`);
