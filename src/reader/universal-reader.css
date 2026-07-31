@@ -143,11 +143,33 @@ body:has(.universal-overlay) { overflow: hidden; }
   .universal-window { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
   .universal-toolbar { grid-template-columns: auto minmax(0, 1fr) auto; padding: 9px 10px; min-height: 108px; }
   .universal-direction { display: none; }
-  .universal-toolbar nav { gap: 6px; }
-  .universal-toolbar nav button { min-width: 38px; height: 38px; padding: 0 10px; }
-  .universal-toolbar nav button:not(:first-child):not(:last-child) { font-size: 0; width: 38px; padding: 0; }
-  .universal-toolbar nav button:nth-child(2):before { content: "↓"; font-size: 16px; }
-  .universal-toolbar nav button:nth-child(3):before { content: "☁"; font-size: 16px; }
+  .universal-toolbar nav {
+    display: grid;
+    grid-template-columns: minmax(132px, 1fr) repeat(4, 40px);
+    gap: 6px;
+    overflow: visible;
+    padding: 0;
+  }
+  .universal-toolbar nav button {
+    width: 40px;
+    min-width: 40px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0;
+    font-size: 0;
+    display: grid;
+    place-items: center;
+  }
+  .universal-toolbar nav button:first-child {
+    width: auto;
+    min-width: 132px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  .universal-toolbar nav button:nth-child(2)::before { content: "↓"; font-size: 18px; }
+  .universal-toolbar nav button:nth-child(3)::before { content: "☁"; font-size: 17px; }
+  .universal-toolbar nav button:nth-child(4)::before { content: "✎"; font-size: 17px; }
+  .universal-toolbar nav button:nth-child(5)::before { content: "⛶"; font-size: 17px; }
   .universal-stage { padding: 8px; }
   .epub-page, .comic-page, .text-book-page { width: 96vw; height: calc(100dvh - 190px); border-radius: 4px; }
   .text-book-page { padding: 30px 24px; }
