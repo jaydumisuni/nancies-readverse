@@ -1,4 +1,4 @@
-name: Verify NoTVerse live deployment
+name: Verify NoTVerse production deployment
 
 on:
   push:
@@ -8,9 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  verify-cloudflare-build:
+  verify-cloudflare-production:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -30,9 +30,9 @@ jobs:
           npm install --no-save playwright
           npx playwright install --with-deps chromium
 
-      - name: Wait until Cloudflare serves this exact client bundle
+      - name: Wait until the custom domain serves this exact client bundle
         env:
-          NOTVERSE_URL: https://notverse.pharrtechnolgiescoltd.workers.dev
+          NOTVERSE_URL: https://notverse.1ink.online
         run: |
           set -euo pipefail
           local_html="$(cat dist/client/index.html)"
@@ -49,20 +49,37 @@ jobs:
               && printf '%s' "$live_health" | grep -Fq '"app":"NoTVerse"'; then
               printf '%s\n' "$live_health" > /tmp/notverse-live-health.json
               printf '%s\n' "$GITHUB_SHA" > /tmp/notverse-live-commit.txt
+              printf '%s\n' "$script_asset" > /tmp/notverse-live-script.txt
+              printf '%s\n' "$style_asset" > /tmp/notverse-live-style.txt
               exit 0
             fi
             sleep 10
           done
 
-          echo "Cloudflare did not serve the exact built assets within 15 minutes."
+          echo "Cloudflare did not serve the exact built assets at the custom domain within 15 minutes."
           echo "Expected script: $script_asset"
           echo "Expected style: $style_asset"
           exit 1
 
-      - name: Verify deployed NoTVerse visually
-        run: node scripts/verify-notverse-live.mjs
+      - name: Verify live identity and responsive shell
         env:
-          NOTVERSE_URL: https://notverse.pharrtechnolgiescoltd.workers.dev/
+          NOTVERSE_URL: https://notverse.1ink.online/
+        run: node scripts/verify-notverse-live.mjs
+
+      - name: Verify live setup, navigation and social workspaces
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-ui.mjs
+
+      - name: Verify live reader, Notes and Library handoff
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-reader-ui.mjs
+
+      - name: Verify live persistent Inbox messaging
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-inbox-ui.mjs
 
       - name: Preserve exact deployment proof
         if: always()
@@ -70,11 +87,15 @@ jobs:
           mkdir -p engineering-evidence/notverse-live
           cp /tmp/notverse-live-health.json engineering-evidence/notverse-live/health.json 2>/dev/null || true
           cp /tmp/notverse-live-commit.txt engineering-evidence/notverse-live/verified-commit.txt 2>/dev/null || true
+          cp /tmp/notverse-live-script.txt engineering-evidence/notverse-live/script-asset.txt 2>/dev/null || true
+          cp /tmp/notverse-live-style.txt engineering-evidence/notverse-live/style-asset.txt 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: notverse-live-visual-evidence
-          path: engineering-evidence/notverse-live
+          name: notverse-production-visual-evidence
+          path: |
+            engineering-evidence/notverse-live
+            engineering-evidence/notverse
           if-no-files-found: error
           retention-days: 14
