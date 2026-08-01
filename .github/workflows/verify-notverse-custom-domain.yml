@@ -1,0 +1,84 @@
+name: Verify NoTVerse custom domain visually
+
+on:
+  push:
+    branches:
+      - verify-notverse-live-20260801
+
+permissions:
+  contents: read
+
+jobs:
+  live-custom-domain-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Wait for the production custom domain
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            health="$(curl -fsS --max-time 20 "$NOTVERSE_URL/api/health?proof=${GITHUB_SHA}" || true)"
+            html="$(curl -fsS --max-time 20 "$NOTVERSE_URL/?proof=${GITHUB_SHA}" || true)"
+            if printf '%s' "$health" | grep -Fq '"app":"NoTVerse"' \
+              && printf '%s' "$html" | grep -Fq '/assets/'; then
+              printf '%s\n' "$health" > /tmp/notverse-custom-health.json
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "The NoTVerse custom domain did not become ready within 15 minutes."
+          exit 1
+
+      - name: Verify exact live shell at desktop, tablet and mobile sizes
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online/
+        run: node scripts/verify-notverse-live.mjs
+
+      - name: Verify live setup, navigation and social workspaces
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-ui.mjs
+
+      - name: Verify live reader, Notes and Library handoff
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-reader-ui.mjs
+
+      - name: Verify live persistent Inbox messaging
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-inbox-ui.mjs
+
+      - name: Preserve production identity proof
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-live
+          cp /tmp/notverse-custom-health.json engineering-evidence/notverse-live/custom-domain-health.json 2>/dev/null || true
+          printf '%s\n' '${{ github.sha }}' > engineering-evidence/notverse-live/verification-branch-commit.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notverse-custom-domain-visual-proof
+          path: |
+            engineering-evidence/notverse-live
+            engineering-evidence/notverse
+          if-no-files-found: error
+          retention-days: 14
