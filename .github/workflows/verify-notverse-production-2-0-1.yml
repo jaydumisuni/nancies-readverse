@@ -1,0 +1,103 @@
+name: Verify NoTVerse production 2.0.1
+
+on:
+  push:
+    branches:
+      - verify-notverse-production-2-0-1
+
+permissions:
+  contents: read
+
+jobs:
+  production-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Rebuild the exact verified production bundle
+        run: npm run build
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Wait for the exact release at the custom domain
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online
+        run: |
+          set -euo pipefail
+          local_html="$(cat dist/client/index.html)"
+          expected_script="$(printf '%s' "$local_html" | grep -oE '/assets/[^" ]+\.js' | head -1)"
+          expected_style="$(printf '%s' "$local_html" | grep -oE '/assets/[^" ]+\.css' | head -1)"
+          test -n "$expected_script"
+          test -n "$expected_style"
+
+          for attempt in $(seq 1 120); do
+            release="$(curl -fsS --max-time 20 "$NOTVERSE_URL/release.json?proof=${GITHUB_SHA}" || true)"
+            health="$(curl -fsS --max-time 20 "$NOTVERSE_URL/api/health?proof=${GITHUB_SHA}" || true)"
+            html="$(curl -fsS --max-time 20 "$NOTVERSE_URL/?proof=${GITHUB_SHA}" || true)"
+            if printf '%s' "$release" | grep -Fq '"releaseId": "notverse-2026-08-01-production"' \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"' \
+              && printf '%s' "$html" | grep -Fq "$expected_script" \
+              && printf '%s' "$html" | grep -Fq "$expected_style"; then
+              mkdir -p engineering-evidence/notverse-production
+              printf '%s\n' "$release" > engineering-evidence/notverse-production/release.json
+              printf '%s\n' "$health" > engineering-evidence/notverse-production/health.json
+              printf '%s\n' "$expected_script" > engineering-evidence/notverse-production/script-asset.txt
+              printf '%s\n' "$expected_style" > engineering-evidence/notverse-production/style-asset.txt
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "The exact NoTVerse 2.0.1 bundle did not reach the custom domain within 20 minutes."
+          echo "Expected script: $expected_script"
+          echo "Expected style: $expected_style"
+          exit 1
+
+      - name: Verify live identity and responsive shell
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online/
+        run: node scripts/verify-notverse-live.mjs
+
+      - name: Verify live setup, six-part navigation and social workspaces
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-ui.mjs
+
+      - name: Verify live reader, Notes and Library handoff
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-reader-ui.mjs
+
+      - name: Verify live persistent Inbox messaging
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-inbox-ui.mjs
+
+      - name: Preserve verified commit
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-production
+          printf '%s\n' '${{ github.sha }}' > engineering-evidence/notverse-production/verification-commit.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notverse-production-2-0-1-proof
+          path: |
+            engineering-evidence/notverse-production
+            engineering-evidence/notverse-live
+            engineering-evidence/notverse
+          if-no-files-found: error
+          retention-days: 14
