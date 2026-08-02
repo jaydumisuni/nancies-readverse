@@ -1,0 +1,3 @@
+NoTVerse production redeploy trigger.
+Source release: 2.0.1
+Purpose: force the connected Cloudflare Workers build to rebuild and publish the already verified main bundle after deterministic deployment correction.
