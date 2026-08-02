@@ -4,7 +4,6 @@ import App from "./App";
 import "./styles.css";
 import "./notverse/notverse-polish.css";
 import "./notverse/notverse-branding-fix.css";
-import "./notverse/notverse-icon-data.css";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");
