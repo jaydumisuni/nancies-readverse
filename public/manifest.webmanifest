@@ -9,10 +9,10 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/notverse-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/notverse-icon.webp",
+      "sizes": "256x256",
+      "type": "image/webp",
+      "purpose": "any"
     }
   ],
   "categories": [
