@@ -64,19 +64,13 @@ try {
     const mark = document.querySelector(".setup-brand .notverse-mark");
     const cover = document.querySelector(".cover-notebook");
     const origin = document.querySelector(".setup-cover-page h2");
-    const setupWordmark = document.querySelector(".setup-brand > strong");
-    const setupLabel = document.querySelector(".setup-brand > small");
-    const duplicateTitle = document.querySelector(".setup-cover-page h1");
-    if (!mark || !cover || !origin || !setupWordmark || !setupLabel || !duplicateTitle) return null;
+    if (!mark || !cover || !origin) return null;
     return {
       markImage: getComputedStyle(mark).backgroundImage,
       coverImage: getComputedStyle(cover).backgroundImage,
       originText: origin.textContent?.trim(),
       originFont: getComputedStyle(origin).fontFamily,
       originStyle: getComputedStyle(origin).fontStyle,
-      setupWordmarkDisplay: getComputedStyle(setupWordmark).display,
-      setupLabelDisplay: getComputedStyle(setupLabel).display,
-      duplicateTitleDisplay: getComputedStyle(duplicateTitle).display,
     };
   });
   assert(setupVisual, "setup visual identity elements are missing");
@@ -85,9 +79,9 @@ try {
   assert(setupVisual.originText === "Created for Nancy. Shared with the world.", "origin line changed");
   assert(setupVisual.originFont.includes("Georgia"), "origin line does not use the polished book font");
   assert(setupVisual.originStyle === "normal", "origin line still uses the old italic treatment");
-  assert(setupVisual.setupWordmarkDisplay === "none", "setup header repeats the NoTVerse wordmark beside the approved artwork");
-  assert(setupVisual.setupLabelDisplay === "none", "setup header still shows the rejected setup-wizard lockup");
-  assert(setupVisual.duplicateTitleDisplay === "none", "setup cover repeats NoTVerse below artwork that already contains the name");
+  assert(await setup.locator(".setup-brand > strong").count() === 0, "setup header still contains a duplicate NoTVerse wordmark");
+  assert(await setup.locator(".setup-brand > small").count() === 0, "setup header still contains the rejected setup-wizard lockup");
+  assert(await setup.locator(".setup-cover-page h1").count() === 0, "setup cover still contains a duplicate NoTVerse title");
   await setup.screenshot({ path: `${output}/setup-brand-desktop.png`, fullPage: true });
   report.screenshots.push("setup-brand-desktop.png");
   report.checks.push("browser favicon and setup surfaces decode the approved NoTVerse artwork");
@@ -107,14 +101,12 @@ try {
   const homeVisual = await home.evaluate(() => {
     const brand = document.querySelector(".brand");
     const brandArtwork = document.querySelector(".brand > span");
-    const duplicateWordmark = document.querySelector(".brand > strong");
     const origin = document.querySelector(".brand small");
     const hero = document.querySelector(".notverse-hero");
-    if (!brand || !brandArtwork || !duplicateWordmark || !origin || !hero) return null;
+    if (!brand || !brandArtwork || !origin || !hero) return null;
     return {
       brandImage: getComputedStyle(brandArtwork).backgroundImage,
       brandBeforeContent: getComputedStyle(brand, "::before").content,
-      duplicateWordmarkDisplay: getComputedStyle(duplicateWordmark).display,
       heroImage: getComputedStyle(hero, "::after").backgroundImage,
       originText: origin.textContent?.replace(/\s+/g, " ").trim(),
       originFont: getComputedStyle(origin).fontFamily,
@@ -124,7 +116,7 @@ try {
   assert(homeVisual.brandImage.includes("notverse-icon.webp"), "sidebar logo is not rendered");
   assert(homeVisual.heroImage.includes("notverse-icon.webp"), "post-setup welcome icon is not rendered");
   assert(homeVisual.brandBeforeContent === "none" || homeVisual.brandBeforeContent === "normal", "sidebar still renders the rejected extra notebook symbol");
-  assert(homeVisual.duplicateWordmarkDisplay === "none", "sidebar repeats NoTVerse beside artwork that already contains the name");
+  assert(await home.locator(".brand > strong").count() === 0, "sidebar still contains a duplicate NoTVerse wordmark");
   assert(homeVisual.originText?.includes("Created for Nancy") && homeVisual.originText?.includes("Shared with the world"), "post-setup origin line is missing");
   assert(homeVisual.originFont.includes("Georgia"), "post-setup origin line still uses the plain UI font");
   await home.screenshot({ path: `${output}/home-brand-desktop.png`, fullPage: true });
@@ -144,15 +136,13 @@ try {
   await mobile.locator(".notverse-home").waitFor();
   const mobileBrand = await mobile.evaluate(() => {
     const artwork = document.querySelector(".mobile-brand > span");
-    const duplicateWordmark = document.querySelector(".mobile-brand > strong");
-    if (!artwork || !duplicateWordmark) return null;
+    if (!artwork) return null;
     return {
       artworkImage: getComputedStyle(artwork).backgroundImage,
-      duplicateWordmarkDisplay: getComputedStyle(duplicateWordmark).display,
     };
   });
   assert(mobileBrand?.artworkImage.includes("notverse-icon.webp"), "mobile header does not use the approved artwork");
-  assert(mobileBrand?.duplicateWordmarkDisplay === "none", "mobile header repeats NoTVerse beside the approved artwork");
+  assert(await mobile.locator(".mobile-brand > strong").count() === 0, "mobile header still contains a duplicate NoTVerse wordmark");
   await mobile.getByRole("button", { name: "Chat now", exact: true }).click();
   const panel = mobile.locator(".companion-panel.open");
   await panel.waitFor();

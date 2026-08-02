@@ -1466,9 +1466,8 @@ export default function App() {
         />
       )}
       <aside className="sidebar">
-        <a className="brand notverse-brand" href="#home" onClick={() => setActiveSection("home")}>
-          <span>▤</span>
-          <strong>NoTVerse</strong>
+        <a className="brand notverse-brand" href="#home" onClick={() => setActiveSection("home")} aria-label="NoTVerse Home">
+          <span role="img" aria-label="NoTVerse" />
           <small className="notverse-origin">Created for Nancy.<br />Shared with the world.</small>
         </a>
 
@@ -1523,7 +1522,7 @@ export default function App() {
 
       <main className={`main-shell notverse-shell ${chatOpen ? "with-chat" : ""}`}>
         <header className="utility-bar">
-          <div className="mobile-brand"><span>▤</span><strong>NoTVerse</strong></div>
+          <div className="mobile-brand"><span role="img" aria-label="NoTVerse" /></div>
           <label className="global-search">
             <Icon name="search" size={18} />
             <input
