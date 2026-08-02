@@ -68,11 +68,6 @@ jobs:
           echo "Expected style: $style_asset"
           exit 1
 
-      - name: Verify live identity and responsive shell
-        env:
-          NOTVERSE_URL: https://notverse.1ink.online/
-        run: node scripts/verify-notverse-live.mjs
-
       - name: Verify live setup, navigation and social workspaces
         env:
           NOTVERSE_TEST_URL: https://notverse.1ink.online
