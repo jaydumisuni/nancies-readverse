@@ -6,6 +6,11 @@ on:
       - fix-approved-notverse-brand-workspace-20260802
     paths:
       - .apply-clean-brand-trigger
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
 
 permissions:
   contents: write
