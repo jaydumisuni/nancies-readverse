@@ -1,0 +1,47 @@
+name: Install approved NoTVerse icon
+
+on:
+  push:
+    branches:
+      - fix-notverse-approved-icon-20260802
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout correction branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix-notverse-approved-icon-20260802
+          fetch-depth: 0
+
+      - name: Decode exact approved artwork and remove generated substitute
+        shell: bash
+        run: |
+          if [ ! -f public/notverse-icon.webp.b64 ]; then
+            echo "Approved artwork is already installed."
+            exit 0
+          fi
+          base64 --decode public/notverse-icon.webp.b64 > public/notverse-icon.webp
+          file public/notverse-icon.webp | grep -qi 'webp'
+          rm -f public/notverse-icon.webp.b64 public/notverse-icon.svg
+
+      - name: Commit exact binary asset
+        shell: bash
+        run: |
+          if git diff --quiet && git diff --cached --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "No asset change required."
+            exit 0
+          fi
+          git config user.name "NoTVerse Workspace"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A public/notverse-icon.webp public/notverse-icon.webp.b64 public/notverse-icon.svg
+          git commit -m "Use the exact approved NoTVerse artwork"
+          git push origin HEAD:fix-notverse-approved-icon-20260802
