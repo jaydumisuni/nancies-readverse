@@ -18,19 +18,21 @@ jobs:
       - name: Checkout exact branch
         uses: actions/checkout@v4
 
-      - name: Package source without generated dependencies
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Package source and dependencies
         run: |
           mkdir -p workspace-export
           rsync -a ./ workspace-export/ \
             --exclude '.git' \
-            --exclude 'node_modules' \
             --exclude 'dist' \
             --exclude 'workspace-export'
-          tar -czf notverse-workspace-source.tar.gz workspace-export
+          tar -czf notverse-workspace-with-deps.tar.gz workspace-export
 
-      - name: Upload workspace source
+      - name: Upload complete local workspace
         uses: actions/upload-artifact@v4
         with:
-          name: notverse-workspace-source
-          path: notverse-workspace-source.tar.gz
+          name: notverse-workspace-with-deps
+          path: notverse-workspace-with-deps.tar.gz
           retention-days: 2
