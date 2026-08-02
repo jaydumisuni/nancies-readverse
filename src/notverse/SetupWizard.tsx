@@ -109,7 +109,7 @@ export default function SetupWizard({ profile, preferences, selectedTheme, selec
 
   return (
     <div className="notverse-setup" onPointerDown={pointerDown} onPointerUp={pointerUp} data-page={page + 1}>
-      <div className="setup-brand"><span className="notverse-mark">▤</span><strong>NoTVerse</strong><small>Setup Wizard</small><b>{page + 1} / {pages}</b></div>
+      <div className="setup-brand"><span className="notverse-mark" role="img" aria-label="NoTVerse" /><b>{page + 1} / {pages}</b></div>
       <div className={`setup-paper-stack turn-${turn || "idle"}`}>
         <section className={`setup-sheet setup-sheet-${page + 1}`}>
           {page === 0 && <SetupCover />}
@@ -131,7 +131,7 @@ export default function SetupWizard({ profile, preferences, selectedTheme, selec
 }
 
 function SetupCover() {
-  return <div className="setup-cover-page"><span className="cover-notebook">▤</span><h1>NoTVerse</h1><h2>Created for Nancy. Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
+  return <div className="setup-cover-page"><span className="cover-notebook" role="img" aria-label="NoTVerse" /><h2>Created for Nancy. Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
 }
 
 function ProfilePage({ profile, onProfile, onPhoto }: { profile: SetupProfile; onProfile: (profile: SetupProfile) => void; onPhoto: (event: ChangeEvent<HTMLInputElement>) => void }) {
