@@ -1,0 +1,439 @@
+--- a/index.html
++++ b/index.html
+@@ -8,7 +8,7 @@
+     <meta name="application-name" content="NoTVerse" />
+     <meta name="apple-mobile-web-app-title" content="NoTVerse" />
+     <meta name="description" content="NoTVerse — Created for Nancy. Shared with the world. Find, verify, read, save and leave Notes across your reading universe." />
+-    <link rel="icon" type="image/svg+xml" href="/notverse-icon.svg" />
++    <link rel="icon" type="image/webp" sizes="863x864" href="/notverse-icon.webp" />
+     <link rel="manifest" href="/manifest.webmanifest" />
+     <title>NoTVerse</title>
+   </head>
+--- a/public/manifest.webmanifest
++++ b/public/manifest.webmanifest
+@@ -9,9 +9,9 @@
+   "orientation": "any",
+   "icons": [
+     {
+-      "src": "/notverse-icon.svg",
+-      "sizes": "any",
+-      "type": "image/svg+xml",
++      "src": "/notverse-icon.webp",
++      "sizes": "863x864",
++      "type": "image/webp",
+       "purpose": "any maskable"
+     }
+   ],
+--- a/src/notverse/SetupWizard.tsx
++++ b/src/notverse/SetupWizard.tsx
+@@ -109,7 +109,7 @@
+ 
+   return (
+     <div className="notverse-setup" onPointerDown={pointerDown} onPointerUp={pointerUp} data-page={page + 1}>
+-      <div className="setup-brand"><span className="notverse-mark">▤</span><strong>NoTVerse</strong><small>Setup Wizard</small><b>{page + 1} / {pages}</b></div>
++      <div className="setup-brand"><b>{page + 1} / {pages}</b></div>
+       <div className={`setup-paper-stack turn-${turn || "idle"}`}>
+         <section className={`setup-sheet setup-sheet-${page + 1}`}>
+           {page === 0 && <SetupCover />}
+@@ -131,7 +131,7 @@
+ }
+ 
+ function SetupCover() {
+-  return <div className="setup-cover-page"><span className="cover-notebook">▤</span><h1>NoTVerse</h1><h2>Created for Nancy. Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
++  return <div className="setup-cover-page"><img className="cover-notebook" src="/notverse-icon.webp" alt="NoTVerse" /><h2>Created for Nancy. Shared with the world.</h2><p>Every reader leaves something behind.<br />Sometimes it is only a Note.</p><em>Swipe up to begin</em></div>;
+ }
+ 
+ function ProfilePage({ profile, onProfile, onPhoto }: { profile: SetupProfile; onProfile: (profile: SetupProfile) => void; onPhoto: (event: ChangeEvent<HTMLInputElement>) => void }) {
+@@ -166,5 +166,5 @@
+ }
+ 
+ function SetupComplete() {
+-  return <div className="setup-complete-page"><span className="cover-notebook">▤</span><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy. Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
++  return <div className="setup-complete-page"><img className="cover-notebook" src="/notverse-icon.webp" alt="NoTVerse" /><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy. Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
+ }
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1466,10 +1466,9 @@
+         />
+       )}
+       <aside className="sidebar">
+-        <a className="brand notverse-brand" href="#home" onClick={() => setActiveSection("home")}>
+-          <span>▤</span>
+-          <strong>NoTVerse</strong>
+-          <small className="notverse-origin">Created for Nancy.<br />Shared with the world.</small>
++        <a className="brand notverse-brand" href="#home" onClick={() => setActiveSection("home")} aria-label="NoTVerse home">
++          <img src="/notverse-icon.webp" alt="NoTVerse" />
++          <small className="notverse-origin">Created for Nancy. Shared with the world.</small>
+         </a>
+ 
+         <nav className="side-nav" aria-label="Main navigation">
+@@ -1523,7 +1522,7 @@
+ 
+       <main className={`main-shell notverse-shell ${chatOpen ? "with-chat" : ""}`}>
+         <header className="utility-bar">
+-          <div className="mobile-brand"><span>▤</span><strong>NoTVerse</strong></div>
++          <div className="mobile-brand" aria-label="NoTVerse"><img src="/notverse-icon.webp" alt="NoTVerse" /></div>
+           <label className="global-search">
+             <Icon name="search" size={18} />
+             <input
+--- a/src/notverse/notverse-branding-fix.css
++++ b/src/notverse/notverse-branding-fix.css
+@@ -1,65 +1,34 @@
+-/* NoTVerse visual identity and mobile companion usability correction.
+-   Loaded after the existing styles so the product keeps its approved layout. */
++/* Approved NoTVerse icon placement and mobile companion usability.
++   The supplied PNG is the only visual logo. Do not add a second notebook mark
++   or repeat the NoTVerse word beside an icon that already contains it. */
+ 
+ .setup-brand {
+   min-height: 64px;
+-  gap: 12px;
+-}
+-
+-.setup-brand .notverse-mark {
+-  flex: 0 0 48px;
+-  width: 48px;
+-  height: 48px;
+-  border: 1px solid rgba(139, 105, 255, .56);
+-  border-radius: 14px;
+-  background: url("/notverse-icon.svg") center / cover no-repeat;
+-  box-shadow: 0 0 24px rgba(124, 77, 255, .28), 0 0 18px rgba(54, 184, 255, .12);
+-  color: transparent;
+-  font-size: 0;
+-  overflow: hidden;
+-}
+-
+-.setup-brand strong {
+-  font: italic 800 25px/1 Georgia, "Times New Roman", serif;
+-  color: var(--accent-2);
+-  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 35%, transparent);
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
+ }
+ 
+-.setup-brand small {
+-  align-self: center;
+-  text-transform: uppercase;
+-  letter-spacing: .16em;
+-  font-size: 9px;
+-  color: #d8cbd4;
+-}
+ 
+ .cover-notebook {
+   display: block;
+   width: clamp(126px, 16vw, 168px);
+   height: clamp(126px, 16vw, 168px);
+-  margin: 0 auto 18px;
++  margin: 0 auto 21px;
++  object-fit: cover;
+   border: 1px solid rgba(139, 105, 255, .55);
+   border-radius: 34px;
+-  background: url("/notverse-icon.svg") center / cover no-repeat;
+   box-shadow:
+     0 0 40px rgba(124, 77, 255, .28),
+     0 0 24px rgba(54, 184, 255, .13),
+     0 20px 55px rgba(0, 0, 0, .42);
+-  color: transparent;
+-  font-size: 0;
+-  filter: none;
+-  overflow: hidden;
+-}
+-
+-.setup-cover-page h1,
+-.setup-complete-page h1 {
+-  letter-spacing: -.045em;
+-  text-shadow: 0 0 34px color-mix(in srgb, var(--accent) 28%, transparent);
+ }
+ 
++/* The supplied icon already says NoTVerse, so the setup cover has no second
++   wordmark. The exact origin line becomes the first text below the icon. */
+ .setup-cover-page h2 {
+   max-width: 720px;
+-  margin: 25px auto 17px;
++  margin: 0 auto 17px;
+   color: #fff7fb;
+   font: 650 clamp(22px, 3.1vw, 34px)/1.24 Georgia, "Times New Roman", serif;
+   font-style: normal;
+@@ -84,92 +53,59 @@
+   text-shadow: 0 8px 28px rgba(0, 0, 0, .34);
+ }
+ 
+-/* Desktop/sidebar lockup: icon + wordmark + origin line. */
++/* Sidebar lockup: approved icon plus origin line only. */
+ .brand {
+   min-height: 126px;
+   display: grid;
+-  grid-template-columns: 64px minmax(0, 1fr);
+-  grid-template-rows: auto auto auto;
++  grid-template-columns: 68px minmax(0, 1fr);
++  align-items: center;
+   column-gap: 12px;
+-  align-content: center;
+-  justify-content: initial;
+   padding: 10px 8px 17px;
+ }
+ 
+-.brand::before {
+-  content: "";
++.brand::before,
++.mobile-brand::before {
++  content: none !important;
++  display: none !important;
++}
++
++.brand > img {
+   grid-column: 1;
+-  grid-row: 1 / 4;
+-  align-self: center;
+-  width: 64px;
+-  height: 64px;
++  width: 68px;
++  height: 68px;
++  display: block;
++  object-fit: cover;
+   border: 1px solid rgba(139, 105, 255, .55);
+-  border-radius: 18px;
+-  background: url("/notverse-icon.svg") center / cover no-repeat;
++  border-radius: 20px;
+   box-shadow: 0 0 28px rgba(124, 77, 255, .28), 0 0 16px rgba(54, 184, 255, .11);
+ }
+ 
+-.brand span {
++.brand .notverse-origin {
+   grid-column: 2;
+   margin: 0;
+-  color: var(--accent-2);
+-  font: italic 800 23px/1 Georgia, "Times New Roman", serif;
+-  text-shadow: 0 0 24px var(--accent-glow);
+-}
+-
+-.brand strong {
+-  grid-column: 2;
+-  margin-top: 5px;
+-  font-size: .58rem;
+-  letter-spacing: .18em;
+-}
+-
+-.brand small {
+-  grid-column: 2;
+-  margin-top: 9px;
+-  color: #cdbdc7;
+-  font: 500 .69rem/1.35 Georgia, "Times New Roman", serif;
++  color: #d9cbd4;
++  font: 600 .78rem/1.38 Georgia, "Times New Roman", serif;
+   letter-spacing: 0;
+   text-transform: none;
+ }
+ 
+ .mobile-brand {
+-  min-width: 116px;
+-  grid-template-columns: 36px minmax(0, 1fr);
+-  grid-template-rows: auto auto;
+-  column-gap: 8px;
++  min-width: 40px;
++  display: none;
+   align-items: center;
+ }
+ 
+-.mobile-brand::before {
+-  content: "";
+-  grid-column: 1;
+-  grid-row: 1 / 3;
+-  width: 36px;
+-  height: 36px;
++.mobile-brand > img {
++  width: 38px;
++  height: 38px;
++  display: block;
++  object-fit: cover;
+   border: 1px solid rgba(139, 105, 255, .5);
+   border-radius: 11px;
+-  background: url("/notverse-icon.svg") center / cover no-repeat;
+   box-shadow: 0 0 18px rgba(124, 77, 255, .25);
+ }
+ 
+-.mobile-brand span,
+-.mobile-brand strong {
+-  grid-column: 2;
+-}
+-
+-.mobile-brand span {
+-  color: var(--accent-2);
+-  font: italic 800 1.02rem/1 Georgia, "Times New Roman", serif;
+-}
+-
+-.mobile-brand strong {
+-  margin-top: 3px;
+-  font-size: .43rem;
+-  letter-spacing: .16em;
+-}
+-
+-/* Put the product icon in the post-setup welcome area without changing layout. */
++/* Approved icon in the post-setup welcome area; no second wordmark. */
+ .notverse-hero {
+   position: relative;
+   padding-right: clamp(96px, 12vw, 142px);
+@@ -186,7 +122,7 @@
+   transform: translateY(-50%);
+   border: 1px solid rgba(139, 105, 255, .42);
+   border-radius: 25px;
+-  background: url("/notverse-icon.svg") center / cover no-repeat;
++  background: url("/notverse-icon.webp") center / cover no-repeat;
+   box-shadow: 0 0 32px rgba(124, 77, 255, .22), 0 0 18px rgba(54, 184, 255, .1);
+   opacity: .96;
+ }
+@@ -201,53 +137,42 @@
+   .brand {
+     display: grid;
+     grid-template-columns: 1fr;
+-    grid-template-rows: 52px auto;
+     justify-items: center;
+     min-height: 96px;
+     padding-inline: 0;
+   }
+-  .brand::before {
++
++  .brand > img {
+     grid-column: 1;
+-    grid-row: 1;
+-    width: 50px;
+-    height: 50px;
+-    border-radius: 15px;
++    width: 54px;
++    height: 54px;
++    border-radius: 16px;
+   }
+-  .brand span {
+-    grid-column: 1;
+-    grid-row: 2;
+-    font-size: .72rem;
++
++  .brand .notverse-origin {
++    display: none;
+   }
+-  .brand strong,
+-  .brand small { display: none; }
+ }
+ 
+ @media (max-width: 720px) {
+   .setup-brand {
+     min-height: 52px;
+-    gap: 9px;
+     padding: 10px 12px;
+   }
+ 
+-  .setup-brand .notverse-mark {
+-    flex-basis: 38px;
+-    width: 38px;
+-    height: 38px;
+-    border-radius: 11px;
++  .mobile-brand {
++    display: flex;
+   }
+ 
+-  .setup-brand strong { font-size: 20px; }
+-  .setup-brand small { font-size: 7px; letter-spacing: .13em; }
+-
+   .cover-notebook {
+     width: 124px;
+     height: 124px;
+     border-radius: 28px;
+-    margin-bottom: 12px;
++    margin-bottom: 15px;
+   }
+ 
+   .setup-cover-page h2 {
+-    margin: 17px auto 12px;
++    margin: 0 auto 12px;
+     font-size: clamp(19px, 6.2vw, 25px);
+     line-height: 1.22;
+   }
+--- a/scripts/verify-notverse-brand-mobile-chat.mjs
++++ b/scripts/verify-notverse-brand-mobile-chat.mjs
+@@ -49,39 +49,47 @@
+   await setup.locator(".notverse-setup").waitFor();
+ 
+   const favicon = await setup.locator('link[rel="icon"]').getAttribute("href");
+-  assert(favicon === "/notverse-icon.svg", "browser favicon does not use the NoTVerse icon");
+-  const iconResponse = await setup.request.get(`${baseURL}/notverse-icon.svg`);
++  assert(favicon === "/notverse-icon.webp", "browser favicon does not use the NoTVerse icon");
++  const iconResponse = await setup.request.get(`${baseURL}/notverse-icon.webp`);
+   assert(iconResponse.ok(), `NoTVerse icon returned HTTP ${iconResponse.status()}`);
+   const iconLoaded = await setup.evaluate((source) => new Promise((resolve) => {
+     const image = new Image();
+     image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0);
+     image.onerror = () => resolve(false);
+     image.src = source;
+-  }), `${baseURL}/notverse-icon.svg`);
++  }), `${baseURL}/notverse-icon.webp`);
+   assert(iconLoaded, "NoTVerse vector artwork could not be decoded by the browser");
+ 
+   const setupVisual = await setup.evaluate(() => {
+-    const mark = document.querySelector(".setup-brand .notverse-mark");
++    const header = document.querySelector(".setup-brand");
+     const cover = document.querySelector(".cover-notebook");
+     const origin = document.querySelector(".setup-cover-page h2");
+-    if (!mark || !cover || !origin) return null;
++    const duplicateHeaderWordmark = document.querySelector(".setup-brand strong, .setup-brand small");
++    const duplicateCoverWordmark = document.querySelector(".setup-cover-page h1");
++    if (!header || !(cover instanceof HTMLImageElement) || !origin) return null;
+     return {
+-      markImage: getComputedStyle(mark).backgroundImage,
+-      coverImage: getComputedStyle(cover).backgroundImage,
++      headerImages: header.querySelectorAll("img").length,
++      headerText: header.textContent?.replace(/\s+/g, " ").trim(),
++      coverSource: cover.getAttribute("src"),
++      duplicateHeaderWordmark: Boolean(duplicateHeaderWordmark),
++      duplicateCoverWordmark: Boolean(duplicateCoverWordmark),
+       originText: origin.textContent?.trim(),
+       originFont: getComputedStyle(origin).fontFamily,
+       originStyle: getComputedStyle(origin).fontStyle,
+     };
+   });
+   assert(setupVisual, "setup visual identity elements are missing");
+-  assert(setupVisual.markImage.includes("notverse-icon.svg"), "setup header icon is not rendered");
+-  assert(setupVisual.coverImage.includes("notverse-icon.svg"), "welcome icon is not rendered");
++  assert(setupVisual.headerImages === 0, "setup header repeats the welcome icon");
++  assert(setupVisual.headerText === "1 / 10", "setup header contains an extra brand lockup");
++  assert(setupVisual.coverSource === "/notverse-icon.webp", "welcome does not use the approved icon");
++  assert(!setupVisual.duplicateHeaderWordmark, "setup header repeats NoTVerse beside the logo");
++  assert(!setupVisual.duplicateCoverWordmark, "setup cover repeats NoTVerse below the logo");
+   assert(setupVisual.originText === "Created for Nancy. Shared with the world.", "origin line changed");
+   assert(setupVisual.originFont.includes("Georgia"), "origin line does not use the polished book font");
+   assert(setupVisual.originStyle === "normal", "origin line still uses the old italic treatment");
+   await setup.screenshot({ path: `${output}/setup-brand-desktop.png`, fullPage: true });
+   report.screenshots.push("setup-brand-desktop.png");
+-  report.checks.push("browser favicon and setup icons decode the NoTVerse artwork");
++  report.checks.push("browser favicon and setup welcome decode the approved NoTVerse artwork");
+   report.checks.push("setup origin line is exact and uses the polished typography");
+   await setupContext.close();
+ 
+@@ -96,19 +104,23 @@
+   await home.locator(".notverse-home").waitFor();
+   const homeVisual = await home.evaluate(() => {
+     const brand = document.querySelector(".brand");
++    const brandImage = document.querySelector(".brand > img");
+     const origin = document.querySelector(".brand small");
+     const hero = document.querySelector(".notverse-hero");
+-    if (!brand || !origin || !hero) return null;
++    const duplicateBrandWordmark = document.querySelector(".brand > strong, .brand > span");
++    if (!brand || !(brandImage instanceof HTMLImageElement) || !origin || !hero) return null;
+     return {
+-      brandImage: getComputedStyle(brand, "::before").backgroundImage,
++      brandSource: brandImage.getAttribute("src"),
+       heroImage: getComputedStyle(hero, "::after").backgroundImage,
++      duplicateBrandWordmark: Boolean(duplicateBrandWordmark),
+       originText: origin.textContent?.replace(/\s+/g, " ").trim(),
+       originFont: getComputedStyle(origin).fontFamily,
+     };
+   });
+   assert(homeVisual, "post-setup NoTVerse brand elements are missing");
+-  assert(homeVisual.brandImage.includes("notverse-icon.svg"), "sidebar logo is not rendered");
+-  assert(homeVisual.heroImage.includes("notverse-icon.svg"), "post-setup welcome icon is not rendered");
++  assert(homeVisual.brandSource === "/notverse-icon.webp", "sidebar does not use the approved icon");
++  assert(homeVisual.heroImage.includes("notverse-icon.webp"), "post-setup welcome icon is not rendered");
++  assert(!homeVisual.duplicateBrandWordmark, "sidebar repeats NoTVerse beside the logo");
+   assert(homeVisual.originText?.includes("Created for Nancy") && homeVisual.originText?.includes("Shared with the world"), "post-setup origin line is missing");
+   assert(homeVisual.originFont.includes("Georgia"), "post-setup origin line still uses the plain UI font");
+   await home.screenshot({ path: `${output}/home-brand-desktop.png`, fullPage: true });
