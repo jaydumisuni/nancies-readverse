@@ -21,18 +21,19 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Package source and dependencies
+      - name: Confirm build packages are complete
         run: |
-          mkdir -p workspace-export
-          rsync -a ./ workspace-export/ \
-            --exclude '.git' \
-            --exclude 'dist' \
-            --exclude 'workspace-export'
-          tar -czf notverse-workspace-with-deps.tar.gz workspace-export
+          test -f node_modules/vite/dist/node/index.js
+          test -f node_modules/@vitejs/plugin-react/dist/index.js
+          test -f node_modules/@cloudflare/vite-plugin/dist/index.mjs || test -f node_modules/@cloudflare/vite-plugin/dist/index.js
 
-      - name: Upload complete local workspace
+      - name: Package dependency tree directly
+        run: |
+          tar --hard-dereference -czf notverse-node-modules.tar.gz node_modules
+
+      - name: Upload dependency tree
         uses: actions/upload-artifact@v4
         with:
-          name: notverse-workspace-with-deps
-          path: notverse-workspace-with-deps.tar.gz
+          name: notverse-node-modules
+          path: notverse-node-modules.tar.gz
           retention-days: 2
