@@ -90,11 +90,6 @@ jobs:
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Capture mobile companion geometry before the strict assertion
-        run: node scripts/diagnose-notverse-mobile-chat.mjs
-        env:
-          NOTVERSE_TEST_URL: http://127.0.0.1:4173
-
       - name: Proof gate 2D — NoTVerse icon, origin typography and mobile chat access
         run: node scripts/verify-notverse-brand-mobile-chat.mjs
         env:
