@@ -1,0 +1,116 @@
+name: Verify NoTVerse live clean branding
+
+on:
+  push:
+    branches:
+      - verify-notverse-live-clean-brand-20260802
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  prove-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build exact production bundle
+        run: npm run build
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Wait for custom domain to serve this exact bundle
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online
+        run: |
+          set -euo pipefail
+          html="$(cat dist/client/index.html)"
+          script_asset="$(printf '%s' "$html" | grep -oE '/assets/[^\" ]+\.js' | head -1)"
+          style_asset="$(printf '%s' "$html" | grep -oE '/assets/[^\" ]+\.css' | head -1)"
+          test -n "$script_asset"
+          test -n "$style_asset"
+          printf '%s\n' "$script_asset" > /tmp/expected-script.txt
+          printf '%s\n' "$style_asset" > /tmp/expected-style.txt
+
+          for attempt in $(seq 1 150); do
+            live_html="$(curl -fsS --max-time 20 "$NOTVERSE_URL/?proof=${GITHUB_SHA}-${attempt}" || true)"
+            release="$(curl -fsS --max-time 20 "$NOTVERSE_URL/release.json?proof=${GITHUB_SHA}-${attempt}" || true)"
+            health="$(curl -fsS --max-time 20 "$NOTVERSE_URL/api/health?proof=${GITHUB_SHA}-${attempt}" || true)"
+            if printf '%s' "$live_html" | grep -Fq "$script_asset" \
+              && printf '%s' "$live_html" | grep -Fq "$style_asset" \
+              && printf '%s' "$release" | grep -Fq '"release": "2.0.1"' \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$live_html" > /tmp/live-index.html
+              printf '%s\n' "$release" > /tmp/live-release.json
+              printf '%s\n' "$health" > /tmp/live-health.json
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Live custom domain never served the exact verified bundle."
+          echo "Expected script: $script_asset"
+          echo "Expected style: $style_asset"
+          exit 1
+
+      - name: Verify live identity and responsive shell
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online/
+        run: node scripts/verify-notverse-live.mjs
+
+      - name: Verify live setup, navigation and social workspaces
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-ui.mjs
+
+      - name: Verify live reader, Notes and Library handoff
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-reader-ui.mjs
+
+      - name: Verify live persistent Inbox messaging
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-inbox-ui.mjs
+
+      - name: Verify live approved artwork and mobile chat access
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-brand-mobile-chat.mjs
+
+      - name: Preserve exact live proof
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-live-clean-brand
+          cp /tmp/expected-script.txt engineering-evidence/notverse-live-clean-brand/expected-script.txt 2>/dev/null || true
+          cp /tmp/expected-style.txt engineering-evidence/notverse-live-clean-brand/expected-style.txt 2>/dev/null || true
+          cp /tmp/live-index.html engineering-evidence/notverse-live-clean-brand/live-index.html 2>/dev/null || true
+          cp /tmp/live-release.json engineering-evidence/notverse-live-clean-brand/live-release.json 2>/dev/null || true
+          cp /tmp/live-health.json engineering-evidence/notverse-live-clean-brand/live-health.json 2>/dev/null || true
+          printf '%s\n' '${{ github.sha }}' > engineering-evidence/notverse-live-clean-brand/verification-commit.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notverse-live-clean-brand-proof
+          path: |
+            engineering-evidence/notverse-live-clean-brand
+            engineering-evidence/notverse
+            engineering-evidence/notverse-brand-mobile
+          if-no-files-found: error
+          retention-days: 14
