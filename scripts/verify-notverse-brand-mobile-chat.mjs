@@ -49,14 +49,16 @@ try {
   await setup.locator(".notverse-setup").waitFor();
 
   const favicon = await setup.locator('link[rel="icon"]').getAttribute("href");
-  assert(favicon?.startsWith("data:image/jpeg;base64,"), "browser favicon does not use the supplied NoTVerse artwork");
-  const faviconLoaded = await setup.evaluate((source) => new Promise((resolve) => {
+  assert(favicon === "/notverse-icon.svg", "browser favicon does not use the NoTVerse icon");
+  const iconResponse = await setup.request.get(`${baseURL}/notverse-icon.svg`);
+  assert(iconResponse.ok(), `NoTVerse icon returned HTTP ${iconResponse.status()}`);
+  const iconLoaded = await setup.evaluate((source) => new Promise((resolve) => {
     const image = new Image();
     image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0);
     image.onerror = () => resolve(false);
     image.src = source;
-  }), favicon);
-  assert(faviconLoaded, "browser favicon artwork could not be decoded");
+  }), `${baseURL}/notverse-icon.svg`);
+  assert(iconLoaded, "NoTVerse vector artwork could not be decoded by the browser");
 
   const setupVisual = await setup.evaluate(() => {
     const mark = document.querySelector(".setup-brand .notverse-mark");
@@ -72,14 +74,14 @@ try {
     };
   });
   assert(setupVisual, "setup visual identity elements are missing");
-  assert(setupVisual.markImage.includes("data:image/jpeg;base64"), "setup header icon is not rendered from the supplied artwork");
-  assert(setupVisual.coverImage.includes("data:image/jpeg;base64"), "welcome icon is not rendered from the supplied artwork");
+  assert(setupVisual.markImage.includes("notverse-icon.svg"), "setup header icon is not rendered");
+  assert(setupVisual.coverImage.includes("notverse-icon.svg"), "welcome icon is not rendered");
   assert(setupVisual.originText === "Created for Nancy. Shared with the world.", "origin line changed");
   assert(setupVisual.originFont.includes("Georgia"), "origin line does not use the polished book font");
   assert(setupVisual.originStyle === "normal", "origin line still uses the old italic treatment");
   await setup.screenshot({ path: `${output}/setup-brand-desktop.png`, fullPage: true });
   report.screenshots.push("setup-brand-desktop.png");
-  report.checks.push("browser favicon and setup icons decode the supplied NoTVerse artwork");
+  report.checks.push("browser favicon and setup icons decode the NoTVerse artwork");
   report.checks.push("setup origin line is exact and uses the polished typography");
   await setupContext.close();
 
@@ -105,13 +107,13 @@ try {
     };
   });
   assert(homeVisual, "post-setup NoTVerse brand elements are missing");
-  assert(homeVisual.brandImage.includes("data:image/jpeg;base64"), "sidebar logo is not rendered from the supplied artwork");
-  assert(homeVisual.heroImage.includes("data:image/jpeg;base64"), "post-setup welcome icon is not rendered from the supplied artwork");
+  assert(homeVisual.brandImage.includes("notverse-icon.svg"), "sidebar logo is not rendered");
+  assert(homeVisual.heroImage.includes("notverse-icon.svg"), "post-setup welcome icon is not rendered");
   assert(homeVisual.originText?.includes("Created for Nancy") && homeVisual.originText?.includes("Shared with the world"), "post-setup origin line is missing");
   assert(homeVisual.originFont.includes("Georgia"), "post-setup origin line still uses the plain UI font");
   await home.screenshot({ path: `${output}/home-brand-desktop.png`, fullPage: true });
   report.screenshots.push("home-brand-desktop.png");
-  report.checks.push("post-setup sidebar and welcome area use the supplied NoTVerse artwork");
+  report.checks.push("post-setup sidebar and welcome area use the NoTVerse artwork");
   report.checks.push("post-setup origin line uses the polished book typography");
   await homeContext.close();
 
