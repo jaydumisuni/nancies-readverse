@@ -24,13 +24,13 @@ jobs:
       - name: Decode exact approved artwork and remove generated substitute
         shell: bash
         run: |
-          if [ ! -f public/notverse-icon.webp.b64 ]; then
+          if [ ! -f public/notverse-icon-approved.webp.b64 ]; then
             echo "Approved artwork is already installed."
             exit 0
           fi
-          base64 --decode public/notverse-icon.webp.b64 > public/notverse-icon.webp
+          base64 --decode public/notverse-icon-approved.webp.b64 > public/notverse-icon.webp
           file public/notverse-icon.webp | grep -qi 'webp'
-          rm -f public/notverse-icon.webp.b64 public/notverse-icon.svg
+          rm -f public/notverse-icon-approved.webp.b64 public/notverse-icon.webp.b64 public/notverse-icon.svg
 
       - name: Commit exact binary asset
         shell: bash
@@ -41,6 +41,6 @@ jobs:
           fi
           git config user.name "NoTVerse Workspace"
           git config user.email "actions@users.noreply.github.com"
-          git add -A public/notverse-icon.webp public/notverse-icon.webp.b64 public/notverse-icon.svg
+          git add -A public/notverse-icon.webp public/notverse-icon-approved.webp.b64 public/notverse-icon.webp.b64 public/notverse-icon.svg
           git commit -m "Use the exact approved NoTVerse artwork"
           git push origin HEAD:fix-notverse-approved-icon-20260802
