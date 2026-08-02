@@ -1,0 +1,36 @@
+name: Verify approved NoTVerse branding
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - fix-notverse-approved-icon-20260802
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout correction branch
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Require the exact approved binary asset
+        shell: bash
+        run: |
+          test -f public/notverse-icon.webp
+          test ! -f public/notverse-icon.svg
+          test ! -f public/notverse-icon.webp.b64
+          file public/notverse-icon.webp | grep -qi 'webp'
+          grep -q '/notverse-icon.webp' index.html
+          grep -q '/notverse-icon.webp' public/manifest.webmanifest
+          grep -q '/notverse-icon.webp' src/notverse/notverse-branding-fix.css
+
+      - name: Strict production build
+        run: npm run build
