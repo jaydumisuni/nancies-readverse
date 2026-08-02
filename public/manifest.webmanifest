@@ -7,6 +7,14 @@
   "background_color": "#050408",
   "theme_color": "#050408",
   "orientation": "any",
+  "icons": [
+    {
+      "src": "/notverse-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
   "categories": [
     "books",
     "entertainment",
