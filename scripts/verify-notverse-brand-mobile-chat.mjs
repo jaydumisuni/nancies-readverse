@@ -49,39 +49,49 @@ try {
   await setup.locator(".notverse-setup").waitFor();
 
   const favicon = await setup.locator('link[rel="icon"]').getAttribute("href");
-  assert(favicon === "/notverse-icon.svg", "browser favicon does not use the NoTVerse icon");
-  const iconResponse = await setup.request.get(`${baseURL}/notverse-icon.svg`);
+  assert(favicon === "/notverse-icon.webp", "browser favicon does not use the approved NoTVerse icon");
+  const iconResponse = await setup.request.get(`${baseURL}/notverse-icon.webp`);
   assert(iconResponse.ok(), `NoTVerse icon returned HTTP ${iconResponse.status()}`);
   const iconLoaded = await setup.evaluate((source) => new Promise((resolve) => {
     const image = new Image();
     image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0);
     image.onerror = () => resolve(false);
     image.src = source;
-  }), `${baseURL}/notverse-icon.svg`);
-  assert(iconLoaded, "NoTVerse vector artwork could not be decoded by the browser");
+  }), `${baseURL}/notverse-icon.webp`);
+  assert(iconLoaded, "approved NoTVerse artwork could not be decoded by the browser");
 
   const setupVisual = await setup.evaluate(() => {
     const mark = document.querySelector(".setup-brand .notverse-mark");
     const cover = document.querySelector(".cover-notebook");
     const origin = document.querySelector(".setup-cover-page h2");
-    if (!mark || !cover || !origin) return null;
+    const setupWordmark = document.querySelector(".setup-brand > strong");
+    const setupLabel = document.querySelector(".setup-brand > small");
+    const duplicateTitle = document.querySelector(".setup-cover-page h1");
+    if (!mark || !cover || !origin || !setupWordmark || !setupLabel || !duplicateTitle) return null;
     return {
       markImage: getComputedStyle(mark).backgroundImage,
       coverImage: getComputedStyle(cover).backgroundImage,
       originText: origin.textContent?.trim(),
       originFont: getComputedStyle(origin).fontFamily,
       originStyle: getComputedStyle(origin).fontStyle,
+      setupWordmarkDisplay: getComputedStyle(setupWordmark).display,
+      setupLabelDisplay: getComputedStyle(setupLabel).display,
+      duplicateTitleDisplay: getComputedStyle(duplicateTitle).display,
     };
   });
   assert(setupVisual, "setup visual identity elements are missing");
-  assert(setupVisual.markImage.includes("notverse-icon.svg"), "setup header icon is not rendered");
-  assert(setupVisual.coverImage.includes("notverse-icon.svg"), "welcome icon is not rendered");
+  assert(setupVisual.markImage.includes("notverse-icon.webp"), "setup header icon is not rendered");
+  assert(setupVisual.coverImage.includes("notverse-icon.webp"), "welcome icon is not rendered");
   assert(setupVisual.originText === "Created for Nancy. Shared with the world.", "origin line changed");
   assert(setupVisual.originFont.includes("Georgia"), "origin line does not use the polished book font");
   assert(setupVisual.originStyle === "normal", "origin line still uses the old italic treatment");
+  assert(setupVisual.setupWordmarkDisplay === "none", "setup header repeats the NoTVerse wordmark beside the approved artwork");
+  assert(setupVisual.setupLabelDisplay === "none", "setup header still shows the rejected setup-wizard lockup");
+  assert(setupVisual.duplicateTitleDisplay === "none", "setup cover repeats NoTVerse below artwork that already contains the name");
   await setup.screenshot({ path: `${output}/setup-brand-desktop.png`, fullPage: true });
   report.screenshots.push("setup-brand-desktop.png");
-  report.checks.push("browser favicon and setup icons decode the NoTVerse artwork");
+  report.checks.push("browser favicon and setup surfaces decode the approved NoTVerse artwork");
+  report.checks.push("setup shows no duplicate wordmark or rejected setup-wizard lockup");
   report.checks.push("setup origin line is exact and uses the polished typography");
   await setupContext.close();
 
@@ -96,24 +106,30 @@ try {
   await home.locator(".notverse-home").waitFor();
   const homeVisual = await home.evaluate(() => {
     const brand = document.querySelector(".brand");
+    const brandArtwork = document.querySelector(".brand > span");
+    const duplicateWordmark = document.querySelector(".brand > strong");
     const origin = document.querySelector(".brand small");
     const hero = document.querySelector(".notverse-hero");
-    if (!brand || !origin || !hero) return null;
+    if (!brand || !brandArtwork || !duplicateWordmark || !origin || !hero) return null;
     return {
-      brandImage: getComputedStyle(brand, "::before").backgroundImage,
+      brandImage: getComputedStyle(brandArtwork).backgroundImage,
+      brandBeforeContent: getComputedStyle(brand, "::before").content,
+      duplicateWordmarkDisplay: getComputedStyle(duplicateWordmark).display,
       heroImage: getComputedStyle(hero, "::after").backgroundImage,
       originText: origin.textContent?.replace(/\s+/g, " ").trim(),
       originFont: getComputedStyle(origin).fontFamily,
     };
   });
   assert(homeVisual, "post-setup NoTVerse brand elements are missing");
-  assert(homeVisual.brandImage.includes("notverse-icon.svg"), "sidebar logo is not rendered");
-  assert(homeVisual.heroImage.includes("notverse-icon.svg"), "post-setup welcome icon is not rendered");
+  assert(homeVisual.brandImage.includes("notverse-icon.webp"), "sidebar logo is not rendered");
+  assert(homeVisual.heroImage.includes("notverse-icon.webp"), "post-setup welcome icon is not rendered");
+  assert(homeVisual.brandBeforeContent === "none" || homeVisual.brandBeforeContent === "normal", "sidebar still renders the rejected extra notebook symbol");
+  assert(homeVisual.duplicateWordmarkDisplay === "none", "sidebar repeats NoTVerse beside artwork that already contains the name");
   assert(homeVisual.originText?.includes("Created for Nancy") && homeVisual.originText?.includes("Shared with the world"), "post-setup origin line is missing");
   assert(homeVisual.originFont.includes("Georgia"), "post-setup origin line still uses the plain UI font");
   await home.screenshot({ path: `${output}/home-brand-desktop.png`, fullPage: true });
   report.screenshots.push("home-brand-desktop.png");
-  report.checks.push("post-setup sidebar and welcome area use the NoTVerse artwork");
+  report.checks.push("post-setup sidebar and welcome area use only the approved NoTVerse artwork");
   report.checks.push("post-setup origin line uses the polished book typography");
   await homeContext.close();
 
@@ -126,6 +142,17 @@ try {
   mobile.on("pageerror", (error) => report.errors.push(`mobile: ${error.message}`));
   await mobile.goto(baseURL, { waitUntil: "networkidle" });
   await mobile.locator(".notverse-home").waitFor();
+  const mobileBrand = await mobile.evaluate(() => {
+    const artwork = document.querySelector(".mobile-brand > span");
+    const duplicateWordmark = document.querySelector(".mobile-brand > strong");
+    if (!artwork || !duplicateWordmark) return null;
+    return {
+      artworkImage: getComputedStyle(artwork).backgroundImage,
+      duplicateWordmarkDisplay: getComputedStyle(duplicateWordmark).display,
+    };
+  });
+  assert(mobileBrand?.artworkImage.includes("notverse-icon.webp"), "mobile header does not use the approved artwork");
+  assert(mobileBrand?.duplicateWordmarkDisplay === "none", "mobile header repeats NoTVerse beside the approved artwork");
   await mobile.getByRole("button", { name: "Chat now", exact: true }).click();
   const panel = mobile.locator(".companion-panel.open");
   await panel.waitFor();
@@ -172,6 +199,7 @@ try {
   assert(mobileVisual.input.top >= 0 && mobileVisual.input.bottom <= mobileVisual.viewport.height, "chat input is hidden below the mobile viewport");
   assert(mobileVisual.input.width > 120 && mobileVisual.input.height >= 36, "chat input is too small to use");
   assert(mobileVisual.scrollWidth <= mobileVisual.viewport.width + 2, "mobile chat causes horizontal overflow");
+  report.checks.push("mobile header uses one approved artwork instance without duplicate wordmark");
   report.checks.push("open mobile chat owns the top layer and hides the bottom navigation");
   report.checks.push("mobile chat input remains fully visible, tappable and editable");
   await mobileContext.close();
