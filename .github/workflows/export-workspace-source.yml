@@ -29,22 +29,22 @@ jobs:
 
       - name: Package exact workspace source
         run: |
-          tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=.wrangler -czf notverse-source.tar.gz .
+          tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=.wrangler -czf /tmp/notverse-source.tar.gz .
 
       - name: Package dependency tree directly
         run: |
-          tar --hard-dereference -czf notverse-node-modules.tar.gz node_modules
+          tar --hard-dereference -czf /tmp/notverse-node-modules.tar.gz node_modules
 
       - name: Upload exact workspace source
         uses: actions/upload-artifact@v4
         with:
           name: notverse-workspace-source
-          path: notverse-source.tar.gz
+          path: /tmp/notverse-source.tar.gz
           retention-days: 2
 
       - name: Upload dependency tree
         uses: actions/upload-artifact@v4
         with:
           name: notverse-node-modules
-          path: notverse-node-modules.tar.gz
+          path: /tmp/notverse-node-modules.tar.gz
           retention-days: 2
