@@ -38,7 +38,7 @@ const setupState = {
 };
 
 const browser = await chromium.launch({ headless: true });
-const report = { ok: false, checks: [], screenshots: [], errors: [] };
+const report = { ok: false, checks: [], screenshots: [], errors: [], mobile: null };
 
 try {
   const setupContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
@@ -122,29 +122,42 @@ try {
   await mobile.getByRole("button", { name: "Chat now", exact: true }).click();
   const panel = mobile.locator(".companion-panel.open");
   await panel.waitFor();
+  await mobile.waitForFunction(() => {
+    const element = document.querySelector(".companion-panel.open");
+    if (!element) return false;
+    const style = getComputedStyle(element);
+    return style.opacity === "1" && (style.transform === "none" || style.transform === "matrix(1, 0, 0, 1, 0, 0)");
+  });
   const input = panel.locator(".chat-input input");
   await input.waitFor();
   await input.fill("The mobile chat box remains usable.");
 
   const mobileVisual = await mobile.evaluate(() => {
-    const panel = document.querySelector(".companion-panel.open");
+    const panelElement = document.querySelector(".companion-panel.open");
     const nav = document.querySelector(".mobile-nav");
-    const input = document.querySelector(".companion-panel.open .chat-input input");
-    if (!panel || !nav || !input) return null;
-    const panelStyle = getComputedStyle(panel);
+    const inputElement = document.querySelector(".companion-panel.open .chat-input input");
+    if (!panelElement || !nav || !inputElement) return null;
+    const panelStyle = getComputedStyle(panelElement);
     const navStyle = getComputedStyle(nav);
-    const box = input.getBoundingClientRect();
+    const box = inputElement.getBoundingClientRect();
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
+      visualViewport: window.visualViewport ? { width: window.visualViewport.width, height: window.visualViewport.height } : null,
       input: { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width, height: box.height },
       panelZ: Number(panelStyle.zIndex || 0),
+      panelOpacity: Number(panelStyle.opacity || 0),
+      panelTransform: panelStyle.transform,
       navZ: Number(navStyle.zIndex || 0),
       navOpacity: Number(navStyle.opacity || 1),
       navPointerEvents: navStyle.pointerEvents,
       scrollWidth: document.documentElement.scrollWidth,
     };
   });
+  report.mobile = mobileVisual;
+  await mobile.screenshot({ path: `${output}/chat-input-mobile.png`, fullPage: false });
+  report.screenshots.push("chat-input-mobile.png");
   assert(mobileVisual, "mobile chat layout elements are missing");
+  assert(mobileVisual.panelOpacity === 1 && (mobileVisual.panelTransform === "none" || mobileVisual.panelTransform === "matrix(1, 0, 0, 1, 0, 0)"), "mobile chat transition did not finish");
   assert(mobileVisual.panelZ > mobileVisual.navZ, "mobile navigation still layers above the chat panel");
   assert(mobileVisual.navOpacity === 0, "mobile navigation remains visible behind the open chat");
   assert(mobileVisual.navPointerEvents === "none", "hidden mobile navigation can still intercept chat taps");
@@ -152,8 +165,6 @@ try {
   assert(mobileVisual.input.top >= 0 && mobileVisual.input.bottom <= mobileVisual.viewport.height, "chat input is hidden below the mobile viewport");
   assert(mobileVisual.input.width > 120 && mobileVisual.input.height >= 36, "chat input is too small to use");
   assert(mobileVisual.scrollWidth <= mobileVisual.viewport.width + 2, "mobile chat causes horizontal overflow");
-  await mobile.screenshot({ path: `${output}/chat-input-mobile.png`, fullPage: false });
-  report.screenshots.push("chat-input-mobile.png");
   report.checks.push("open mobile chat owns the top layer and hides the bottom navigation");
   report.checks.push("mobile chat input remains fully visible, tappable and editable");
   await mobileContext.close();
