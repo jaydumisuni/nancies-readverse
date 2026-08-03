@@ -1,0 +1,63 @@
+name: Verify live exact NoTVerse branding 20260803
+
+on:
+  push:
+    branches:
+      - verify/live-exact-brand-20260803
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  live-brand-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait for production release 2.0.2
+        run: |
+          for attempt in $(seq 1 120); do
+            release=$(curl --fail --silent --show-error https://notverse.1ink.online/release.json || true)
+            if echo "$release" | grep -q '"release"[[:space:]]*:[[:space:]]*"2.0.2"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production did not report release 2.0.2"
+          exit 1
+
+      - name: Install visual proof dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+
+      - name: Prove live approved branding and mobile chat
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+        run: node scripts/verify-notverse-brand-mobile-chat.mjs
+
+      - name: Record live identity
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/notverse-brand-mobile
+          curl --fail --silent --show-error https://notverse.1ink.online/release.json > engineering-evidence/notverse-brand-mobile/live-release.json || true
+          curl --fail --silent --show-error https://notverse.1ink.online/api/health > engineering-evidence/notverse-brand-mobile/live-health.json || true
+          git rev-parse HEAD > engineering-evidence/notverse-brand-mobile/verification-branch-commit.txt
+
+      - name: Upload exact live branding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-live-exact-brand-proof
+          path: engineering-evidence/notverse-brand-mobile
+          if-no-files-found: error
+          retention-days: 14
