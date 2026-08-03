@@ -4,8 +4,25 @@
 
 html:has(.companion-panel.open),
 body:has(.companion-panel.open) {
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden !important;
   overscroll-behavior: none;
+}
+
+body:has(.companion-panel.open) {
+  position: fixed;
+  inset: 0;
+}
+
+body:has(.companion-panel.open) #root,
+body:has(.companion-panel.open) .readverse-app,
+body:has(.companion-panel.open) .main-shell {
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden !important;
 }
 
 .chat-body,
