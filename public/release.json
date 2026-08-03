@@ -1,6 +1,6 @@
 {
   "app": "NoTVerse",
-  "release": "2.0.1",
-  "releaseId": "notverse-2026-08-01-production",
-  "expectedInterface": "NoTVerse setup, six-part navigation, reader, Notes, Library, Inbox and Me"
+  "release": "2.0.2",
+  "releaseId": "notverse-2026-08-03-mobile-notes-chat",
+  "expectedInterface": "NoTVerse setup, six-part navigation, viewport-bounded Notes, responsive companion chat, Library, Inbox and Me"
 }
