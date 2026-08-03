@@ -31,6 +31,7 @@ function viewportHeight(): number {
 function applyViewportMetrics(): void {
   rootElement.style.setProperty("--notverse-viewport-height", `${viewportHeight()}px`);
   rootElement.style.setProperty("--notverse-viewport-top", "0px");
+  rootElement.style.setProperty("--notverse-page-scroll-y", `${Math.max(0, window.scrollY)}px`);
 }
 
 function setViewportLock(locked: boolean): void {
@@ -71,6 +72,7 @@ function initialiseViewportObserver(): void {
   });
   window.addEventListener("resize", syncInteractionState, { passive: true });
   window.addEventListener("orientationchange", syncInteractionState, { passive: true });
+  window.addEventListener("scroll", applyViewportMetrics, { passive: true });
   window.visualViewport?.addEventListener("resize", syncInteractionState, { passive: true });
   window.visualViewport?.addEventListener("scroll", applyViewportMetrics, { passive: true });
   syncInteractionState();
