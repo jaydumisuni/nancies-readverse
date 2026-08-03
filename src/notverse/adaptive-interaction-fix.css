@@ -71,6 +71,10 @@ body.notverse-chat-open .main-shell.notverse-shell {
 }
 
 @media (min-width: 761px) and (max-width: 1100px) {
+  .main-shell.notverse-shell.with-chat {
+    padding-right: 14px !important;
+  }
+
   .companion-panel {
     top: 8px !important;
     right: 8px !important;
