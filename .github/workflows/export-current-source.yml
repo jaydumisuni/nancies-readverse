@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - workspace-export-notverse-current-20260803
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
