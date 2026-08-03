@@ -100,8 +100,8 @@ function visibleBounds(geometry, fallbackWidth, fallbackHeight) {
   if (!viewport) {
     return { left: 0, top: 0, right: fallbackWidth, bottom: fallbackHeight };
   }
-  const left = Number(viewport.offsetLeft || 0);
-  const top = Number(viewport.offsetTop || 0);
+  const left = Number(viewport.pageLeft ?? viewport.offsetLeft ?? 0);
+  const top = Number(viewport.pageTop ?? viewport.offsetTop ?? 0);
   return {
     left,
     top,
@@ -156,12 +156,12 @@ async function verifyChatViewport(width, height, name, mobile = false) {
   await page.waitForTimeout(250);
 
   const geometry = await measureChat(page);
+  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
   assertChatGeometry(name, geometry, width, height, mobile);
   if (name === "tablet" && (!geometry.main || geometry.main.paddingRight > 20)) {
     throw new Error(`${name}: opening chat still squeezes Home (padding-right ${geometry.main?.paddingRight})`);
   }
 
-  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
   report.cases.push({ name, width, height, geometry });
   await context.close();
 }
@@ -299,14 +299,14 @@ async function verifyRecommendationAndViewportResize() {
   }
 
   const initial = await measureChat(page);
-  assertChatGeometry("mobile-recommendation", initial, width, height, true);
   await page.screenshot({ path: `${out}/mobile-recommendation.png`, fullPage: false });
+  assertChatGeometry("mobile-recommendation", initial, width, height, true);
 
   await page.setViewportSize({ width, height: 520 });
   await page.waitForTimeout(300);
   const resized = await measureChat(page);
-  assertChatGeometry("mobile-resized-viewport", resized, width, 520, true);
   await page.screenshot({ path: `${out}/mobile-resized-chat.png`, fullPage: false });
+  assertChatGeometry("mobile-resized-viewport", resized, width, 520, true);
 
   report.cases.push({
     name: "mobile-recommendation-and-resize",
