@@ -2,7 +2,7 @@
    Use the supplied NoTVerse artwork exactly once per branding surface. */
 
 :root {
-  --notverse-logo: url("/notverse-icon.webp");
+  --notverse-logo: url("/notverse-icon.png");
 }
 
 /* Setup chrome: approved icon only. No extra notebook glyph, wordmark, or duplicate title. */
