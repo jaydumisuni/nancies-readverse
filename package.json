@@ -1,6 +1,6 @@
 {
   "name": "notverse",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,11 +8,12 @@
     "clean": "node scripts/clean-build.mjs",
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:guided": "node scripts/verify-guided-discovery-build.mjs",
-    "build": "npm run clean && npm run verify:architecture && tsc --noEmit && vite build && node scripts/configure-workers-build-deploy.mjs && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social",
+    "verify:mobile-chat": "node scripts/verify-mobile-notes-chat.mjs",
+    "build": "npm run clean && npm run verify:architecture && npm run verify:mobile-chat && tsc --noEmit && vite build && node scripts/configure-workers-build-deploy.mjs && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social",
     "preview": "vite preview",
     "deploy": "wrangler deploy --config dist/notverse/wrangler.json",
     "deploy:preview": "wrangler versions upload --config dist/notverse/wrangler.json",
-    "check": "npm run verify:architecture && tsc --noEmit",
+    "check": "npm run verify:architecture && npm run verify:mobile-chat && tsc --noEmit",
     "cf-typegen": "wrangler types",
     "verify:finish": "node scripts/verify-finished-readverse.mjs",
     "verify:notverse": "node scripts/verify-notverse-build.mjs",
