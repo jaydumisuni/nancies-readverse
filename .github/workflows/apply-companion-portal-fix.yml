@@ -1,0 +1,91 @@
+name: Apply companion portal correction
+
+on:
+  push:
+    branches:
+      - fix/mobile-notes-chat-regression-v2-20260803
+    paths:
+      - ".github/workflows/apply-companion-portal-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-remove-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-notes-chat-regression-v2-20260803
+          fetch-depth: 0
+
+      - name: Move companion panel into a document-level React portal
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app_path = Path("src/App.tsx")
+          app = app_path.read_text(encoding="utf-8")
+
+          portal_import = 'import { createPortal } from "react-dom";\n'
+          if portal_import not in app:
+              anchor = 'import { avatarImages, type AvatarId } from "./avatars";\n'
+              if anchor not in app:
+                  raise SystemExit("App import anchor not found")
+              app = app.replace(anchor, portal_import + anchor, 1)
+
+          start_token = '      <CompanionPanel\n'
+          next_token = '\n\n      <input\n'
+          start = app.find(start_token)
+          if start < 0:
+              raise SystemExit("CompanionPanel render start not found")
+          end = app.find(next_token, start)
+          if end < 0:
+              raise SystemExit("CompanionPanel render end not found")
+
+          block = app[start:end]
+          if '{createPortal(' not in block:
+              lines = block.splitlines()
+              if not lines[-1].strip() == '/>':
+                  raise SystemExit("Unexpected CompanionPanel closing markup")
+              portal_block = ['      {createPortal(', '        <CompanionPanel']
+              portal_block.extend('  ' + line for line in lines[1:-1])
+              portal_block.extend(['        />', '        document.body,', '      )}'])
+              app = app[:start] + '\n'.join(portal_block) + app[end:]
+
+          app_path.write_text(app, encoding="utf-8")
+
+          css_path = Path("src/notverse/final-viewport-stability.css")
+          css = css_path.read_text(encoding="utf-8")
+          css = css.replace(
+              'transform: translate3d(0, calc(-1 * var(--notverse-page-scroll-y, 0px)), 0) !important;',
+              'transform: none !important;',
+          )
+          css_path.write_text(css, encoding="utf-8")
+
+          runtime_path = Path("src/notverse/runtime-interaction-fix.ts")
+          runtime = runtime_path.read_text(encoding="utf-8")
+          runtime = runtime.replace(
+              '  rootElement.style.setProperty("--notverse-page-scroll-y", `${Math.max(0, window.scrollY)}px`);\n',
+              '',
+          )
+          runtime_path.write_text(runtime, encoding="utf-8")
+          PY
+
+      - name: Verify structural patch
+        run: |
+          grep -F 'import { createPortal } from "react-dom";' src/App.tsx
+          grep -F '{createPortal(' src/App.tsx
+          grep -F 'document.body,' src/App.tsx
+          grep -F 'transform: none !important;' src/notverse/final-viewport-stability.css
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Commit only the verified correction
+        run: |
+          rm .github/workflows/apply-companion-portal-fix.yml
+          git config user.name "NoTVerse verification bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx src/notverse/final-viewport-stability.css src/notverse/runtime-interaction-fix.ts .github/workflows/apply-companion-portal-fix.yml
+          git commit -m "Portal companion chat outside the scrolling application shell"
+          git push origin HEAD:fix/mobile-notes-chat-regression-v2-20260803
