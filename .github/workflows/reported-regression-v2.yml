@@ -1,0 +1,68 @@
+name: Reported NoTVerse viewport regression v2
+
+on:
+  push:
+    branches:
+      - fix/mobile-notes-chat-regression-v2-20260803
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "scripts/prove-reported-regression-v2.mjs"
+      - ".github/workflows/reported-regression-v2.yml"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-reported-regression-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Strict build
+        run: npm run build
+
+      - name: Install browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start exact generated production client
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/notverse-v2-preview.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/notverse-v2-preview.log
+          exit 1
+
+      - name: Prove desktop, tablet, mobile, resize and recommendation behaviour
+        run: node scripts/prove-reported-regression-v2.mjs
+
+      - name: Preserve exact evidence
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/reported-regression-v2
+          cp /tmp/notverse-v2-preview.log engineering-evidence/reported-regression-v2/preview.log 2>/dev/null || true
+          git rev-parse HEAD > engineering-evidence/reported-regression-v2/verified-commit.txt
+
+      - name: Upload exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reported-regression-v2-proof
+          path: engineering-evidence/reported-regression-v2
+          if-no-files-found: error
+          retention-days: 14
