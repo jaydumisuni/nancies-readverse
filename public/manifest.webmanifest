@@ -9,9 +9,9 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/notverse-icon.png",
-      "sizes": "863x864",
-      "type": "image/png",
+      "src": "/notverse-icon.webp?v=2.0.3",
+      "sizes": "256x256",
+      "type": "image/webp",
       "purpose": "any"
     }
   ],
