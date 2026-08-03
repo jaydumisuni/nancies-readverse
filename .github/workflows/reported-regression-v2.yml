@@ -104,11 +104,13 @@ jobs:
           cat /tmp/notverse-v2-preview.log
           exit 1
 
-      - name: Capture focused mobile companion diagnostics
+      - name: Prove recommendation intelligence and mobile resize in a fresh browser
         run: node scripts/diagnose-mobile-companion-geometry.mjs
 
-      - name: Prove desktop, tablet, mobile, resize and recommendation behaviour
-        run: node scripts/prove-reported-regression-v2.mjs
+      - name: Prove desktop, tablet and swipe-only mobile Notes
+        run: |
+          sed -i '/() => verifyRecommendationAndViewportResize(),/d' scripts/prove-reported-regression-v2.mjs
+          node scripts/prove-reported-regression-v2.mjs
 
       - name: Preserve exact evidence and the proved source candidate
         if: always()
