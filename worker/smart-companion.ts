@@ -149,7 +149,7 @@ function quickConversation(
     return companion === "Gojo" ? "You are welcome. I will accept the praise responsibly." : "You are welcome. Keep going.";
   }
   if (/^(yes|yeah|yep|okay|ok|go ahead|continue|do it)[.!?]*$/.test(value) && history.length) {
-    return "I have the context. I will continue from the last clear request instead of starting over.";
+    return null;
   }
   return null;
 }
@@ -163,8 +163,7 @@ function intelligentFallback(
   const opener = openings[companion] ?? openings.Gojo;
 
   if (isRecommendationRequest(question)) {
-    const topic = recommendationTopic(question);
-    return `${opener} For ${topic || "that subject"}, I can give you a balanced list instead of random titles. Should I lean toward fiction, memoir, research, practical guidance or a beginner-friendly overview? If you do not mind, I will mix the strongest starting points and explain why each fits.`;
+    return fallbackRecommendations(question, opener);
   }
   if (/\b(upload|file|pdf|epub|cbz)\b/.test(value)) {
     return "Attach the file or paste its public link. NoTVerse will verify it before opening it temporarily.";
@@ -176,9 +175,29 @@ function intelligentFallback(
     return "Tell me which item you want to change or save. I will keep the current context and only claim completion after the app confirms it.";
   }
   if (history.length) {
-    return "I am following. Say the next part naturally; I will use the conversation we already have instead of resetting to a generic answer.";
+    const previousUser = [...history].reverse().find((turn) => turn.role === "user")?.content;
+    return previousUser
+      ? `${opener} I still have your last point about “${previousUser.slice(0, 110)}”. Add the next detail and I will continue from there.`
+      : `${opener} Continue naturally; I am keeping the conversation context.`;
   }
   return `${opener} Ask me about a book, a subject, a reading mood or something you only partly remember. I will answer that question first.`;
+}
+
+function fallbackRecommendations(question: string, opener: string): string {
+  const topic = recommendationTopic(question).toLowerCase();
+  if (/\b(gambl|casino|poker|betting|wager)\b/.test(topic)) {
+    return [
+      `${opener} Start with these rather than a random gambling list:`,
+      "1. Addiction by Design — Natasha Dow Schüll. A serious look at how machine gambling environments are engineered to keep people playing.",
+      "2. The Biggest Bluff — Maria Konnikova. Poker memoir plus psychology, uncertainty and how people learn to make decisions under pressure.",
+      "3. Thinking in Bets — Annie Duke. Uses poker to explain probability, incomplete information and better decision-making.",
+      "4. The Theory of Gambling and Statistical Logic — Richard A. Epstein. The mathematical and probability side, best when you want something more technical.",
+      "Do you want the next list to lean toward addiction and recovery, probability and strategy, or gambling fiction?",
+    ].join("\n\n");
+  }
+
+  const cleanTopic = recommendationTopic(question) || "that subject";
+  return `${opener} For ${cleanTopic}, I would start with a balanced set across an accessible overview, one deeper specialist book, one personal or narrative account and one critical perspective. Tell me whether you prefer fiction, memoir, research or practical guidance, and I will give you specific titles with a reason for each.`;
 }
 
 function isRecommendationRequest(value: string): boolean {
@@ -188,6 +207,7 @@ function isRecommendationRequest(value: string): boolean {
 function recommendationTopic(value: string): string {
   const cleaned = value
     .replace(/\b(?:do you have|can you give me|give me|any|some|please|recommendations?|recommended|suggestions?|books?|i can read|to read|reading list|good)\b/gi, " ")
+    .replace(/^\s*(?:for|on|about)\s+/i, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s,.:;!?-]+|[\s,.:;!?-]+$/g, "")
     .trim();
