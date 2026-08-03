@@ -12,7 +12,34 @@
 }
 
 @media (max-width: 760px) {
+  /* A fixed body makes mobile browsers treat fixed descendants as part of the
+     scrolled page. Keep the document non-scrollable without turning body into
+     the companion panel's containing block. */
+  body.notverse-chat-open {
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-chat-open #root,
+  body.notverse-chat-open .readverse-app,
+  body.notverse-chat-open .main-shell.notverse-shell {
+    width: 100% !important;
+    height: var(--notverse-viewport-height, 100dvh) !important;
+    max-height: var(--notverse-viewport-height, 100dvh) !important;
+    overflow: hidden !important;
+  }
+
   body.notverse-chat-open .companion-panel.open {
+    position: fixed !important;
+    inset: 0 !important;
     top: 0 !important;
+    width: 100vw !important;
+    height: var(--notverse-viewport-height, 100dvh) !important;
+    max-height: var(--notverse-viewport-height, 100dvh) !important;
+    background: #08070a !important;
+    transform: none !important;
   }
 }
