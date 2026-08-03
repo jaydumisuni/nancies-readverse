@@ -10,6 +10,7 @@ on:
     paths:
       - "src/**"
       - "scripts/prove-reported-regression-v2.mjs"
+      - "scripts/diagnose-mobile-companion-geometry.mjs"
       - ".github/workflows/reported-regression-v2.yml"
       - "package.json"
 
@@ -102,6 +103,9 @@ jobs:
           done
           cat /tmp/notverse-v2-preview.log
           exit 1
+
+      - name: Capture focused mobile companion diagnostics
+        run: node scripts/diagnose-mobile-companion-geometry.mjs
 
       - name: Prove desktop, tablet, mobile, resize and recommendation behaviour
         run: node scripts/prove-reported-regression-v2.mjs
