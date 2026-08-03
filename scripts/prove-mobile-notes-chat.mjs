@@ -65,6 +65,8 @@ async function verifyPhone(width, height, name) {
   await page.getByRole("button", { name: "Home" }).last().click();
   await page.getByRole("button", { name: "Chat now" }).click();
   await page.waitForSelector(".companion-panel.open .chat-input input");
+  await page.waitForTimeout(420);
+
   const chatGeometry = await page.evaluate(() => {
     const panel = document.querySelector(".companion-panel.open")?.getBoundingClientRect();
     const input = document.querySelector(".chat-input")?.getBoundingClientRect();
@@ -88,29 +90,34 @@ async function verifyPhone(width, height, name) {
       bodyOverflow: getComputedStyle(document.body).overflow,
     };
   });
-  if (!chatGeometry.panel || chatGeometry.panel.top < -1 || chatGeometry.panel.bottom > height + 1) throw new Error(`${name}: chat panel exceeds viewport`);
+
+  const input = page.locator(".chat-input input");
+  await input.fill("Do you have recommendations for books I can read on gambling?");
+  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
+  report.viewports.push({ name, width, height, notesGeometry, chatGeometry, before, after });
+
+  if (!chatGeometry.panel || chatGeometry.panel.top < -1 || chatGeometry.panel.bottom > height + 1) throw new Error(`${name}: chat panel exceeds viewport: ${JSON.stringify(chatGeometry.panel)}`);
   if (!chatGeometry.input || chatGeometry.input.bottom > height + 1) throw new Error(`${name}: chat composer is unreachable`);
   if (chatGeometry.chatBody?.overflowY !== "auto") throw new Error(`${name}: only chat history should scroll internally`);
   if (chatGeometry.chatBody?.scrollbarWidth !== "none") throw new Error(`${name}: chat scrollbar remains visible`);
   if (chatGeometry.nav?.opacity !== "0" || chatGeometry.nav?.pointerEvents !== "none") throw new Error(`${name}: mobile navigation remains active behind chat`);
   if (chatGeometry.documentHeight > height + 1) throw new Error(`${name}: chat opens with document scrolling`);
-
-  const input = page.locator(".chat-input input");
-  await input.fill("Do you have recommendations for books I can read on gambling?");
   if ((await input.inputValue()).length < 20) throw new Error(`${name}: chat input is not editable`);
-  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
 
-  report.viewports.push({ name, width, height, notesGeometry, chatGeometry, before, after });
   await context.close();
 }
 
-try {
-  await verifyPhone(360, 640, "short-phone");
-  await verifyPhone(384, 848, "phone");
-  await verifyPhone(390, 844, "tall-phone");
-} catch (error) {
-  report.ok = false;
-  report.errors.push(error instanceof Error ? error.message : String(error));
+for (const [width, height, name] of [
+  [360, 640, "short-phone"],
+  [384, 848, "phone"],
+  [390, 844, "tall-phone"],
+]) {
+  try {
+    await verifyPhone(width, height, name);
+  } catch (error) {
+    report.ok = false;
+    report.errors.push(error instanceof Error ? error.message : String(error));
+  }
 }
 
 await writeFile(`${out}/browser-report.json`, `${JSON.stringify(report, null, 2)}\n`);
