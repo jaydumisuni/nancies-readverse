@@ -15,7 +15,7 @@ on:
       - "package.json"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   exact-reported-regression-proof:
@@ -113,7 +113,6 @@ jobs:
           node scripts/prove-reported-regression-v2.mjs
 
       - name: Preserve exact evidence and the proved source candidate
-        if: always()
         run: |
           mkdir -p engineering-evidence/reported-regression-v2/proved-source/src/notverse
           cp /tmp/notverse-v2-preview.log engineering-evidence/reported-regression-v2/preview.log 2>/dev/null || true
@@ -123,10 +122,38 @@ jobs:
           cp src/notverse/runtime-interaction-fix.ts engineering-evidence/reported-regression-v2/proved-source/src/notverse/runtime-interaction-fix.ts
 
       - name: Upload exact evidence
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reported-regression-v2-proof
           path: engineering-evidence/reported-regression-v2
           if-no-files-found: error
           retention-days: 14
+
+      - name: Commit the exact source that passed every proof
+        run: |
+          mkdir -p /tmp/notverse-proved/src/notverse
+          cp src/App.tsx /tmp/notverse-proved/src/App.tsx
+          cp src/notverse/final-viewport-stability.css /tmp/notverse-proved/src/notverse/final-viewport-stability.css
+          cp src/notverse/runtime-interaction-fix.ts /tmp/notverse-proved/src/notverse/runtime-interaction-fix.ts
+
+          git reset --hard
+          git clean -fdx
+          git fetch origin fix/mobile-notes-chat-regression-v2-20260803
+          git checkout -B fix/mobile-notes-chat-regression-v2-20260803 origin/fix/mobile-notes-chat-regression-v2-20260803
+
+          cp /tmp/notverse-proved/src/App.tsx src/App.tsx
+          cp /tmp/notverse-proved/src/notverse/final-viewport-stability.css src/notverse/final-viewport-stability.css
+          cp /tmp/notverse-proved/src/notverse/runtime-interaction-fix.ts src/notverse/runtime-interaction-fix.ts
+          rm -f src/notverse/viewport-scroll-stability.ts
+          rm -f .github/workflows/apply-companion-portal-fix.yml
+          rm -f .github/workflows/reported-regression-v2.yml
+
+          grep -F 'import { createPortal } from "react-dom";' src/App.tsx
+          grep -F '{createPortal(' src/App.tsx
+          grep -F 'document.body,' src/App.tsx
+
+          git config user.name "NoTVerse verification bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix adaptive Notes, companion geometry and recommendation routing"
+          git push origin HEAD:fix/mobile-notes-chat-regression-v2-20260803
