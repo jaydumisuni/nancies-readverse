@@ -28,6 +28,8 @@ async function measureChat(page) {
     const input = document.querySelector(".chat-input")?.getBoundingClientRect();
     const history = document.querySelector(".chat-body");
     const navigation = document.querySelector(".mobile-nav");
+    const main = document.querySelector(".main-shell.notverse-shell");
+    const homeCard = document.querySelector(".notverse-companion-card")?.getBoundingClientRect();
     return {
       viewport: { width: innerWidth, height: innerHeight },
       visualViewport: window.visualViewport && {
@@ -47,6 +49,11 @@ async function measureChat(page) {
         opacity: getComputedStyle(navigation).opacity,
         pointerEvents: getComputedStyle(navigation).pointerEvents,
       },
+      main: main && {
+        paddingRight: Number.parseFloat(getComputedStyle(main).paddingRight),
+        width: main.getBoundingClientRect().width,
+      },
+      homeCard: homeCard && { left: homeCard.left, right: homeCard.right, width: homeCard.width },
       document: {
         width: document.documentElement.scrollWidth,
         height: document.documentElement.scrollHeight,
@@ -89,6 +96,9 @@ async function verifyChatViewport(width, height, name, mobile = false) {
 
   const geometry = await measureChat(page);
   assertChatGeometry(name, geometry, width, height, mobile);
+  if (name === "tablet" && (!geometry.main || geometry.main.paddingRight > 20)) {
+    throw new Error(`${name}: opening chat still squeezes the Home layout (padding-right ${geometry.main?.paddingRight})`);
+  }
   await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
 
   report.cases.push({ name, width, height, geometry });
@@ -186,6 +196,8 @@ async function verifyRecommendationAndViewportResize() {
   }
   if (/paste (?:the |a )?link/i.test(transcript)) throw new Error("generic source-link response is still visible");
 
+  const initial = await measureChat(page);
+  assertChatGeometry("mobile-recommendation", initial, width, height, true);
   await page.screenshot({ path: `${out}/mobile-recommendation.png`, fullPage: false });
 
   await page.setViewportSize({ width, height: 520 });
@@ -194,7 +206,7 @@ async function verifyRecommendationAndViewportResize() {
   assertChatGeometry("mobile-resized-viewport", resized, width, 520, true);
   await page.screenshot({ path: `${out}/mobile-resized-chat.png`, fullPage: false });
 
-  report.cases.push({ name: "mobile-recommendation-and-resize", transcript, companionEndpointCalled, resized });
+  report.cases.push({ name: "mobile-recommendation-and-resize", transcript, companionEndpointCalled, initial, resized });
   await context.close();
 }
 
