@@ -1,0 +1,46 @@
+name: Export exact current NoTVerse source 20260803b
+
+on:
+  push:
+    branches:
+      - workspace-export-notverse-current-20260803b
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install exact dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Package exact source outside working tree
+        run: tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=.wrangler -czf /tmp/notverse-current-source.tar.gz .
+
+      - name: Package dependency tree for local verification
+        run: tar -czf /tmp/notverse-node-modules.tar.gz node_modules
+
+      - name: Upload exact source
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-current-workspace-source-20260803b
+          path: /tmp/notverse-current-source.tar.gz
+          retention-days: 2
+
+      - name: Upload exact dependency tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-current-workspace-dependencies-20260803b
+          path: /tmp/notverse-node-modules.tar.gz
+          retention-days: 2
