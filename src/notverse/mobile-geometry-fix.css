@@ -1,0 +1,397 @@
+/* Responsive interaction safeguards verified against short phones, tall phones,
+   tablets and desktop viewports. Vertical gestures remain reserved for flipping
+   Notes while chat history may scroll internally without exposing scrollbars. */
+
+html:has(.companion-panel.open),
+body:has(.companion-panel.open) {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.chat-body,
+.notes-tabs,
+.notverse-book-row,
+.note-composer,
+.note-filter-sheet,
+.replies-drawer,
+.inbox-layout > aside,
+.main-shell.notverse-shell {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-body::-webkit-scrollbar,
+.notes-tabs::-webkit-scrollbar,
+.notverse-book-row::-webkit-scrollbar,
+.note-composer::-webkit-scrollbar,
+.note-filter-sheet::-webkit-scrollbar,
+.replies-drawer::-webkit-scrollbar,
+.inbox-layout > aside::-webkit-scrollbar,
+.main-shell.notverse-shell::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.companion-panel {
+  width: min(420px, calc(100vw - 28px));
+  height: auto;
+  max-height: calc(100dvh - 28px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.companion-header {
+  min-width: 0;
+}
+
+.companion-header > div {
+  min-width: 0;
+}
+
+.companion-header small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: auto;
+}
+
+.chat-input {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  flex-shrink: 0;
+  background: rgba(8, 7, 10, .98);
+}
+
+.chat-input input {
+  min-width: 0;
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .companion-panel {
+    top: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: min(390px, calc(100vw - 20px));
+    max-height: calc(100dvh - 20px);
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root,
+  .readverse-app {
+    max-width: 100%;
+  }
+
+  .companion-panel,
+  .companion-panel.open {
+    inset: 0 !important;
+    width: 100dvw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .companion-header {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-inline: 12px;
+    padding-bottom: 10px;
+  }
+
+  .companion-header .companion-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .companion-header strong {
+    font-size: 16px;
+  }
+
+  .companion-header small {
+    font-size: 10px;
+  }
+
+  .chat-body {
+    padding: 12px 10px 14px;
+  }
+
+  .message-row {
+    max-width: 100%;
+  }
+
+  .message-bubble {
+    max-width: min(84vw, 470px);
+  }
+
+  .chat-input {
+    min-height: 62px;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .companion-panel.open ~ .mobile-nav,
+  body:has(.companion-panel.open) .mobile-nav {
+    transform: translateY(calc(100% + 34px)) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .main-shell.notverse-shell:has(.notes-experience) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden !important;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .main-shell.notverse-shell:has(.notes-experience) .utility-bar {
+    min-height: 50px;
+    height: 50px;
+    padding-inline: 10px;
+  }
+
+  .main-shell.notverse-shell:has(.notes-experience) .global-search {
+    height: 34px;
+  }
+
+  .notes-experience {
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    padding: 7px 10px calc(74px + env(safe-area-inset-bottom)) !important;
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  .notes-header {
+    align-items: center;
+  }
+
+  .notes-header h1 {
+    font-size: clamp(28px, 9vw, 36px);
+    line-height: 1;
+    margin: 2px 0;
+  }
+
+  .notes-header .notverse-eyebrow {
+    font-size: 8px;
+  }
+
+  .notes-header button {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .notes-tabs {
+    min-height: 34px;
+    margin: 3px 0 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+  }
+
+  .notes-tabs button {
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  .note-flip-stage {
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    padding: 5px 0 3px;
+    align-items: stretch;
+  }
+
+  .note-shadow-sheet,
+  .note-paper {
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    max-height: 100%;
+  }
+
+  .note-shadow-sheet {
+    transform: translate(5px, 5px) rotate(.35deg);
+  }
+
+  .note-paper {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    padding: 17px 13px 10px 38px;
+  }
+
+  .note-binding {
+    left: 8px;
+    top: 10px;
+    bottom: 10px;
+    width: 20px;
+  }
+
+  .note-binding i {
+    width: 9px;
+    height: 9px;
+  }
+
+  .note-tape {
+    width: 76px;
+    height: 20px;
+  }
+
+  .note-paper > header {
+    gap: 7px;
+    padding-bottom: 8px;
+  }
+
+  .note-author-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .note-paper header strong {
+    font-size: 12px;
+  }
+
+  .note-paper header small,
+  .note-paper header time {
+    font-size: 8px;
+  }
+
+  .note-body {
+    min-height: 0 !important;
+    overflow: hidden;
+    padding: 9px 3px 2px;
+  }
+
+  .note-type {
+    font-size: 8px;
+  }
+
+  .note-body > p {
+    margin: 7px 0;
+    font-size: clamp(16px, 4.8vw, 20px);
+    line-height: 1.34;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10;
+    overflow: hidden;
+  }
+
+  .note-tags {
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .note-photo {
+    margin: 9px 0 4px;
+  }
+
+  .note-photo img {
+    width: 112px;
+    height: 74px;
+    border-width: 5px;
+  }
+
+  .note-book-link {
+    margin-top: 8px;
+    padding-top: 7px;
+  }
+
+  .note-paper > footer {
+    gap: 12px;
+    padding-top: 8px;
+  }
+
+  .note-paper > footer button {
+    font-size: 11px;
+  }
+
+  .note-position {
+    min-height: 30px;
+    margin: 1px 0 0;
+    line-height: 1.1;
+  }
+
+  .note-position strong {
+    font-size: 10px;
+  }
+
+  .note-position span,
+  .note-position small {
+    font-size: 8px;
+  }
+
+  .note-swipe-controls {
+    display: none !important;
+  }
+
+  .note-modal-backdrop {
+    height: 100dvh;
+    overflow: hidden !important;
+  }
+
+  .note-composer,
+  .note-filter-sheet,
+  .replies-drawer {
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    overflow-y: auto !important;
+    margin: 8px auto !important;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 720px) {
+  .main-shell.notverse-shell:has(.notes-experience) .utility-bar {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .notes-experience {
+    padding-top: 4px !important;
+    padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .notes-header h1 {
+    font-size: 26px;
+  }
+
+  .notes-header .notverse-eyebrow,
+  .note-position small {
+    display: none;
+  }
+
+  .notes-tabs {
+    min-height: 29px;
+  }
+
+  .notes-tabs button {
+    padding-block: 5px;
+  }
+
+  .note-body > p {
+    -webkit-line-clamp: 8;
+    font-size: 15px;
+  }
+
+  .chat-body {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
