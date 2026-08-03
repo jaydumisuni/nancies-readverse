@@ -5,6 +5,8 @@ import "./styles.css";
 import "./notverse/notverse-polish.css";
 import "./notverse/notverse-branding-fix.css";
 import "./notverse/mobile-geometry-fix.css";
+import "./notverse/adaptive-interaction-fix.css";
+import "./notverse/runtime-interaction-fix";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");
