@@ -27,6 +27,61 @@ jobs:
         with:
           node-version: 22
 
+      - name: Apply the structural portal candidate in the isolated proof workspace
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app_path = Path("src/App.tsx")
+          app = app_path.read_text(encoding="utf-8")
+          portal_import = 'import { createPortal } from "react-dom";\n'
+          if portal_import not in app:
+              anchor = 'import { avatarImages, type AvatarId } from "./avatars";\n'
+              if anchor not in app:
+                  raise SystemExit("App import anchor not found")
+              app = app.replace(anchor, portal_import + anchor, 1)
+
+          start_token = '      <CompanionPanel\n'
+          next_token = '\n\n      <input\n'
+          start = app.find(start_token)
+          if start < 0:
+              raise SystemExit("CompanionPanel render start not found")
+          end = app.find(next_token, start)
+          if end < 0:
+              raise SystemExit("CompanionPanel render end not found")
+
+          block = app[start:end]
+          if '{createPortal(' not in block:
+              lines = block.splitlines()
+              if lines[-1].strip() != '/>':
+                  raise SystemExit("Unexpected CompanionPanel closing markup")
+              portal_block = ['      {createPortal(', '        <CompanionPanel']
+              portal_block.extend('  ' + line for line in lines[1:-1])
+              portal_block.extend(['        />', '        document.body,', '      )}'])
+              app = app[:start] + '\n'.join(portal_block) + app[end:]
+          app_path.write_text(app, encoding="utf-8")
+
+          css_path = Path("src/notverse/final-viewport-stability.css")
+          css = css_path.read_text(encoding="utf-8")
+          css = css.replace(
+              'transform: translate3d(0, calc(-1 * var(--notverse-page-scroll-y, 0px)), 0) !important;',
+              'transform: none !important;',
+          )
+          css_path.write_text(css, encoding="utf-8")
+
+          runtime_path = Path("src/notverse/runtime-interaction-fix.ts")
+          runtime = runtime_path.read_text(encoding="utf-8")
+          runtime = runtime.replace(
+              '  rootElement.style.setProperty("--notverse-page-scroll-y", `${Math.max(0, window.scrollY)}px`);\n',
+              '',
+          )
+          runtime_path.write_text(runtime, encoding="utf-8")
+          PY
+
+          grep -F 'import { createPortal } from "react-dom";' src/App.tsx
+          grep -F '{createPortal(' src/App.tsx
+          grep -F 'document.body,' src/App.tsx
+
       - name: Install project dependencies
         run: npm install --no-audit --no-fund
 
@@ -51,12 +106,15 @@ jobs:
       - name: Prove desktop, tablet, mobile, resize and recommendation behaviour
         run: node scripts/prove-reported-regression-v2.mjs
 
-      - name: Preserve exact evidence
+      - name: Preserve exact evidence and the proved source candidate
         if: always()
         run: |
-          mkdir -p engineering-evidence/reported-regression-v2
+          mkdir -p engineering-evidence/reported-regression-v2/proved-source/src/notverse
           cp /tmp/notverse-v2-preview.log engineering-evidence/reported-regression-v2/preview.log 2>/dev/null || true
           git rev-parse HEAD > engineering-evidence/reported-regression-v2/verified-commit.txt
+          cp src/App.tsx engineering-evidence/reported-regression-v2/proved-source/src/App.tsx
+          cp src/notverse/final-viewport-stability.css engineering-evidence/reported-regression-v2/proved-source/src/notverse/final-viewport-stability.css
+          cp src/notverse/runtime-interaction-fix.ts engineering-evidence/reported-regression-v2/proved-source/src/notverse/runtime-interaction-fix.ts
 
       - name: Upload exact evidence
         if: always()
