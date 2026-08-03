@@ -1,1 +1,0 @@
-Run the strict build and existing desktop/mobile visual proof for the bounded Notes workspace, scrollbar-free companion chat and context-aware recommendation response.
