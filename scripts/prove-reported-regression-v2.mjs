@@ -30,15 +30,34 @@ async function measureChat(page) {
     const navigation = document.querySelector(".mobile-nav");
     const main = document.querySelector(".main-shell.notverse-shell");
     const homeCard = document.querySelector(".notverse-companion-card")?.getBoundingClientRect();
+    const visualViewport = window.visualViewport;
+
     return {
-      viewport: { width: innerWidth, height: innerHeight },
-      visualViewport: window.visualViewport && {
-        width: window.visualViewport.width,
-        height: window.visualViewport.height,
-        offsetTop: window.visualViewport.offsetTop,
+      layoutViewport: { width: innerWidth, height: innerHeight },
+      visualViewport: visualViewport ? {
+        width: visualViewport.width,
+        height: visualViewport.height,
+        offsetLeft: visualViewport.offsetLeft,
+        offsetTop: visualViewport.offsetTop,
+        pageLeft: visualViewport.pageLeft,
+        pageTop: visualViewport.pageTop,
+        scale: visualViewport.scale,
+      } : null,
+      panel: panel && {
+        top: panel.top,
+        right: panel.right,
+        bottom: panel.bottom,
+        left: panel.left,
+        width: panel.width,
+        height: panel.height,
       },
-      panel: panel && { top: panel.top, right: panel.right, bottom: panel.bottom, left: panel.left, width: panel.width, height: panel.height },
-      input: input && { top: input.top, bottom: input.bottom, height: input.height },
+      input: input && {
+        top: input.top,
+        right: input.right,
+        bottom: input.bottom,
+        left: input.left,
+        height: input.height,
+      },
       history: history && {
         clientHeight: history.clientHeight,
         scrollHeight: history.scrollHeight,
@@ -53,10 +72,16 @@ async function measureChat(page) {
         paddingRight: Number.parseFloat(getComputedStyle(main).paddingRight),
         width: main.getBoundingClientRect().width,
       },
-      homeCard: homeCard && { left: homeCard.left, right: homeCard.right, width: homeCard.width },
+      homeCard: homeCard && {
+        left: homeCard.left,
+        right: homeCard.right,
+        width: homeCard.width,
+      },
       document: {
         width: document.documentElement.scrollWidth,
         height: document.documentElement.scrollHeight,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
       },
       body: {
         overflow: getComputedStyle(document.body).overflow,
@@ -70,24 +95,60 @@ async function measureChat(page) {
   });
 }
 
+function visibleBounds(geometry, fallbackWidth, fallbackHeight) {
+  const viewport = geometry.visualViewport;
+  if (!viewport) {
+    return { left: 0, top: 0, right: fallbackWidth, bottom: fallbackHeight };
+  }
+  const left = Number(viewport.offsetLeft || 0);
+  const top = Number(viewport.offsetTop || 0);
+  return {
+    left,
+    top,
+    right: left + Number(viewport.width || fallbackWidth),
+    bottom: top + Number(viewport.height || fallbackHeight),
+  };
+}
+
+function assertRectInside(name, label, rect, bounds, tolerance = 3) {
+  if (!rect
+      || rect.left < bounds.left - tolerance
+      || rect.top < bounds.top - tolerance
+      || rect.right > bounds.right + tolerance
+      || rect.bottom > bounds.bottom + tolerance) {
+    throw new Error(`${name}: ${label} exceeds visual viewport. rect=${JSON.stringify(rect)} bounds=${JSON.stringify(bounds)}`);
+  }
+}
+
 function assertChatGeometry(name, geometry, width, height, mobile) {
-  if (!geometry.panel || geometry.panel.top < -1 || geometry.panel.left < -1 || geometry.panel.right > width + 1 || geometry.panel.bottom > height + 1) {
-    throw new Error(`${name}: companion panel exceeds viewport: ${JSON.stringify(geometry.panel)}`);
+  const bounds = visibleBounds(geometry, width, height);
+  assertRectInside(name, "companion panel", geometry.panel, bounds);
+  assertRectInside(name, "companion composer", geometry.input, bounds);
+
+  if (geometry.history?.overflowY !== "auto") {
+    throw new Error(`${name}: chat history is not the only scrollable region`);
   }
-  if (!geometry.input || geometry.input.bottom > height + 1 || geometry.input.top < 0) {
-    throw new Error(`${name}: companion composer is unreachable: ${JSON.stringify(geometry.input)}`);
+  if (geometry.history?.scrollbarWidth !== "none") {
+    throw new Error(`${name}: visual chat scrollbar remains enabled`);
   }
-  if (geometry.history?.overflowY !== "auto") throw new Error(`${name}: chat history is not the only scrollable region`);
-  if (geometry.history?.scrollbarWidth !== "none") throw new Error(`${name}: visual chat scrollbar remains enabled`);
-  if (!geometry.stateClasses.body.includes("notverse-chat-open")) throw new Error(`${name}: runtime chat state class was not applied`);
-  if (geometry.document.height > height + 1) throw new Error(`${name}: opening chat leaves the document scrollable (${geometry.document.height} > ${height})`);
+  if (!geometry.stateClasses.body.includes("notverse-chat-open")) {
+    throw new Error(`${name}: runtime chat state class was not applied`);
+  }
+  if (geometry.document.height > height + 1) {
+    throw new Error(`${name}: opening chat leaves the document scrollable (${geometry.document.height} > ${height})`);
+  }
   if (mobile && (geometry.navigation?.opacity !== "0" || geometry.navigation?.pointerEvents !== "none")) {
     throw new Error(`${name}: mobile navigation remains active behind chat`);
   }
 }
 
 async function verifyChatViewport(width, height, name, mobile = false) {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    isMobile: mobile,
+    hasTouch: mobile,
+  });
   const page = await context.newPage();
   await prepare(page);
   await page.getByRole("button", { name: "Chat now", exact: true }).click();
@@ -97,16 +158,21 @@ async function verifyChatViewport(width, height, name, mobile = false) {
   const geometry = await measureChat(page);
   assertChatGeometry(name, geometry, width, height, mobile);
   if (name === "tablet" && (!geometry.main || geometry.main.paddingRight > 20)) {
-    throw new Error(`${name}: opening chat still squeezes the Home layout (padding-right ${geometry.main?.paddingRight})`);
+    throw new Error(`${name}: opening chat still squeezes Home (padding-right ${geometry.main?.paddingRight})`);
   }
-  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
 
+  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
   report.cases.push({ name, width, height, geometry });
   await context.close();
 }
 
 async function verifyMobileNotes(width, height, name) {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
   const page = await context.newPage();
   await prepare(page);
   await page.getByRole("button", { name: "Notes" }).last().click();
@@ -133,11 +199,21 @@ async function verifyMobileNotes(width, height, name) {
     };
   });
 
-  if (!geometry.stateClass.includes("notverse-notes-open")) throw new Error(`${name}: runtime Notes state class was not applied`);
-  if (geometry.document.height > height + 1) throw new Error(`${name}: Notes document still scrolls`);
-  if (!geometry.paper || !geometry.nav || geometry.paper.bottom > geometry.nav.top + 1) throw new Error(`${name}: Note paper remains behind navigation`);
-  if (!geometry.footer || geometry.footer.bottom > geometry.nav.top + 1) throw new Error(`${name}: Note footer is not reachable`);
-  if (geometry.workspaceOverflow !== "hidden" || geometry.touchAction !== "none") throw new Error(`${name}: vertical gestures are not reserved for Note flipping`);
+  if (!geometry.stateClass.includes("notverse-notes-open")) {
+    throw new Error(`${name}: runtime Notes state class was not applied`);
+  }
+  if (geometry.document.height > height + 1) {
+    throw new Error(`${name}: Notes document still scrolls`);
+  }
+  if (!geometry.paper || !geometry.nav || geometry.paper.bottom > geometry.nav.top + 1) {
+    throw new Error(`${name}: Note paper remains behind navigation`);
+  }
+  if (!geometry.footer || geometry.footer.bottom > geometry.nav.top + 1) {
+    throw new Error(`${name}: Note footer is not reachable`);
+  }
+  if (geometry.workspaceOverflow !== "hidden" || geometry.touchAction !== "none") {
+    throw new Error(`${name}: vertical gestures are not reserved for Note flipping`);
+  }
 
   await page.locator(".notes-experience").evaluate((element) => {
     element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, clientY: 540 }));
@@ -155,7 +231,12 @@ async function verifyMobileNotes(width, height, name) {
 async function verifyRecommendationAndViewportResize() {
   const width = 390;
   const height = 844;
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
   const page = await context.newPage();
   let companionEndpointCalled = false;
 
@@ -166,9 +247,24 @@ async function verifyRecommendationAndViewportResize() {
       body: JSON.stringify({
         ok: true,
         candidates: [
-          { title: "Addiction by Design", authors: ["Natasha Dow Schüll"], year: 2012, description: "How machine gambling environments are engineered to keep people playing." },
-          { title: "The Biggest Bluff", authors: ["Maria Konnikova"], year: 2020, description: "Poker, psychology and decisions under uncertainty." },
-          { title: "Thinking in Bets", authors: ["Annie Duke"], year: 2018, description: "Probability, incomplete information and better decisions." },
+          {
+            title: "Addiction by Design",
+            authors: ["Natasha Dow Schüll"],
+            year: 2012,
+            description: "How machine gambling environments are engineered to keep people playing.",
+          },
+          {
+            title: "The Biggest Bluff",
+            authors: ["Maria Konnikova"],
+            year: 2020,
+            description: "Poker, psychology and decisions under uncertainty.",
+          },
+          {
+            title: "Thinking in Bets",
+            authors: ["Annie Duke"],
+            year: 2018,
+            description: "Probability, incomplete information and better decisions.",
+          },
         ],
       }),
     });
@@ -190,11 +286,17 @@ async function verifyRecommendationAndViewportResize() {
   await page.waitForSelector("text=Addiction by Design");
 
   const transcript = await page.locator(".chat-body").innerText();
-  if (companionEndpointCalled) throw new Error("recommendation request reached the generic companion endpoint instead of catalogue routing");
-  if (!transcript.includes("Addiction by Design") || !transcript.includes("The Biggest Bluff") || !transcript.includes("Thinking in Bets")) {
+  if (companionEndpointCalled) {
+    throw new Error("recommendation request reached generic companion fallback instead of catalogue routing");
+  }
+  if (!transcript.includes("Addiction by Design")
+      || !transcript.includes("The Biggest Bluff")
+      || !transcript.includes("Thinking in Bets")) {
     throw new Error(`catalogue-backed recommendation titles are missing: ${transcript}`);
   }
-  if (/paste (?:the |a )?link/i.test(transcript)) throw new Error("generic source-link response is still visible");
+  if (/paste (?:the |a )?link/i.test(transcript)) {
+    throw new Error("generic source-link response is still visible");
+  }
 
   const initial = await measureChat(page);
   assertChatGeometry("mobile-recommendation", initial, width, height, true);
@@ -206,7 +308,13 @@ async function verifyRecommendationAndViewportResize() {
   assertChatGeometry("mobile-resized-viewport", resized, width, 520, true);
   await page.screenshot({ path: `${out}/mobile-resized-chat.png`, fullPage: false });
 
-  report.cases.push({ name: "mobile-recommendation-and-resize", transcript, companionEndpointCalled, initial, resized });
+  report.cases.push({
+    name: "mobile-recommendation-and-resize",
+    transcript,
+    companionEndpointCalled,
+    initial,
+    resized,
+  });
   await context.close();
 }
 
@@ -227,6 +335,7 @@ for (const task of [
 
 await writeFile(`${out}/reported-regression-v2.json`, `${JSON.stringify(report, null, 2)}\n`);
 await browser.close();
+
 if (!report.ok) {
   console.error(report.errors.join("\n"));
   process.exit(1);
