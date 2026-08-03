@@ -41,9 +41,9 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright
           npx playwright install --with-deps chromium
 
-      - name: Start exact production client
+      - name: Start exact generated production client
         run: |
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/notverse-preview.log 2>&1 &
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/notverse-preview.log 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
             sleep 1
@@ -54,9 +54,9 @@ jobs:
       - name: Prove short-phone and tall-phone Notes/chat geometry
         run: node scripts/prove-mobile-notes-chat.mjs
 
-      - name: Start local Worker entry
+      - name: Start exact generated Worker entry
         run: |
-          npx wrangler dev --local --port 8790 --config wrangler.jsonc > /tmp/notverse-worker.log 2>&1 &
+          npx wrangler dev --local --port 8790 --config dist/notverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
           for attempt in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:8790/api/health >/dev/null; then exit 0; fi
             sleep 1
