@@ -185,7 +185,7 @@ function intelligentFallback(
 
 function fallbackRecommendations(question: string, opener: string): string {
   const topic = recommendationTopic(question).toLowerCase();
-  if (/\b(gambl|casino|poker|betting|wager)\b/.test(topic)) {
+  if (/\b(?:gambl(?:e|ing|er|ers)?|casino|poker|betting|wager(?:ing)?)\b/.test(topic)) {
     return [
       `${opener} Start with these rather than a random gambling list:`,
       "1. Addiction by Design — Natasha Dow Schüll. A serious look at how machine gambling environments are engineered to keep people playing.",
@@ -207,7 +207,7 @@ function isRecommendationRequest(value: string): boolean {
 function recommendationTopic(value: string): string {
   const cleaned = value
     .replace(/\b(?:do you have|can you give me|give me|any|some|please|recommendations?|recommended|suggestions?|books?|i can read|to read|reading list|good)\b/gi, " ")
-    .replace(/^\s*(?:for|on|about)\s+/i, "")
+    .replace(/^\s*(?:(?:for|on|about)\s+)+/i, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s,.:;!?-]+|[\s,.:;!?-]+$/g, "")
     .trim();
