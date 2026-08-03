@@ -1,0 +1,71 @@
+name: Live NoTVerse 2.0.2 mobile verification
+
+on:
+  push:
+    branches:
+      - verify/live-mobile-notes-chat-20260803
+
+permissions:
+  contents: read
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait for production release 2.0.2
+        run: |
+          for attempt in $(seq 1 60); do
+            echo "Production probe $attempt/60"
+            health="$(curl --fail --silent --show-error --max-time 20 -H 'cache-control: no-cache' https://notverse.1ink.online/api/health || true)"
+            release="$(curl --fail --silent --show-error --max-time 20 -H 'cache-control: no-cache' https://notverse.1ink.online/release.json || true)"
+            echo "$health"
+            echo "$release"
+            if echo "$health" | grep -q 'NoTVerse' && echo "$release" | grep -q '2.0.2'; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "NoTVerse 2.0.2 was not promoted to production in time."
+          exit 1
+
+      - name: Install proof dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+
+      - name: Prove live mobile Notes and chat geometry
+        env:
+          PROOF_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/live-mobile-notes-chat
+        run: node scripts/prove-mobile-notes-chat.mjs
+
+      - name: Prove live companion recommendation intelligence
+        env:
+          WORKER_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/live-mobile-notes-chat
+        run: node scripts/prove-companion-runtime.mjs
+
+      - name: Record deployed asset identity
+        run: |
+          mkdir -p engineering-evidence/live-mobile-notes-chat
+          curl --fail --silent --show-error -H 'cache-control: no-cache' https://notverse.1ink.online/ > engineering-evidence/live-mobile-notes-chat/live-index.html
+          curl --fail --silent --show-error -H 'cache-control: no-cache' https://notverse.1ink.online/api/health > engineering-evidence/live-mobile-notes-chat/live-health.json
+          curl --fail --silent --show-error -H 'cache-control: no-cache' https://notverse.1ink.online/release.json > engineering-evidence/live-mobile-notes-chat/live-release.json
+          git rev-parse HEAD > engineering-evidence/live-mobile-notes-chat/verification-branch-commit.txt
+
+      - name: Upload live visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-2.0.2-live-mobile-proof
+          path: engineering-evidence/live-mobile-notes-chat
+          if-no-files-found: error
+          retention-days: 14
