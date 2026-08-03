@@ -29,7 +29,10 @@ function viewportHeight(): number {
 }
 
 function viewportTop(): number {
-  return Math.max(0, Math.round(window.visualViewport?.offsetTop || 0));
+  const viewport = window.visualViewport;
+  if (!viewport) return 0;
+  const keyboardOrBrowserInset = viewport.height < window.innerHeight - 20;
+  return keyboardOrBrowserInset ? Math.max(0, Math.round(viewport.offsetTop)) : 0;
 }
 
 function applyViewportMetrics(): void {
