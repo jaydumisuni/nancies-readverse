@@ -57,7 +57,7 @@ jobs:
                   raise SystemExit("Unexpected CompanionPanel closing markup")
               portal_block = ['      {createPortal(', '        <CompanionPanel']
               portal_block.extend('  ' + line for line in lines[1:-1])
-              portal_block.extend(['        />', '        document.body,', '      )}'])
+              portal_block.extend(['        />,', '        document.body,', '      )}'])
               app = app[:start] + '\n'.join(portal_block) + app[end:]
           app_path.write_text(app, encoding="utf-8")
 
