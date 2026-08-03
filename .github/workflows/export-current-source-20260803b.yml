@@ -1,0 +1,26 @@
+name: Export exact current NoTVerse source 20260803b
+
+on:
+  push:
+    branches:
+      - workspace-export-notverse-current-20260803b
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+
+      - name: Package exact source outside working tree
+        run: tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=.wrangler -czf /tmp/notverse-current-source.tar.gz .
+
+      - name: Upload exact source
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-current-workspace-source-20260803b
+          path: /tmp/notverse-current-source.tar.gz
+          retention-days: 2
