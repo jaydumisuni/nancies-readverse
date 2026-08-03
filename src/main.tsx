@@ -8,7 +8,6 @@ import "./notverse/mobile-geometry-fix.css";
 import "./notverse/adaptive-interaction-fix.css";
 import "./notverse/final-viewport-stability.css";
 import "./notverse/runtime-interaction-fix";
-import "./notverse/viewport-scroll-stability";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");
