@@ -28,16 +28,9 @@ function viewportHeight(): number {
   return Math.max(320, Math.round(window.visualViewport?.height || window.innerHeight));
 }
 
-function viewportTop(): number {
-  const viewport = window.visualViewport;
-  if (!viewport) return 0;
-  const keyboardOrBrowserInset = viewport.height < window.innerHeight - 20;
-  return keyboardOrBrowserInset ? Math.max(0, Math.round(viewport.offsetTop)) : 0;
-}
-
 function applyViewportMetrics(): void {
   rootElement.style.setProperty("--notverse-viewport-height", `${viewportHeight()}px`);
-  rootElement.style.setProperty("--notverse-viewport-top", `${viewportTop()}px`);
+  rootElement.style.setProperty("--notverse-viewport-top", "0px");
 }
 
 function setViewportLock(locked: boolean): void {
