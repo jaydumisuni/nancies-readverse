@@ -22,17 +22,24 @@ const response = await fetch(`${baseUrl}/api/companion/help`, {
 const body = await response.json();
 const answer = typeof body.answer === "string" ? body.answer.trim() : "";
 const sourceMisroute = /paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(answer);
-const relevant = /gambl|fiction|memoir|research|practical|probability|psychology|addiction|poker|beginner/i.test(answer);
+const concreteTitles = [
+  "Addiction by Design",
+  "The Biggest Bluff",
+  "Thinking in Bets",
+  "The Theory of Gambling and Statistical Logic",
+].filter((title) => answer.includes(title));
+const genericOnly = /i (?:can|will) give you|tell me whether you prefer/i.test(answer) && concreteTitles.length === 0;
 
 const report = {
-  ok: response.ok && Boolean(answer) && !sourceMisroute && relevant,
+  ok: response.ok && Boolean(answer) && !sourceMisroute && !genericOnly && concreteTitles.length >= 3,
   status: response.status,
   mode: body.mode,
   model: body.model,
   question,
   answer,
   sourceMisroute,
-  relevant,
+  genericOnly,
+  concreteTitles,
 };
 
 await writeFile(`${out}/companion-runtime-report.json`, `${JSON.stringify(report, null, 2)}\n`);
@@ -40,4 +47,4 @@ if (!report.ok) {
   console.error(JSON.stringify(report, null, 2));
   process.exit(1);
 }
-console.log(`Companion runtime proof passed: ${answer}`);
+console.log(`Companion runtime proof passed with ${concreteTitles.length} concrete titles.`);
