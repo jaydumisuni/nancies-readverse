@@ -31,7 +31,6 @@ function viewportHeight(): number {
 function applyViewportMetrics(): void {
   rootElement.style.setProperty("--notverse-viewport-height", `${viewportHeight()}px`);
   rootElement.style.setProperty("--notverse-viewport-top", "0px");
-  rootElement.style.setProperty("--notverse-page-scroll-y", `${Math.max(0, window.scrollY)}px`);
 }
 
 function setViewportLock(locked: boolean): void {

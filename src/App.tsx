@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { avatarImages, type AvatarId } from "./avatars";
 import PdfBookReader from "./reader/PdfBookReader";
 import UniversalReader, { type ReaderActionStatus } from "./reader/UniversalReader";
@@ -1587,28 +1588,31 @@ export default function App() {
         </button>
       </main>
 
-      <CompanionPanel
-        companion={companion}
-        ringColor={ringColor}
-        open={chatOpen}
-        messages={companionMessages}
-        question={question}
-        sending={sending}
-        searching={searching}
-        onClose={() => setChatOpen(false)}
-        onSubmit={askCompanion}
-        onQuestionChange={setQuestion}
-        onAttach={() => fileInputRef.current?.click()}
-        onMood={chooseMood}
-        onReadUpload={openUploadedFile}
-        onAddUpload={addUploadedToLibrary}
-        onPrepareSource={prepareSource}
-        onOpenSource={openPreparedSource}
-        onRejectSource={rejectSource}
-        onSelectDiscovery={selectDiscoveryCandidate}
-        onRejectDiscovery={rejectDiscoveryCandidate}
-        onMoreDiscovery={showMoreDiscovery}
-      />
+      {createPortal(
+        <CompanionPanel
+          companion={companion}
+          ringColor={ringColor}
+          open={chatOpen}
+          messages={companionMessages}
+          question={question}
+          sending={sending}
+          searching={searching}
+          onClose={() => setChatOpen(false)}
+          onSubmit={askCompanion}
+          onQuestionChange={setQuestion}
+          onAttach={() => fileInputRef.current?.click()}
+          onMood={chooseMood}
+          onReadUpload={openUploadedFile}
+          onAddUpload={addUploadedToLibrary}
+          onPrepareSource={prepareSource}
+          onOpenSource={openPreparedSource}
+          onRejectSource={rejectSource}
+          onSelectDiscovery={selectDiscoveryCandidate}
+          onRejectDiscovery={rejectDiscoveryCandidate}
+          onMoreDiscovery={showMoreDiscovery}
+        />,
+        document.body,
+      )}
 
       <input
         className="visually-hidden"
