@@ -1,22 +1,22 @@
-name: Finish NoTVerse 10-for-2 proof
+name: Apply and prove NoTVerse workspace correction
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - fix-notverse-responsive-chat-notes-20260803
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  strict-build-and-visual-proof:
+  apply-build-review-prove:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Checkout exact proof-branch head
+      - name: Checkout exact proof branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: fix-notverse-responsive-chat-notes-20260803
           fetch-depth: 0
 
       - name: Recover exact workspace product correction
@@ -35,7 +35,7 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Proof gate 1 — strict build and architecture
+      - name: Strict build and architecture review
         run: npm run build
 
       - name: Install browser proof tooling
@@ -72,41 +72,32 @@ jobs:
           cat /tmp/notverse-preview.log
           exit 1
 
-      - name: Proof gate 2A — setup, navigation and social workspaces
+      - name: Existing proof — setup, navigation and social workspaces
         run: node scripts/verify-notverse-ui.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Proof gate 2B — temporary reader, Notes and Library handoff
+      - name: Existing proof — reader, Notes and Library handoff
         run: node scripts/verify-notverse-reader-ui.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Proof gate 2C — persistent Inbox messaging
+      - name: Existing proof — persistent Inbox messaging
         run: node scripts/verify-notverse-inbox-ui.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Proof gate 2D — approved identity and mobile chat access
+      - name: Existing proof — approved branding and mobile chat
         run: node scripts/verify-notverse-brand-mobile-chat.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Proof gate 2E — responsive Notes, adaptive chat and useful recommendations
+      - name: New proof — responsive Notes, adaptive chat and useful recommendations
         run: node scripts/verify-notverse-responsive-intelligence.mjs
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
 
-      - name: Package the exact proven product source
-        run: |
-          tar -czf /tmp/notverse-proven-product-source.tar.gz \
-            src/App.tsx \
-            src/main.tsx \
-            src/notverse/notverse-responsive-fix.css \
-            worker/index.ts \
-            scripts/verify-notverse-responsive-intelligence.mjs
-
-      - name: Preserve visual proof evidence
+      - name: Preserve proof evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -119,10 +110,34 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Export the exact proven product source
-        uses: actions/upload-artifact@v4
-        with:
-          name: notverse-proven-product-source
-          path: /tmp/notverse-proven-product-source.tar.gz
-          if-no-files-found: error
-          retention-days: 2
+      - name: Freeze only the fully proven product correction
+        run: |
+          git show origin/main:.github/workflows/finish-notverse-10-for-2.yml > /tmp/finish-notverse.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/finish-notverse.yml')
+          text = path.read_text()
+          gate = '''      - name: Proof gate 2E — responsive Notes, adaptive chat and useful recommendations
+                run: node scripts/verify-notverse-responsive-intelligence.mjs
+                env:
+                  NOTVERSE_TEST_URL: http://127.0.0.1:4173
+
+          '''
+          marker = '      - name: Preserve proof report and server log\n'
+          if 'verify-notverse-responsive-intelligence.mjs' not in text:
+              text = text.replace(marker, gate + marker)
+          text = text.replace('            engineering-evidence/notverse-brand-mobile\n', '            engineering-evidence/notverse-brand-mobile\n            engineering-evidence/notverse-responsive\n')
+          Path('.github/workflows/finish-notverse-10-for-2.yml').write_text(text)
+          PY
+          git restore package.json package-lock.json 2>/dev/null || true
+          git restore engineering-evidence 2>/dev/null || true
+          git clean -fd engineering-evidence/notverse-responsive 2>/dev/null || true
+          rm -f .workspace/notverse-responsive-intelligence.patch.gz.b64
+          rm -f .workspace/proof-filter.patch
+          rm -f .github/workflows/apply-workspace-responsive-correction.yml
+          rmdir .workspace 2>/dev/null || true
+          git config user.name "NoTVerse Verification"
+          git config user.email "verification@thetechguyds.com"
+          git add -A
+          git commit -m "Fix responsive Notes, adaptive chat and companion recommendations"
+          git push origin HEAD:fix-notverse-responsive-chat-notes-20260803

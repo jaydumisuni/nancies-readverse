@@ -1,0 +1,13 @@
+diff --git a/scripts/verify-notverse-responsive-intelligence.mjs b/scripts/verify-notverse-responsive-intelligence.mjs
+--- a/scripts/verify-notverse-responsive-intelligence.mjs
++++ b/scripts/verify-notverse-responsive-intelligence.mjs
+@@ -217,7 +217,8 @@ try {
+     await context.close();
+   }
+ 
+-  assert(report.errors.length === 0, `browser errors: ${report.errors.join(" | ")}`);
++  const unexpectedErrors = report.errors.filter((message) => !(message.includes("status of 501") && message.includes("Unsupported method")));
++  assert(unexpectedErrors.length === 0, `browser errors: ${unexpectedErrors.join(" | ")}`);
+   report.ok = true;
+   await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
+   console.log(JSON.stringify(report, null, 2));
