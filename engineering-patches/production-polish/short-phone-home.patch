@@ -1,0 +1,15 @@
+--- a/src/notverse/production-polish.css
++++ b/src/notverse/production-polish.css
+@@ -79,3 +79,12 @@
+     gap: 6px;
+   }
+ }
++
++@media (max-width: 760px) and (max-height: 700px) {
++  /* The compact Home header CTAs duplicate the persistent six-part navigation.
++     Removing only those redundant shortcuts keeps every actionable control out
++     of the fixed navigation footprint on short phones without redesigning Home. */
++  .notverse-home .notverse-section > header > button {
++    display: none !important;
++  }
++}
