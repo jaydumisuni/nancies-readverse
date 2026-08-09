@@ -104,6 +104,9 @@ jobs:
           cat /tmp/notverse-polish-preview.log
           exit 1
 
+      - name: Inspect discovery proof block
+        run: sed -n '285,345p' scripts/verify-production-polish.mjs
+
       - name: Exercise every setup page, navigation route and viewport locally
         env:
           NOTVERSE_TEST_URL: http://127.0.0.1:4173
