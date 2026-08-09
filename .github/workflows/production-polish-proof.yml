@@ -129,6 +129,10 @@ jobs:
           PY
           echo "applied=true" >> "$GITHUB_OUTPUT"
 
+      - name: Show recommendation proof context
+        shell: bash
+        run: grep -n -B 35 -A 35 'The Biggest Bluff' scripts/verify-production-polish.mjs || true
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
