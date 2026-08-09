@@ -1,15 +1,54 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -79,3 +79,12 @@
+@@ -79,3 +79,38 @@
      gap: 6px;
    }
  }
 +
 +@media (max-width: 760px) and (max-height: 700px) {
-+  /* The compact Home header CTAs duplicate the persistent six-part navigation.
-+     Removing only those redundant shortcuts keeps every actionable control out
-+     of the fixed navigation footprint on short phones without redesigning Home. */
++  /* Compact only the redundant Home shortcuts and dense discovery controls on
++     short phones. Keep the approved structure and all primary actions intact. */
 +  .notverse-home .notverse-section > header > button {
 +    display: none !important;
++  }
++
++  .search-view > header:not(.profile-cover) {
++    margin-bottom: 10px !important;
++  }
++
++  .search-view > header p {
++    font-size: 13px;
++    line-height: 1.35;
++  }
++
++  .search-view h1 {
++    margin-top: 4px;
++    margin-bottom: 6px;
++  }
++
++  .notverse-search-box input {
++    padding: 9px 8px;
++    font-size: 16px;
++  }
++
++  .search-action-grid {
++    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
++    gap: 6px !important;
++    margin: 10px 0 14px !important;
++  }
++
++  .search-action-grid button {
++    min-width: 0;
++    padding: 9px 7px !important;
++    gap: 3px !important;
++  }
++
++  .search-action-grid button > span { font-size: 19px; }
++  .search-action-grid button strong { font-size: 12px; line-height: 1.15; }
++  .search-action-grid button small {
++    font-size: 9px;
++    line-height: 1.25;
++    max-height: 2.5em;
++    overflow: hidden;
 +  }
 +}
