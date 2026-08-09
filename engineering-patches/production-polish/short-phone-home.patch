@@ -1,6 +1,6 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -79,3 +79,108 @@
+@@ -79,3 +79,120 @@
      gap: 6px;
    }
  }
@@ -107,5 +107,17 @@
 +    white-space: nowrap;
 +    overflow: hidden;
 +    text-overflow: ellipsis;
++  }
++
++  .library-grid {
++    grid-template-columns: repeat(4, 128px) !important;
++    gap: 8px !important;
++    overflow-x: auto;
++    padding-bottom: 6px;
++  }
++
++  .library-grid > button {
++    min-width: 128px;
++    padding: 7px !important;
 +  }
 +}
