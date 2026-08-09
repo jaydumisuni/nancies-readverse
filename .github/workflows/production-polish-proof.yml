@@ -46,6 +46,16 @@ jobs:
             git apply --check engineering-patches/production-polish/short-phone-home.patch
             git apply engineering-patches/production-polish/short-phone-home.patch
           fi
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-production-polish.mjs')
+          text = path.read_text()
+          old = "page.locator('.notverse-mobile-nav button').filter({ hasText: label })"
+          new = "page.locator('.notverse-mobile-nav').getByRole('button', { name: label, exact: true })"
+          if old not in text:
+              raise SystemExit('Expected mobile navigation locator not found')
+          path.write_text(text.replace(old, new))
+          PY
           echo "applied=true" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
