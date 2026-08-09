@@ -1,6 +1,6 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -79,3 +79,83 @@
+@@ -79,3 +79,109 @@
      gap: 6px;
    }
  }
@@ -9,7 +9,32 @@
 +  /* A closed mobile chat must not leave hidden controls geometrically sitting
 +     underneath the fixed six-tab navigation. */
 +  .companion-panel:not(.open) { display: none !important; }
-+  .companion-panel.open { display: flex !important; }
++  .companion-panel.open {
++    display: grid !important;
++    grid-template-rows: auto minmax(0, 1fr) auto !important;
++    overflow: hidden !important;
++  }
++  .companion-panel.open .companion-header {
++    position: relative;
++    z-index: 4;
++    flex: none;
++  }
++  .companion-panel.open .companion-header > button {
++    position: relative;
++    z-index: 5;
++    min-width: 44px;
++    min-height: 44px;
++    pointer-events: auto;
++  }
++  .companion-panel.open .chat-body {
++    min-height: 0 !important;
++    overflow-y: auto !important;
++  }
++  .companion-panel.open .chat-input {
++    position: relative;
++    z-index: 3;
++    flex: none;
++  }
 +}
 +
 +@media (max-width: 760px) and (max-height: 700px) {
