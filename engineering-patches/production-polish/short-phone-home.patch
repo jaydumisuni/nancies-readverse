@@ -1,9 +1,16 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -79,3 +79,76 @@
+@@ -79,3 +79,83 @@
      gap: 6px;
    }
  }
++
++@media (max-width: 760px) {
++  /* A closed mobile chat must not leave hidden controls geometrically sitting
++     underneath the fixed six-tab navigation. */
++  .companion-panel:not(.open) { display: none !important; }
++  .companion-panel.open { display: flex !important; }
++}
 +
 +@media (max-width: 760px) and (max-height: 700px) {
 +  /* Short phones keep the approved layout and all actions; only spacing is
