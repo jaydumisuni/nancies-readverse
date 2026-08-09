@@ -42,6 +42,10 @@ jobs:
           gzip --decompress --stdout /tmp/notverse-production-polish.patch.gz > /tmp/notverse-production-polish.patch
           git apply --check /tmp/notverse-production-polish.patch
           git apply /tmp/notverse-production-polish.patch
+          if [[ -f engineering-patches/production-polish/short-phone-home.patch ]]; then
+            git apply --check engineering-patches/production-polish/short-phone-home.patch
+            git apply engineering-patches/production-polish/short-phone-home.patch
+          fi
           echo "applied=true" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
