@@ -1,5 +1,12 @@
 FAILED_STAGE=local-interaction-proof
 
+Selecting previously unselected package libwayland-server0:amd64.
+Preparing to unpack .../163-libwayland-server0_1.22.0-2.1build1_amd64.deb ...
+Unpacking libwayland-server0:amd64 (1.22.0-2.1build1) ...
+Selecting previously unselected package libwildmidi2:amd64.
+Preparing to unpack .../164-libwildmidi2_0.4.3-1build3_amd64.deb ...
+Unpacking libwildmidi2:amd64 (0.4.3-1build3) ...
+Selecting previously unselected package libwoff1:amd64.
 Preparing to unpack .../165-libwoff1_1.0.2-2build1_amd64.deb ...
 Unpacking libwoff1:amd64 (1.0.2-2build1) ...
 Selecting previously unselected package libxcb-xkb1:amd64.
@@ -307,16 +314,9 @@ node:internal/modules/run_main:123
     triggerUncaughtException(
     ^
 
-locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.side-nav').getByRole('button', { name: 'Home', exact: true })
-
-    at clickNavigation (/home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:124:16)
-    at /home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:287:13 {
-  log: [
-    "  - waiting for locator('.side-nav').getByRole('button', { name: 'Home', exact: true })"
-  ],
-  name: 'TimeoutError'
-}
+Error: tablet/Chat: focused input leaves the viewport horizontally
+    at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:41:25)
+    at assertFocusedInput (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:228:3)
+    at async file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:348:23
 
 Node.js v22.23.1
