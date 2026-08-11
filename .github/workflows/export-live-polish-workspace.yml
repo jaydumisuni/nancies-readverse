@@ -1,0 +1,30 @@
+name: Export NoTVerse polish workspace
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'verify-live-production-polish-20260811'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package current main product workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/notverse-workspace
+          cp -R package.json package-lock.json tsconfig.json vite.config.* wrangler.jsonc src worker social-worker scripts public index.html /tmp/notverse-workspace/ 2>/dev/null || true
+          tar -C /tmp -czf /tmp/notverse-workspace.tar.gz notverse-workspace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notverse-current-product-workspace
+          path: /tmp/notverse-workspace.tar.gz
+          retention-days: 1
