@@ -25,7 +25,7 @@ let lockedScrollY = 0;
 let viewportLocked = false;
 
 function viewportHeight(): number {
-  return Math.max(320, Math.round(window.visualViewport?.height || window.innerHeight));
+  return Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight));
 }
 
 function applyViewportMetrics(): void {
@@ -46,8 +46,40 @@ function setViewportLock(locked: boolean): void {
   }
 }
 
+function applyMobileChatGeometry(): void {
+  const panel = document.querySelector<HTMLElement>(".companion-panel");
+  if (!panel) return;
+
+  const shouldBound = panel.classList.contains("open") && window.matchMedia("(max-width: 760px)").matches;
+  if (!shouldBound) {
+    for (const property of ["top", "bottom", "height", "max-height"]) {
+      panel.style.removeProperty(property);
+    }
+    return;
+  }
+
+  const visualViewport = window.visualViewport;
+  const viewportTop = Math.max(
+    0,
+    Math.min(window.innerHeight - 1, Math.round(visualViewport?.offsetTop || 0)),
+  );
+  const availableHeight = Math.max(
+    1,
+    Math.min(
+      window.innerHeight - viewportTop,
+      Math.round(visualViewport?.height || window.innerHeight),
+    ) - 2,
+  );
+
+  panel.style.setProperty("top", `${viewportTop}px`, "important");
+  panel.style.setProperty("bottom", "auto", "important");
+  panel.style.setProperty("height", `${availableHeight}px`, "important");
+  panel.style.setProperty("max-height", `${availableHeight}px`, "important");
+}
+
 function syncInteractionState(): void {
   applyViewportMetrics();
+  applyMobileChatGeometry();
   const chatOpen = Boolean(document.querySelector(".companion-panel.open"));
   const notesOpen = Boolean(document.querySelector(".notes-experience"));
 

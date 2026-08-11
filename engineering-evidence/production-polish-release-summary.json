@@ -1,0 +1,11 @@
+{
+  "status": "production-candidate-proven",
+  "branch": "polish-notverse-production-20260806",
+  "commit": "15f383fc7c68d90edaa32405cc7bfe8c4d3848d1",
+  "js": "assets/index-BrtJctMy.js",
+  "css": "assets/index-LcujehTr.css",
+  "localMatrix": "pass",
+  "deployedMatrix": "pass",
+  "companions": "12/12 pass",
+  "publicRatings": "pass"
+}

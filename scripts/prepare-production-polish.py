@@ -1,0 +1,129 @@
+from pathlib import Path
+
+path = Path("scripts/verify-production-polish.mjs")
+text = path.read_text()
+
+# Match the visible six-tab label exactly. Role names can include icon metadata,
+# while a plain hasText string makes "Me" match "Home". Exact visible text is
+# the stable product contract we actually need to prove.
+old_nav = 'page.locator(`${root} button`).filter({ hasText: label })'
+new_nav = 'page.locator(`${root} button`).filter({ hasText: new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*$`, "i") }).first()'
+if old_nav in text:
+    text = text.replace(old_nav, new_nav, 1)
+else:
+    previous_exact = 'page.locator(root).getByRole("button", { name: label, exact: true })'
+    if previous_exact in text:
+        text = text.replace(previous_exact, new_nav, 1)
+
+# A focus proof should model the user's real action: bring an off-fold field
+# into view, then focus it. This still fails genuine clipping/overlap but does
+# not treat a legitimately scrollable laptop Inbox as a broken layout.
+old_focus = '''  const input = page.locator(selector).first();
+  await input.focus();
+'''
+new_focus = '''  const input = page.locator(selector).first();
+  await input.scrollIntoViewIfNeeded();
+  await input.focus();
+'''
+if old_focus not in text:
+    raise SystemExit("Expected focused-input proof sequence was not found")
+text = text.replace(old_focus, new_focus, 1)
+
+# Preserve exact input geometry in assertion failures so layout corrections are
+# made from evidence instead of guessing.
+text = text.replace('`${label}: focused input leaves the viewport horizontally`','`${label}: focused input leaves the viewport horizontally ${JSON.stringify(state)}`')
+text = text.replace('`${label}: focused input leaves the viewport vertically`','`${label}: focused input leaves the viewport vertically ${JSON.stringify(state)}`')
+
+# Companion panels animate in on tablet/desktop. Visibility alone becomes true
+# before the transform has fully settled, so prove the panel is actually inside
+# the viewport before focusing its composer.
+old_panel_wait = '''    const panel = page.locator(".companion-panel.open");
+    await panel.waitFor();
+    const chatInput = await assertFocusedInput(page, ".companion-panel.open .chat-input input", `${viewport.name}/Chat`, viewport.mobile);
+'''
+new_panel_wait = '''    const panel = page.locator(".companion-panel.open");
+    await panel.waitFor();
+    await page.waitForFunction(() => {
+      const element = document.querySelector(".companion-panel.open");
+      if (!element) return false;
+      const box = element.getBoundingClientRect();
+      return box.left >= -1 && box.right <= innerWidth + 1 && box.top >= -1 && box.bottom <= innerHeight + 1;
+    });
+    const chatInput = await assertFocusedInput(page, ".companion-panel.open .chat-input input", `${viewport.name}/Chat`, viewport.mobile);
+'''
+if old_panel_wait not in text:
+    raise SystemExit("Expected companion panel proof sequence was not found")
+text = text.replace(old_panel_wait, new_panel_wait, 1)
+
+# Local browser proof uses deterministic catalogue responses so it validates the
+# UI and interaction contract without depending on external network timing.
+start_marker = '  await page.route("**/api/discovery/search", async (route) => {'
+end_marker = '  await page.route("**/api/companion/help", async (route) => {'
+start = text.find(start_marker)
+end = text.find(end_marker, start + 1)
+if start < 0 or end < 0:
+    raise SystemExit("Expected deterministic discovery route was not found")
+
+discovery_route = '''  await page.route("**/api/discovery/search", async (route) => {
+    const body = route.request().postDataJSON() || {};
+    const query = String(body.query || "").toLowerCase();
+    const gambling = /gambl|casino|poker|odds|bet/.test(query);
+    const candidates = gambling ? [
+      { title: "Addiction by Design", authors: ["Natasha Dow Schüll"], year: 2012, description: "How machine gambling environments are engineered to keep people playing.", whyMatch: "A direct match for gambling-system design and behavioural psychology.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780691160887" } },
+      { title: "The Biggest Bluff", authors: ["Maria Konnikova"], year: 2020, description: "Poker, psychology and decisions under uncertainty.", whyMatch: "A strong match for poker, probability and decision-making under uncertainty.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780525522621" } },
+      { title: "Thinking in Bets", authors: ["Annie Duke"], year: 2018, description: "Probability, incomplete information and better decisions.", whyMatch: "A useful probability-and-decisions companion to gambling-specific reading.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780735216358" } },
+    ] : [{
+      title: "Pride and Prejudice", authors: ["Jane Austen"], year: 1813,
+      description: "A novel of manners, judgement and self-knowledge.",
+      whyMatch: "Matched across public book catalogues using title, creator and edition identifiers.",
+      provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780141439518" },
+      rating: { overall: 4.26, ratingCount: 2000, sourceCount: 2, sources: [
+        { name: "Google Books", sourceId: "google-pride", rating: 4.4, ratingCount: 1200, confidence: 0.96 },
+        { name: "Open Library", sourceId: "/works/OL66554W", rating: 4.1, ratingCount: 800, confidence: 0.90 },
+      ] },
+    }];
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, candidates }) });
+  });
+'''
+text = text[:start] + discovery_route + text[end:]
+
+fn_start = text.find('async function assertNoNavigationOverlap(page, label) {')
+if fn_start < 0:
+    raise SystemExit("Expected mobile navigation overlap assertion was not found")
+fn_end = text.find('\n}\n\n', fn_start)
+if fn_end < 0:
+    raise SystemExit("Could not determine overlap assertion boundary")
+fn_end += 3
+replacement = '''async function assertNoNavigationOverlap(page, label) {
+  const result = await page.evaluate(() => {
+    const clippedRect = (element) => {
+      const style = getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) <= 0) return null;
+      const source = element.getBoundingClientRect();
+      let left = Math.max(0, source.left), top = Math.max(0, source.top), right = Math.min(innerWidth, source.right), bottom = Math.min(innerHeight, source.bottom);
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const s = getComputedStyle(parent);
+        const clipsX = /(hidden|auto|scroll|clip)/.test(s.overflowX) || /(hidden|auto|scroll|clip)/.test(s.overflow);
+        const clipsY = /(hidden|auto|scroll|clip)/.test(s.overflowY) || /(hidden|auto|scroll|clip)/.test(s.overflow);
+        if (!clipsX && !clipsY) continue;
+        const box = parent.getBoundingClientRect();
+        if (clipsX) { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+        if (clipsY) { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+      }
+      return right > left && bottom > top ? { left, top, right, bottom } : null;
+    };
+    const nav = document.querySelector(".notverse-mobile-nav");
+    const navBox = nav ? clippedRect(nav) : null;
+    if (!nav || !navBox) return [];
+    return [...document.querySelectorAll("button,input,textarea,select,a[href]")]
+      .filter((element) => !nav.contains(element))
+      .map((element) => ({ element, box: clippedRect(element) }))
+      .filter(({ box }) => box && box.left < navBox.right && box.right > navBox.left && box.top < navBox.bottom && box.bottom > navBox.top)
+      .map(({ element }) => ({ tag: element.tagName, text: (element.textContent || element.getAttribute("aria-label") || element.getAttribute("placeholder") || "").trim().slice(0, 80) }));
+  });
+  assert(result.length === 0, `${label}: controls hidden behind mobile navigation: ${JSON.stringify(result)}`);
+}'''
+text = text[:fn_start] + replacement + text[fn_end:]
+text = text.replace('`${viewport.name}/Keyboard: chat panel exceeds resized viewport`','`${viewport.name}/Keyboard: chat panel exceeds resized viewport ${JSON.stringify(keyboard)}`')
+text = text.replace('`${viewport.name}/Keyboard: composer hides behind software keyboard area`','`${viewport.name}/Keyboard: composer hides behind software keyboard area ${JSON.stringify(keyboard)}`')
+path.write_text(text)

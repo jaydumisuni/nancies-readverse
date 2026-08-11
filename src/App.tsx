@@ -96,6 +96,21 @@ type UploadItem = {
   sizeLabel: string;
 };
 
+type RatingSource = {
+  name: string;
+  sourceId: string;
+  rating: number;
+  ratingCount: number;
+  confidence: number;
+};
+
+type PublicRating = {
+  overall: number;
+  ratingCount: number;
+  sourceCount: number;
+  sources: RatingSource[];
+};
+
 type DiscoveryCandidate = {
   id: string;
   title: string;
@@ -108,6 +123,7 @@ type DiscoveryCandidate = {
   language?: string;
   downloadUrl?: string;
   identifiers?: Record<string, string>;
+  rating?: PublicRating;
 };
 
 type SourceCandidate = {
@@ -1854,6 +1870,13 @@ function DiscoveryResults({ card, onSelect, onReject, onMore }: {
             <strong>{candidate.title}</strong>
             <small>{candidate.authors.join(", ") || "Unknown creator"}{candidate.year ? ` · ${candidate.year}` : ""}</small>
             {candidate.description && <p>{candidate.description}</p>}
+            {candidate.rating && (
+              <div className="public-rating" aria-label={`${candidate.rating.overall} out of 5 from ${candidate.rating.ratingCount} ratings across public sources`}>
+                <strong><span aria-hidden="true">★</span>{candidate.rating.overall.toFixed(2)}</strong>
+                <small>{candidate.rating.ratingCount.toLocaleString()} rating{candidate.rating.ratingCount === 1 ? "" : "s"} across public sources</small>
+                <em>{candidate.rating.sources.map((source) => source.name).join(" + ")}</em>
+              </div>
+            )}
             <i>{candidate.whyMatch}</i>
             <div className="discovery-actions">
               <button type="button" onClick={() => onSelect(candidate)}>That&apos;s it</button>

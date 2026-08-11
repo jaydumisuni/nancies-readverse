@@ -216,8 +216,8 @@ async function messagesRoute(request: Request, auth: AuthClaims, env: Env): Prom
 async function ratingsRoute(request: Request, env: Env, bookId: string): Promise<Response> {
   if (request.method !== "GET") return methodNotAllowed();
   const rows = await env.DB.prepare(`SELECT source_name AS sourceName,source_book_id AS sourceBookId,rating,rating_count AS ratingCount,edition_match AS editionMatch,collected_at AS collectedAt FROM rating_sources WHERE book_id=? AND collected_at>datetime('now','-30 days')`).bind(bookId).all();
-  if (rows.results.length < 3 || !rows.results.some((row) => String(row.sourceName).toLowerCase() === "goodreads")) {
-    return json({ ok: true, available: false, reason: "Three approved edition-matched rating sources, including Goodreads, are not connected for this title.", sources: rows.results });
+  if (!rows.results.length) {
+    return json({ ok: true, available: false, reason: "No public rating data is available for this edition yet.", sources: [] });
   }
   let weighted = 0;
   let weight = 0;

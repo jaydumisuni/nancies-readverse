@@ -1,0 +1,45 @@
+--- a/src/notverse/production-polish.css
++++ b/src/notverse/production-polish.css
+@@ -80,3 +80,42 @@
+ @media (max-width: 760px) {
++  /* Mobile navigation owns its own protected strip. The product views scroll
++     inside the remaining viewport instead of passing interactive controls
++     beneath the fixed six-tab navigation. This changes geometry only. */
++  .main-shell.notverse-shell {
++    --notverse-mobile-nav-space: calc(82px + env(safe-area-inset-bottom));
++    box-sizing: border-box;
++    height: 100dvh;
++    min-height: 0 !important;
++    overflow: hidden !important;
++    padding: 8px 10px var(--notverse-mobile-nav-space) !important;
++  }
++
++  .main-shell.notverse-shell > .notverse-view {
++    box-sizing: border-box;
++    height: calc(100dvh - 60px - var(--notverse-mobile-nav-space));
++    min-height: 0 !important;
++    overflow-y: auto !important;
++    overscroll-behavior-y: contain;
++    scrollbar-width: none;
++    padding-bottom: 24px !important;
++  }
++
++  .main-shell.notverse-shell > .notverse-view::-webkit-scrollbar {
++    display: none;
++  }
++
++  /* Hard-cap an open companion to the *current* dynamic viewport as the
++     software keyboard opens. The runtime variable can lag one resize event;
++     100dvh is the final safety bound so the composer never falls below view. */
++  body.notverse-chat-open .companion-panel.open {
++    top: 0 !important;
++    bottom: auto !important;
++    height: min(var(--notverse-viewport-height, 100dvh), 100dvh) !important;
++    max-height: 100dvh !important;
++    min-height: 0 !important;
++    overflow: hidden !important;
++    grid-template-rows: auto minmax(0, 1fr) auto !important;
++  }
++
+   /* A closed mobile chat must not leave hidden controls geometrically sitting
+      underneath the fixed six-tab navigation. */

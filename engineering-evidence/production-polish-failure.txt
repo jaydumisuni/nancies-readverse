@@ -1,0 +1,26 @@
+FAILED_STAGE=strict-build
+
+npm warn deprecated @types/localforage@0.0.34: This is a stub types definition for localforage (https://github.com/localForage/localForage). localforage provides its own type definitions, so you don't need @types/localforage installed!
+npm warn deprecated @xmldom/xmldom@0.7.13: this version has critical issues, please update to the latest version
+
+added 142 packages in 5s
+
+> notverse@2.0.2 build
+> npm run clean && npm run verify:architecture && npm run verify:mobile-chat && tsc --noEmit && vite build && node scripts/configure-workers-build-deploy.mjs && npm run verify:ratings && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social
+
+
+> notverse@2.0.2 clean
+> node scripts/clean-build.mjs
+
+Removed stale build and deploy output.
+
+> notverse@2.0.2 verify:architecture
+> node scripts/verify-architecture.mjs
+
+Canonical local-first, Google-owned persistence architecture verified.
+
+> notverse@2.0.2 verify:mobile-chat
+> node scripts/verify-mobile-notes-chat.mjs
+
+Mobile Notes/chat verification failed:
+- recommendation behaviour is explicit

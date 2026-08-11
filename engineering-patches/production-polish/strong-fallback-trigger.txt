@@ -1,0 +1,1 @@
+Run final NoTVerse proof after the live-AI quality gate and current smart-companion source are synchronized.
