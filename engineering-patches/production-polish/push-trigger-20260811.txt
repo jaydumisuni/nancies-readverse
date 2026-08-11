@@ -3,3 +3,4 @@ Diagnostic trigger: 2026-08-11.
 Stepwise production proof trigger.
 Final isolated stepwise trigger after removing competing branch writers.
 Minimal runner trigger.
+Mobile Home viewport correction trigger.
