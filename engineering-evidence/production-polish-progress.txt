@@ -1,5 +1,5 @@
-stage=start
-result=running
+stage=candidate-applied
+result=pass
 workflow_sha=ac7a5f7c9e41d4b549038921b6d9c41def687958
-head=ac7a5f7c9e41d4b549038921b6d9c41def687958
-time_utc=2026-08-11T00:57:02Z
+head=4fb89e4b8db1b6aa6d7aecef395285cda82f5f7b
+time_utc=2026-08-11T00:57:03Z
