@@ -89,7 +89,7 @@ export async function handleSmartCompanion(
 
   const models = [...new Set([
     env.AI_MODEL,
-    "@cf/meta/llama-3.1-8b-instruct",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   ].filter(Boolean))];
 
   for (const model of models) {
@@ -117,7 +117,7 @@ export async function handleSmartCompanion(
   // falling back to deterministic rules. This preserves personality while
   // requiring actual reasoning and context retention.
   try {
-    const repairModel = "@cf/meta/llama-3.1-8b-instruct";
+    const repairModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
     const repairPrompt = [
       systemPrompt,
       "QUALITY REPAIR: Previous candidate answers were too thin or generic.",
