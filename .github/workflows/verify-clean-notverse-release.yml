@@ -1,0 +1,145 @@
+name: Verify clean NoTVerse release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-clean-notverse-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prove-clean-release:
+    if: github.head_ref == 'release-notverse-production-20260811'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      BRANCH_PREVIEW: https://release-notverse-production-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+      LOCAL_PROOF_DIR: engineering-evidence/clean-release-local
+      PREVIEW_PROOF_DIR: engineering-evidence/clean-release-preview
+      LIVE_PROOF_DIR: engineering-evidence/clean-release-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Strict production build
+        run: npm run build
+
+      - name: Static mobile and public-rating regressions
+        run: |
+          node scripts/verify-mobile-notes-chat.mjs
+          node scripts/verify-public-ratings.mjs
+
+      - name: Install Chromium and WebKit proof engines
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+
+      - name: Start exact generated production client
+        shell: bash
+        run: |
+          cat > /tmp/serve_notverse.py <<'PY'
+          import json
+          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+          from functools import partial
+
+          class Handler(SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.split('?', 1)[0] == '/api/auth/google/status':
+                      payload = json.dumps({'configured': False, 'connected': False, 'account': None}).encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.send_header('Content-Length', str(len(payload)))
+                      self.end_headers()
+                      self.wfile.write(payload)
+                      return
+                  return super().do_GET()
+
+          ThreadingHTTPServer(('127.0.0.1', 4173), partial(Handler, directory='dist/client')).serve_forever()
+          PY
+          python3 /tmp/serve_notverse.py > /tmp/notverse-clean-release.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/notverse-clean-release.log
+          exit 1
+
+      - name: Exercise every setup page, navigation route, input and viewport locally
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+          PROOF_DIR: engineering-evidence/clean-release-local
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Record exact generated assets
+        id: assets
+        shell: bash
+        run: |
+          js="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/client/index.html | head -1)"
+          css="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.css' dist/client/index.html | head -1)"
+          test -n "$js" && test -n "$css"
+          echo "js=$js" >> "$GITHUB_OUTPUT"
+          echo "css=$css" >> "$GITHUB_OUTPUT"
+          printf '{"commit":"%s","js":"%s","css":"%s"}\n' "$GITHUB_SHA" "$js" "$css" > "$LOCAL_PROOF_DIR/generated-assets.json"
+
+      - name: Wait for exact Cloudflare branch-preview bundle
+        shell: bash
+        run: |
+          mkdir -p "$LIVE_PROOF_DIR"
+          for attempt in $(seq 1 150); do
+            html="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/?proof=$attempt" || true)"
+            health="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/api/health?proof=$attempt" || true)"
+            if printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.js }}' \
+              && printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.css }}' \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$health" > "$LIVE_PROOF_DIR/health.json"
+              printf '%s\n' "$html" > "$LIVE_PROOF_DIR/index.html"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "The exact clean-release branch assets never became live."
+          exit 1
+
+      - name: Exercise deployed preview across the same complete matrix
+        env:
+          NOTVERSE_TEST_URL: https://release-notverse-production-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/clean-release-preview
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Hold real multi-turn conversations with all twelve companions
+        env:
+          NOTVERSE_URL: https://release-notverse-production-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/clean-release-live
+        run: node scripts/verify-live-companion-matrix.mjs
+
+      - name: Prove public ratings from live catalogue sources
+        env:
+          NOTVERSE_URL: https://release-notverse-production-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/clean-release-live
+        run: node scripts/verify-live-public-ratings.mjs
+
+      - name: Upload clean release proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-clean-release-proof-${{ github.run_attempt }}
+          path: |
+            engineering-evidence/clean-release-local
+            engineering-evidence/clean-release-preview
+            engineering-evidence/clean-release-live
+            /tmp/notverse-clean-release.log
+          if-no-files-found: warn
+          retention-days: 14
