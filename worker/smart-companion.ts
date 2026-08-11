@@ -13,7 +13,7 @@ type CompanionEnv = {
 
 const personalityGuides: Record<string, string> = {
   Gojo: "playful, highly confident, quick-witted, lightly teasing, protective, energetic and never cruel",
-  Itachi: "calm, economical with words, observant, emotionally restrained, precise, loyal and quietly reassuring",
+  Itachi: "calm, measured, observant, emotionally restrained, precise, loyal and quietly reassuring; concise in style but substantive in reasoning",
   Naruto: "warm, optimistic, loyal, encouraging, impulsively funny and persistent",
   Kakashi: "relaxed, mature, perceptive, dryly funny, concise and dependable",
   Megumi: "reserved, thoughtful, practical, direct, quietly caring and skeptical of noise",
@@ -76,6 +76,7 @@ export async function handleSmartCompanion(
     "Maintain a distinct, consistent voice without claiming to be the canonical copyrighted character, quoting catchphrases or reproducing copyrighted dialogue.",
     "Answer the user's actual topic first. Never redirect an ordinary question or recommendation request into uploading a link or file.",
     "For book recommendations, give 3 to 5 specific relevant titles when reasonably confident, identify author and angle, explain each choice briefly, then ask at most one useful narrowing question.",
+    "For comparisons, explanations and advice, give enough reasoning to establish the important distinction or trade-off: normally two to four substantive sentences or compact bullets. A terse personality must never make the answer shallow.",
     "When the request is broad, provide a balanced starter list rather than refusing or responding with product instructions.",
     "Use recent history to understand follow-ups such as it, that, yes, another one and go ahead. Do not reset the conversation.",
     "When the user supplies a source URL, the NoTVerse client verifies it. Never claim a file opened, source resolved, setting saved or Google action completed without confirmed client evidence.",
@@ -99,8 +100,8 @@ export async function handleSmartCompanion(
           ...history,
           { role: "user", content: question },
         ],
-        max_tokens: recommendation ? 520 : 380,
-        temperature: recommendation ? 0.62 : 0.75,
+        max_tokens: recommendation ? 520 : 420,
+        temperature: recommendation ? 0.62 : 0.72,
       });
       const answer = extractText(result);
       if (answer && !isLowQualityAnswer(question, answer, history)) {
@@ -228,7 +229,7 @@ function isLowQualityAnswer(
   const sourceOnly = /paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(clean);
   if (asksForRecommendation && sourceOnly) return true;
   if (asksForRecommendation && clean.length < 180) return true;
-  if (!/^(hi|hey|hello|yo|sup|thanks|thank you|ok|okay)[.!?]*$/i.test(question.trim()) && clean.length < 45) return true;
+  if (!/^(hi|hey|hello|yo|sup|thanks|thank you|ok|okay)[.!?]*$/i.test(question.trim()) && clean.length < 90) return true;
   if (/^(?:i can help|i(?:'m| am) here to help|tell me more|what would you like)[.!?\s]*$/i.test(clean)) return true;
   const previousAssistant = [...history].reverse().find((turn) => turn.role === "assistant")?.content;
   if (previousAssistant && normaliseForComparison(previousAssistant) === normaliseForComparison(clean)) return true;
