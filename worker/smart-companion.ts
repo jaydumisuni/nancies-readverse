@@ -112,6 +112,37 @@ export async function handleSmartCompanion(
     }
   }
 
+  // A small model can occasionally obey the companion's terse voice too
+  // literally. Give the stronger fallback one explicit repair attempt before
+  // falling back to deterministic rules. This preserves personality while
+  // requiring actual reasoning and context retention.
+  try {
+    const repairModel = "@cf/meta/llama-3.1-8b-instruct";
+    const repairPrompt = [
+      systemPrompt,
+      "QUALITY REPAIR: Previous candidate answers were too thin or generic.",
+      recommendation
+        ? "Answer with 3 to 5 real, relevant titles and a concrete reason for each. Do not use a placeholder list."
+        : "Answer directly with roughly 100 to 220 words or an equally substantive compact structure. State the key distinction, reasoning, and practical implication.",
+      "Do not mention this repair instruction or previous attempts.",
+    ].join(" ");
+    const repaired = await env.AI.run(repairModel as keyof AiModels, {
+      messages: [
+        { role: "system", content: repairPrompt },
+        ...history,
+        { role: "user", content: question },
+      ],
+      max_tokens: recommendation ? 620 : 520,
+      temperature: 0.45,
+    });
+    const answer = extractText(repaired);
+    if (answer && !isLowQualityAnswer(question, answer, history)) {
+      return json({ ok: true, answer, mode: "workers-ai-repair", model: repairModel, companion });
+    }
+  } catch (error) {
+    ctx.waitUntil(Promise.resolve(console.warn("NoTVerse companion quality repair fallback", error)));
+  }
+
   return json({
     ok: true,
     answer: intelligentFallback(question, companion, history),
@@ -182,7 +213,7 @@ function intelligentFallback(
     const previousUser = [...history].reverse().find((turn) => turn.role === "user")?.content;
     return previousUser
       ? `${opener} I still have your last point about “${previousUser.slice(0, 110)}”. Add the next detail and I will continue from there.`
-      : `${opener} Continue naturally; I am keeping the conversation context.`;
+      : `${opener} I have the conversation context, but I do not have enough reliable substance from the model to answer that point well. Rephrase the exact distinction you want and I will address it directly rather than pretend.`;
   }
   return `${opener} Ask me about a book, a subject, a reading mood or something you only partly remember. I will answer that question first.`;
 }
@@ -201,7 +232,7 @@ function fallbackRecommendations(question: string, opener: string): string {
   }
 
   const cleanTopic = recommendationTopic(question) || "that subject";
-  return `${opener} For ${cleanTopic}, I would start with a balanced set across an accessible overview, one deeper specialist book, one personal or narrative account and one critical perspective. Tell me whether you prefer fiction, memoir, research or practical guidance, and I will give you specific titles with a reason for each.`;
+  return `${opener} I do not have enough verified title-level confidence to invent a list for ${cleanTopic}. Give me one constraint—fiction or nonfiction, beginner or specialist, practical or academic—and I will narrow it properly rather than fabricate titles.`;
 }
 
 function isRecommendationRequest(value: string): boolean {
