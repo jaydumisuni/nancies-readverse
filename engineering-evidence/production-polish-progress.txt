@@ -1,5 +1,5 @@
-stage=frozen-proof-engines
+stage=branch-preview-assets
 result=pass
 workflow_sha=3594709a504d59035c31944287b1935124700f5b
-head=3f2cad3f663fa2a28913326e83a4029a1dd34bc5
-time_utc=2026-08-11T08:02:30Z
+head=357487e1e8dee31e026934f795aed935f034f345
+time_utc=2026-08-11T08:02:31Z
