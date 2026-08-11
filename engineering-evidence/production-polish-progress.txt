@@ -1,5 +1,5 @@
-stage=public-ratings
+stage=complete
 result=pass
 workflow_sha=98f684b14407e887260d8f076bd87a2f3ed7b74e
-head=9cdfcc2d82e0ac564dfa941e75b3f1b489ca4c4d
-time_utc=2026-08-11T08:23:06Z
+head=c86824c73e8ea29d1a54b198f22a4c0b89a8ecc4
+time_utc=2026-08-11T08:23:10Z
