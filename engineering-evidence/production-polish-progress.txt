@@ -1,5 +1,5 @@
-stage=local-interaction-proof
-result=failure
-workflow_sha=6709ebf48ad31818d45e155589460cc560c98fc9
-head=6d48bc78bd812e339abdf1c3606b53255919ce04
-time_utc=2026-08-11T01:12:52Z
+stage=start
+result=running
+workflow_sha=7055056121f3119bcdc2cf7c33ef398158ab85fb
+head=7055056121f3119bcdc2cf7c33ef398158ab85fb
+time_utc=2026-08-11T01:18:31Z
