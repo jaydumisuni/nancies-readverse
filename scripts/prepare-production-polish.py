@@ -26,6 +26,27 @@ text = text.replace(
     '`${label}: focused input leaves the viewport vertically ${JSON.stringify(state)}`',
 )
 
+# Companion panels animate in on tablet/desktop. Visibility alone becomes true
+# before the transform has fully settled, so prove the panel is actually inside
+# the viewport before focusing its composer.
+old_panel_wait = '''    const panel = page.locator(".companion-panel.open");
+    await panel.waitFor();
+    const chatInput = await assertFocusedInput(page, ".companion-panel.open .chat-input input", `${viewport.name}/Chat`, viewport.mobile);
+'''
+new_panel_wait = '''    const panel = page.locator(".companion-panel.open");
+    await panel.waitFor();
+    await page.waitForFunction(() => {
+      const element = document.querySelector(".companion-panel.open");
+      if (!element) return false;
+      const box = element.getBoundingClientRect();
+      return box.left >= -1 && box.right <= innerWidth + 1 && box.top >= -1 && box.bottom <= innerHeight + 1;
+    });
+    const chatInput = await assertFocusedInput(page, ".companion-panel.open .chat-input input", `${viewport.name}/Chat`, viewport.mobile);
+'''
+if old_panel_wait not in text:
+    raise SystemExit("Expected companion panel proof sequence was not found")
+text = text.replace(old_panel_wait, new_panel_wait, 1)
+
 # Local browser proof uses deterministic catalogue responses so it validates the
 # UI and interaction contract without depending on external network timing.
 start_marker = '  await page.route("**/api/discovery/search", async (route) => {'
