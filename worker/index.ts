@@ -23,6 +23,21 @@ type ResolveBody = { url?: unknown };
 type DiscoveryBody = { query?: unknown; exclude?: unknown };
 type DiscoverySourceBody = { candidate?: unknown };
 
+type RatingSource = {
+  name: string;
+  sourceId: string;
+  rating: number;
+  ratingCount: number;
+  confidence: number;
+};
+
+type PublicRating = {
+  overall: number;
+  ratingCount: number;
+  sourceCount: number;
+  sources: RatingSource[];
+};
+
 type DiscoveryCandidate = {
   id: string;
   title: string;
@@ -35,6 +50,8 @@ type DiscoveryCandidate = {
   language?: string;
   downloadUrl?: string;
   identifiers?: Record<string, string>;
+  rating?: PublicRating;
+  ratingSources?: RatingSource[];
 };
 
 type ResolvedSource = {
@@ -155,10 +172,11 @@ async function handleDiscoverySearch(request: Request): Promise<Response> {
     ...(google.status === "fulfilled" ? google.value : []),
     ...(openLibrary.status === "fulfilled" ? openLibrary.value : []),
   ];
-  const deduped = dedupeDiscovery(candidates)
+  const deduped = mergeDiscovery(candidates)
     .filter((item) => !excluded.has(item.id))
     .sort((a, b) => discoveryScore(b, query) - discoveryScore(a, query))
-    .slice(0, 6);
+    .slice(0, 6)
+    .map(finalizePublicRating);
 
   if (!deduped.length) {
     const failed = [google, openLibrary].filter((item) => item.status === "rejected").length;
@@ -251,6 +269,7 @@ async function searchGoogleBooks(query: string): Promise<DiscoveryCandidate[]> {
       language: typeof info.language === "string" ? info.language : undefined,
       downloadUrl: access.accessViewStatus === "FULL_PUBLIC" ? downloadUrl : undefined,
       identifiers: Object.fromEntries((info.industryIdentifiers || []).map((entry: any) => [String(entry.type), String(entry.identifier)])),
+      ratingSources: validRatingSource("Google Books", String(item.id || ""), info.averageRating, info.ratingsCount, 0.96),
     };
   });
 }
@@ -259,7 +278,7 @@ async function searchOpenLibrary(query: string): Promise<DiscoveryCandidate[]> {
   const url = new URL("https://openlibrary.org/search.json");
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "10");
-  url.searchParams.set("fields", "key,title,author_name,first_publish_year,cover_i,edition_key,language,subject,isbn");
+  url.searchParams.set("fields", "key,title,author_name,first_publish_year,cover_i,edition_key,language,subject,isbn,ratings_average,ratings_count");
   const data = await fetchJson(url) as { docs?: Array<Record<string, any>> };
   return (data.docs || []).map((item) => ({
     id: `openlibrary:${String(item.key || item.edition_key?.[0] || item.title)}`,
@@ -272,6 +291,7 @@ async function searchOpenLibrary(query: string): Promise<DiscoveryCandidate[]> {
     provider: "Open Library",
     language: Array.isArray(item.language) ? item.language[0] : undefined,
     identifiers: Array.isArray(item.isbn) && item.isbn[0] ? { ISBN: String(item.isbn[0]) } : undefined,
+    ratingSources: validRatingSource("Open Library", String(item.key || item.edition_key?.[0] || ""), item.ratings_average, item.ratings_count, 0.9),
   }));
 }
 
@@ -346,17 +366,109 @@ function normalizeDiscoveryCandidate(value: unknown): DiscoveryCandidate | null 
     language: typeof item.language === "string" ? item.language.slice(0, 40) : undefined,
     downloadUrl: typeof item.downloadUrl === "string" ? item.downloadUrl : undefined,
     identifiers: item.identifiers && typeof item.identifiers === "object" ? item.identifiers as Record<string, string> : undefined,
+    rating: normalizePublicRating(item.rating),
   };
 }
 
-function dedupeDiscovery(items: DiscoveryCandidate[]): DiscoveryCandidate[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
+function mergeDiscovery(items: DiscoveryCandidate[]): DiscoveryCandidate[] {
+  const merged = new Map<string, DiscoveryCandidate>();
+  for (const item of items) {
     const key = `${normalise(item.title)}|${normalise(item.authors[0] || "")}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const current = merged.get(key);
+    if (!current) {
+      merged.set(key, { ...item, ratingSources: [...(item.ratingSources || [])] });
+      continue;
+    }
+    const sharedIsbn = isbnValues(current.identifiers).some((isbn) => isbnValues(item.identifiers).includes(isbn));
+    const confidenceBoost = sharedIsbn ? 1 : 0.54;
+    const incomingRatings = (item.ratingSources || []).map((source) => ({
+      ...source,
+      confidence: Math.min(source.confidence, confidenceBoost),
+    }));
+    merged.set(key, {
+      ...current,
+      cover: current.cover || item.cover,
+      description: longerText(current.description, item.description),
+      year: current.year || item.year,
+      language: current.language || item.language,
+      downloadUrl: current.downloadUrl || item.downloadUrl,
+      identifiers: { ...(item.identifiers || {}), ...(current.identifiers || {}) },
+      provider: [...new Set(`${current.provider}|${item.provider}`.split("|"))].join(" · "),
+      whyMatch: "Matched across public book catalogues using title, creator and edition identifiers.",
+      ratingSources: [...(current.ratingSources || []), ...incomingRatings],
+    });
+  }
+  return [...merged.values()];
+}
+
+function validRatingSource(name: string, sourceId: string, ratingValue: unknown, countValue: unknown, confidence: number): RatingSource[] | undefined {
+  const rating = Number(ratingValue);
+  const ratingCount = Number(countValue);
+  if (!sourceId || !Number.isFinite(rating) || rating < 0 || rating > 5 || !Number.isFinite(ratingCount) || ratingCount <= 0) return undefined;
+  return [{ name, sourceId, rating, ratingCount: Math.round(ratingCount), confidence }];
+}
+
+function finalizePublicRating(candidate: DiscoveryCandidate): DiscoveryCandidate {
+  const unique = new Map<string, RatingSource>();
+  for (const source of candidate.ratingSources || []) {
+    const key = `${source.name}:${source.sourceId}`;
+    if (!unique.has(key)) unique.set(key, source);
+  }
+  const sources = [...unique.values()].filter((source) => source.ratingCount > 0 && source.confidence >= 0.55);
+  if (!sources.length) {
+    const { ratingSources: _ratingSources, ...clean } = candidate;
+    return clean;
+  }
+  let weighted = 0;
+  let weight = 0;
+  for (const source of sources) {
+    const sourceWeight = Math.log10(source.ratingCount + 10) * source.confidence;
+    weighted += source.rating * sourceWeight;
+    weight += sourceWeight;
+  }
+  const rating: PublicRating = {
+    overall: Number((weighted / weight).toFixed(2)),
+    ratingCount: sources.reduce((sum, source) => sum + source.ratingCount, 0),
+    sourceCount: sources.length,
+    sources,
+  };
+  const { ratingSources: _ratingSources, ...clean } = candidate;
+  return { ...clean, rating };
+}
+
+function normalizePublicRating(value: unknown): PublicRating | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const overall = Number(record.overall);
+  const ratingCount = Number(record.ratingCount);
+  const sourceCount = Number(record.sourceCount);
+  if (!Number.isFinite(overall) || overall < 0 || overall > 5 || !Number.isFinite(ratingCount) || ratingCount <= 0 || !Number.isFinite(sourceCount) || sourceCount <= 0) return undefined;
+  const sources = Array.isArray(record.sources)
+    ? record.sources.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const source = entry as Record<string, unknown>;
+        const rating = Number(source.rating);
+        const count = Number(source.ratingCount);
+        const confidence = Number(source.confidence);
+        if (typeof source.name !== "string" || typeof source.sourceId !== "string" || !Number.isFinite(rating) || !Number.isFinite(count) || !Number.isFinite(confidence)) return [];
+        return [{ name: source.name.slice(0, 80), sourceId: source.sourceId.slice(0, 160), rating, ratingCount: Math.max(1, Math.round(count)), confidence: Math.max(0, Math.min(1, confidence)) }];
+      })
+    : [];
+  return { overall, ratingCount: Math.round(ratingCount), sourceCount: Math.round(sourceCount), sources };
+}
+
+function isbnValues(identifiers?: Record<string, string>): string[] {
+  if (!identifiers) return [];
+  return Object.entries(identifiers)
+    .filter(([key]) => key.toUpperCase().includes("ISBN"))
+    .map(([, value]) => String(value).replace(/[^0-9X]/gi, "").toUpperCase())
+    .filter(Boolean);
+}
+
+function longerText(a?: string, b?: string): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return a.length >= b.length ? a : b;
 }
 
 function discoveryScore(item: DiscoveryCandidate, query: string): number {

@@ -15,8 +15,8 @@ const checks = [
   [css.includes("touch-action: none"), "vertical Notes gestures are reserved for page flipping"],
   [css.includes(".note-flip-stage") && css.includes("min-height: 0 !important"), "Note paper can shrink to short screens"],
   [smart.includes("Answer the user's actual topic first"), "companion prompt prioritises the real question"],
-  [smart.includes("For book recommendations, give 3 to 5 specific relevant titles"), "recommendation behaviour is explicit"],
-  [smart.includes("isMismatchedAnswer"), "generic source answers are rejected for recommendation questions"],
+  [smart.includes("For recommendations, give 3 to 5 specific relevant titles") || smart.includes("For book recommendations, give 3 to 5 specific relevant titles"), "recommendation behaviour is explicit"],
+  [smart.includes("isLowQualityAnswer") && smart.includes("sourceOnly"), "generic source answers are rejected for recommendation questions"],
   [!/\/link\|source\|url\|ad\//.test(smart), "the old substring 'ad' routing bug is absent"],
   [config.includes('"main": "worker/entry.ts"'), "the smart companion entry is deployed"],
 ];
