@@ -41,7 +41,7 @@ replacement = '''function applyMobileChatGeometry(): void {
     Math.min(
       window.innerHeight - viewportTop,
       Math.round(visualViewport?.height || window.innerHeight),
-    ),
+    ) - 2,
   );
 
   panel.style.setProperty("top", `${viewportTop}px`, "important");
