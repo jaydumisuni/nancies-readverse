@@ -11,6 +11,8 @@ type CompanionEnv = {
   AI_MODEL: string;
 };
 
+type NormalizedTurn = { role: "user" | "assistant"; content: string };
+
 const personalityGuides: Record<string, string> = {
   Gojo: "playful, highly confident, quick-witted, lightly teasing, protective, energetic and never cruel",
   Itachi: "calm, measured, observant, emotionally restrained, precise, loyal and quietly reassuring; concise in style but substantive in reasoning",
@@ -41,6 +43,12 @@ const openings: Record<string, string> = {
   "Mei Mei": "Certainly. A recommendation should justify your time.",
 };
 
+const QUALITY_MODELS = [
+  "@cf/zai-org/glm-4.7-flash",
+  "@cf/qwen/qwen3-30b-a3b-fp8",
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+] as const;
+
 export async function handleSmartCompanion(
   request: Request,
   env: CompanionEnv,
@@ -59,7 +67,8 @@ export async function handleSmartCompanion(
   const companion = typeof body.companion === "string" && body.companion.trim()
     ? body.companion.trim()
     : "Gojo";
-  const customVibe = typeof body.vibe === "string" ? body.vibe.slice(0, 220) : "";
+  const customVibe = typeof body.vibe === "string" ? body.vibe.trim().slice(0, 220) : "";
+
   if (!question || question.length > 1200) {
     return json({ ok: false, error: "Question must be between 1 and 1200 characters" }, 400);
   }
@@ -68,79 +77,39 @@ export async function handleSmartCompanion(
   const quick = quickConversation(question, companion, history);
   if (quick) return json({ ok: true, answer: quick, mode: "conversation-router", companion });
 
-  const personality = personalityGuides[companion] ?? personalityGuides.Gojo;
   const recommendation = isRecommendationRequest(question);
-  const systemPrompt = [
-    `You are the ${companion}-inspired reading companion selected in NoTVerse.`,
-    `Use only broad personality traits: ${personality}. ${customVibe}`,
-    "Maintain a distinct, consistent voice without claiming to be the canonical copyrighted character, quoting catchphrases or reproducing copyrighted dialogue.",
-    "Answer the user's actual topic first. Never redirect an ordinary question or recommendation request into uploading a link or file.",
-    "For book recommendations, give 3 to 5 specific relevant titles when reasonably confident, identify author and angle, explain each choice briefly, then ask at most one useful narrowing question.",
-    "For comparisons, explanations and advice, give enough reasoning to establish the important distinction or trade-off: normally two to four substantive sentences or compact bullets. A terse personality must never make the answer shallow.",
-    "When the request is broad, provide a balanced starter list rather than refusing or responding with product instructions.",
-    "Use recent history to understand follow-ups such as it, that, yes, another one and go ahead. Do not reset the conversation.",
-    "When the user supplies a source URL, the NoTVerse client verifies it. Never claim a file opened, source resolved, setting saved or Google action completed without confirmed client evidence.",
-    "Reading files remain temporary unless the user explicitly saves them. Do not help bypass DRM, paywalls, authentication, CAPTCHAs or access controls.",
-    "Answer with concrete insight rather than a generic acknowledgement. When useful, state the key point, explain why, and give one practical next step.",
-    "If the user challenges, corrects or asks why, respond to that exact turn using the previous answer instead of restarting the topic.",
-    "Never invent a title, author, rating, source result or factual claim. State uncertainty briefly when evidence is insufficient.",
-    "Be concise, useful, spoiler-aware, natural and honest. Avoid canned signature sentences and repeated flourishes.",
-  ].join(" ");
-
+  const personality = personalityGuides[companion] ?? personalityGuides.Gojo;
+  const prompt = buildSystemPrompt(companion, personality, customVibe, recommendation);
   const models = [...new Set([
+    QUALITY_MODELS[0],
     env.AI_MODEL,
-    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    QUALITY_MODELS[1],
+    QUALITY_MODELS[2],
   ].filter(Boolean))];
 
   for (const model of models) {
-    try {
-      const result = await env.AI.run(model as keyof AiModels, {
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...history,
-          { role: "user", content: question },
-        ],
-        max_tokens: recommendation ? 520 : 420,
-        temperature: recommendation ? 0.62 : 0.72,
-      });
-      const answer = extractText(result);
-      if (answer && !isLowQualityAnswer(question, answer, history)) {
-        return json({ ok: true, answer, mode: "workers-ai", model, companion });
-      }
-    } catch (error) {
-      ctx.waitUntil(Promise.resolve(console.warn("NoTVerse companion model fallback", model, error)));
+    const answer = await runCandidate(env, ctx, model, prompt, history, question, recommendation, false);
+    if (answer && !isLowQualityAnswer(question, answer, history)) {
+      return json({ ok: true, answer, mode: "workers-ai", model, companion });
     }
   }
 
-  // A small model can occasionally obey the companion's terse voice too
-  // literally. Give the stronger fallback one explicit repair attempt before
-  // falling back to deterministic rules. This preserves personality while
-  // requiring actual reasoning and context retention.
-  try {
-    const repairModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-    const repairPrompt = [
-      systemPrompt,
-      "QUALITY REPAIR: Previous candidate answers were too thin or generic.",
-      recommendation
-        ? "Answer with 3 to 5 real, relevant titles and a concrete reason for each. Do not use a placeholder list."
-        : "Answer directly with roughly 100 to 220 words or an equally substantive compact structure. State the key distinction, reasoning, and practical implication.",
-      "Do not mention this repair instruction or previous attempts.",
-    ].join(" ");
-    const repaired = await env.AI.run(repairModel as keyof AiModels, {
-      messages: [
-        { role: "system", content: repairPrompt },
-        ...history,
-        { role: "user", content: question },
-      ],
-      max_tokens: recommendation ? 620 : 520,
-      temperature: 0.45,
-    });
-    const answer = extractText(repaired);
+  const repairPrompt = [
+    prompt,
+    "QUALITY REPAIR: Earlier candidates were rejected as thin, generic, off-topic or context-losing.",
+    "Use the exact subject of the user's question. Name its central concepts explicitly rather than replying with a generic acknowledgement.",
+    recommendation
+      ? "Give 3 to 5 real relevant titles only when confident, with author and a concrete reason each. Never invent a title."
+      : "Give a direct, substantive answer with the key distinction, reasoning and practical implication. Aim for roughly 100 to 220 words unless a shorter answer is genuinely complete.",
+    "If this is a follow-up, use the immediately preceding answer and user's earlier question. Do not restart the conversation.",
+    "Do not mention the repair process.",
+  ].join(" ");
+
+  for (const model of [QUALITY_MODELS[1], QUALITY_MODELS[2], QUALITY_MODELS[0]]) {
+    const answer = await runCandidate(env, ctx, model, repairPrompt, history, question, recommendation, true);
     if (answer && !isLowQualityAnswer(question, answer, history)) {
-      return json({ ok: true, answer, mode: "workers-ai-repair", model: repairModel, companion });
+      return json({ ok: true, answer, mode: "workers-ai-repair", model, companion });
     }
-  } catch (error) {
-    ctx.waitUntil(Promise.resolve(console.warn("NoTVerse companion quality repair fallback", error)));
   }
 
   return json({
@@ -151,9 +120,60 @@ export async function handleSmartCompanion(
   });
 }
 
-function normalizeHistory(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
+function buildSystemPrompt(
+  companion: string,
+  personality: string,
+  customVibe: string,
+  recommendation: boolean,
+): string {
+  return [
+    `You are the ${companion}-inspired reading companion selected in NoTVerse.`,
+    `Use only broad personality traits: ${personality}. ${customVibe}`,
+    "Maintain a distinct, consistent voice without claiming to be the canonical copyrighted character, quoting catchphrases or reproducing copyrighted dialogue.",
+    "Answer the user's actual topic first. Never redirect an ordinary question into uploading a link or file.",
+    recommendation
+      ? "For recommendations, give 3 to 5 specific relevant titles when reasonably confident, identify author and angle, explain each briefly, then ask at most one useful narrowing question."
+      : "For comparisons, explanations and advice, establish the important distinction or trade-off with concrete reasoning. A terse personality must never make the answer shallow.",
+    "Use recent history to understand follow-ups such as it, that, yes, another one, why and go ahead. Do not reset the conversation.",
+    "Answer with concrete insight rather than generic acknowledgement. Refer explicitly to the central subject or concepts in the user's question.",
+    "When the user supplies a source URL, the NoTVerse client verifies it. Never claim a file opened, source resolved, setting saved or Google action completed without confirmed client evidence.",
+    "Reading files remain temporary unless the user explicitly saves them. Do not help bypass DRM, paywalls, authentication, CAPTCHAs or access controls.",
+    "Never invent a title, author, rating, source result or factual claim. State uncertainty briefly when evidence is insufficient.",
+    "If the user challenges, corrects or asks why, respond to that exact turn using the previous answer instead of restarting the topic.",
+    "Be concise, useful, spoiler-aware, natural and honest. Avoid canned signature sentences and repeated flourishes.",
+  ].join(" ");
+}
+
+async function runCandidate(
+  env: CompanionEnv,
+  ctx: ExecutionContext,
+  model: string,
+  systemPrompt: string,
+  history: NormalizedTurn[],
+  question: string,
+  recommendation: boolean,
+  repair: boolean,
+): Promise<string> {
+  try {
+    const result = await env.AI.run(model as keyof AiModels, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: question },
+      ],
+      max_tokens: recommendation ? (repair ? 680 : 560) : (repair ? 560 : 460),
+      temperature: repair ? 0.38 : (recommendation ? 0.56 : 0.58),
+    });
+    return extractText(result);
+  } catch (error) {
+    ctx.waitUntil(Promise.resolve(console.warn("NoTVerse companion model fallback", model, error)));
+    return "";
+  }
+}
+
+function normalizeHistory(value: unknown): NormalizedTurn[] {
   if (!Array.isArray(value)) return [];
-  const result: Array<{ role: "user" | "assistant"; content: string }> = [];
+  const result: NormalizedTurn[] = [];
   for (const turn of value.slice(-16) as ChatTurn[]) {
     const role = turn?.role === "user"
       ? "user"
@@ -166,11 +186,7 @@ function normalizeHistory(value: unknown): Array<{ role: "user" | "assistant"; c
   return result;
 }
 
-function quickConversation(
-  question: string,
-  companion: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): string | null {
+function quickConversation(question: string, companion: string, history: NormalizedTurn[]): string | null {
   const value = question.trim().toLowerCase();
   const opener = openings[companion] ?? openings.Gojo;
 
@@ -183,23 +199,15 @@ function quickConversation(
   if (/^(thanks|thank you|nice|cool|great|perfect)[.!?]*$/.test(value)) {
     return companion === "Gojo" ? "You are welcome. I will accept the praise responsibly." : "You are welcome. Keep going.";
   }
-  if (/^(yes|yeah|yep|okay|ok|go ahead|continue|do it)[.!?]*$/.test(value) && history.length) {
-    return null;
-  }
+  if (/^(yes|yeah|yep|okay|ok|go ahead|continue|do it)[.!?]*$/.test(value) && history.length) return null;
   return null;
 }
 
-function intelligentFallback(
-  question: string,
-  companion: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): string {
+function intelligentFallback(question: string, companion: string, history: NormalizedTurn[]): string {
   const value = question.toLowerCase();
   const opener = openings[companion] ?? openings.Gojo;
 
-  if (isRecommendationRequest(question)) {
-    return fallbackRecommendations(question, opener);
-  }
+  if (isRecommendationRequest(question)) return fallbackRecommendations(question, opener);
   if (/\b(upload|file|pdf|epub|cbz)\b/.test(value)) {
     return "Attach the file or paste its public link. NoTVerse will verify it before opening it temporarily.";
   }
@@ -210,10 +218,7 @@ function intelligentFallback(
     return "Tell me which item you want to change or save. I will keep the current context and only claim completion after the app confirms it.";
   }
   if (history.length) {
-    const previousUser = [...history].reverse().find((turn) => turn.role === "user")?.content;
-    return previousUser
-      ? `${opener} I still have your last point about “${previousUser.slice(0, 110)}”. Add the next detail and I will continue from there.`
-      : `${opener} I have the conversation context, but I do not have enough reliable substance from the model to answer that point well. Rephrase the exact distinction you want and I will address it directly rather than pretend.`;
+    return `${opener} The AI response did not meet NoTVerse's quality check, so I will not pretend it did. Try that question again in a moment.`;
   }
   return `${opener} Ask me about a book, a subject, a reading mood or something you only partly remember. I will answer that question first.`;
 }
@@ -230,7 +235,6 @@ function fallbackRecommendations(question: string, opener: string): string {
       "Do you want the next list to lean toward addiction and recovery, probability and strategy, or gambling fiction?",
     ].join("\n\n");
   }
-
   const cleanTopic = recommendationTopic(question) || "that subject";
   return `${opener} I do not have enough verified title-level confidence to invent a list for ${cleanTopic}. Give me one constraint—fiction or nonfiction, beginner or specialist, practical or academic—and I will narrow it properly rather than fabricate titles.`;
 }
@@ -240,20 +244,16 @@ function isRecommendationRequest(value: string): boolean {
 }
 
 function recommendationTopic(value: string): string {
-  const cleaned = value
+  return value
     .replace(/\b(?:do you have|can you give me|give me|any|some|please|recommendations?|recommended|suggestions?|books?|i can read|to read|reading list|good)\b/gi, " ")
     .replace(/^\s*(?:(?:for|on|about)\s+)+/i, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s,.:;!?-]+|[\s,.:;!?-]+$/g, "")
-    .trim();
-  return cleaned.slice(0, 120);
+    .trim()
+    .slice(0, 120);
 }
 
-function isLowQualityAnswer(
-  question: string,
-  answer: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): boolean {
+function isLowQualityAnswer(question: string, answer: string, history: NormalizedTurn[]): boolean {
   const clean = answer.trim();
   if (!clean) return true;
   const asksForRecommendation = isRecommendationRequest(question);
@@ -262,6 +262,7 @@ function isLowQualityAnswer(
   if (asksForRecommendation && clean.length < 180) return true;
   if (!/^(hi|hey|hello|yo|sup|thanks|thank you|ok|okay)[.!?]*$/i.test(question.trim()) && clean.length < 90) return true;
   if (/^(?:i can help|i(?:'m| am) here to help|tell me more|what would you like)[.!?\s]*$/i.test(clean)) return true;
+  if (/i (?:do not|don't) have enough reliable substance|rephrase the exact distinction/i.test(clean)) return true;
   const previousAssistant = [...history].reverse().find((turn) => turn.role === "assistant")?.content;
   if (previousAssistant && normaliseForComparison(previousAssistant) === normaliseForComparison(clean)) return true;
   return false;
@@ -276,6 +277,18 @@ function extractText(result: unknown): string {
   const record = result as Record<string, unknown>;
   if (typeof record.response === "string") return record.response.trim();
   if (typeof record.text === "string") return record.text.trim();
+
+  const choices = Array.isArray(record.choices) ? record.choices : [];
+  const first = choices[0];
+  if (first && typeof first === "object") {
+    const choice = first as Record<string, unknown>;
+    if (typeof choice.text === "string") return choice.text.trim();
+    const message = choice.message;
+    if (message && typeof message === "object") {
+      const content = (message as Record<string, unknown>).content;
+      if (typeof content === "string") return content.trim();
+    }
+  }
   return "";
 }
 
