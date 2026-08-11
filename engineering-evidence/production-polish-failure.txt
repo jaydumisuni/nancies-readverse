@@ -354,9 +354,9 @@ file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live
   if (!condition) throw new Error(message);
                         ^
 
-Error: Itachi: main answer is too generic (63 characters)
+Error: Itachi: answer did not address the requested topic. Expected one of 1984, brave new world, control, freedom
     at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:24:25)
-    at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:52:3
+    at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:56:3
     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
 
 Node.js v22.23.1
