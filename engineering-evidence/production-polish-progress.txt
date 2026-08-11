@@ -1,5 +1,5 @@
-stage=branch-preview-assets
+stage=deployed-interaction-proof
 result=pass
 workflow_sha=a25d9e5665e887f41c8d0f49cdddf216ad8638b5
-head=5bc7a22c137910e6f18566de6e4f36e8b20f5db6
-time_utc=2026-08-11T07:42:38Z
+head=23682de9e8c40c9eea830f60592f2e3a593760da
+time_utc=2026-08-11T07:43:28Z
