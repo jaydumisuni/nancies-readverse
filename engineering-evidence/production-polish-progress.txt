@@ -1,5 +1,5 @@
-stage=companion-matrix
-result=failure
-workflow_sha=a25d9e5665e887f41c8d0f49cdddf216ad8638b5
-head=5d44107eed792ef9b02449b3f4ebb06805778380
-time_utc=2026-08-11T07:43:54Z
+stage=frozen-start
+result=running
+workflow_sha=8d3b15826a0587a20bde394b41caf7b2271c790e
+head=8d3b15826a0587a20bde394b41caf7b2271c790e
+time_utc=2026-08-11T07:46:30Z
