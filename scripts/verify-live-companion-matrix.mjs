@@ -41,19 +41,19 @@ const greetings = new Set();
 for (const [companion, question, expected] of cases) {
   const greeting = await ask(companion, "Hi");
   greetings.add(greeting.answer);
-  assert(greeting.answer.length >= 25, `${companion}: greeting is too thin`);
-  assert(!/paste (?:the |a )?link|attach (?:the |a )?file/i.test(greeting.answer), `${companion}: greeting was misrouted to source handling`);
+  assert(greeting.answer.length >= 25, `${companion}: greeting is too thin: ${JSON.stringify(greeting)}`);
+  assert(!/paste (?:the |a )?link|attach (?:the |a )?file/i.test(greeting.answer), `${companion}: greeting was misrouted to source handling: ${JSON.stringify(greeting)}`);
 
   const history = [
     { role: "assistant", text: greeting.answer },
     { role: "user", text: question },
   ];
   const main = await ask(companion, question, history.slice(0, 1));
-  assert(main.answer.length >= 90, `${companion}: main answer is too generic (${main.answer.length} characters)`);
-  assert(!/paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(main.answer), `${companion}: ordinary question was misrouted to source handling`);
-  assert(!/i (?:opened|saved|uploaded|verified) (?:the |your )/i.test(main.answer), `${companion}: answer claimed an unconfirmed action`);
+  assert(main.answer.length >= 90, `${companion}: main answer is too generic (${main.answer.length} characters): ${JSON.stringify(main)}`);
+  assert(!/paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(main.answer), `${companion}: ordinary question was misrouted to source handling: ${JSON.stringify(main)}`);
+  assert(!/i (?:opened|saved|uploaded|verified) (?:the |your )/i.test(main.answer), `${companion}: answer claimed an unconfirmed action: ${JSON.stringify(main)}`);
   const lower = main.answer.toLowerCase();
-  assert(expected.some((term) => lower.includes(term)), `${companion}: answer did not address the requested topic. Expected one of ${expected.join(", ")}`);
+  assert(expected.some((term) => lower.includes(term)), `${companion}: answer did not address the requested topic. Expected one of ${expected.join(", ")}. Actual: ${JSON.stringify(main)}`);
 
   const followQuestion = "Why is your first conclusion or recommendation the strongest fit for what I asked?";
   const followHistory = [
@@ -62,11 +62,12 @@ for (const [companion, question, expected] of cases) {
     { role: "assistant", text: main.answer },
   ];
   const follow = await ask(companion, followQuestion, followHistory);
-  assert(follow.answer.length >= 60, `${companion}: follow-up answer is too thin`);
-  assert(follow.answer !== main.answer, `${companion}: follow-up repeated the previous answer`);
-  assert(!/ask me about a book|tell me more|what would you like/i.test(follow.answer), `${companion}: follow-up reset to generic conversation`);
+  assert(follow.answer.length >= 60, `${companion}: follow-up answer is too thin: ${JSON.stringify(follow)}`);
+  assert(follow.answer !== main.answer, `${companion}: follow-up repeated the previous answer: ${JSON.stringify(follow)}`);
+  assert(!/ask me about a book|tell me more|what would you like/i.test(follow.answer), `${companion}: follow-up reset to generic conversation: ${JSON.stringify(follow)}`);
 
   report.cases.push({ companion, question, greeting, main, followQuestion, follow });
+  await writeFile(`${output}/companion-matrix-partial.json`, `${JSON.stringify(report, null, 2)}\n`);
 }
 
 assert(greetings.size >= 8, `companion greetings are not distinct enough (${greetings.size}/12 unique)`);
