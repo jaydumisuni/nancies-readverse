@@ -25,11 +25,17 @@ function assert(condition, message) {
 }
 
 async function ask(companion, question, history = []) {
-  const response = await fetch(`${baseURL}/api/companion/help`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ companion, question, history }),
-  });
+  let response;
+  try {
+    response = await fetch(`${baseURL}/api/companion/help`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ companion, question, history }),
+      signal: AbortSignal.timeout(45000),
+    });
+  } catch (error) {
+    throw new Error(`${companion}: companion request exceeded 45 seconds or failed: ${error?.message || error}`);
+  }
   const body = await response.json();
   assert(response.ok && body.ok && typeof body.answer === "string", `${companion}: companion request failed (${response.status}) ${JSON.stringify(body)}`);
   return { answer: body.answer.trim(), mode: body.mode, model: body.model };
@@ -79,6 +85,7 @@ report.checks = [
   "follow-ups use conversation history instead of resetting",
   "no companion claims an unconfirmed save, open, upload or verification",
   "companion voices produce at least eight distinct greetings",
+  "every companion turn returns within 45 seconds",
 ];
 report.ok = true;
 await writeFile(`${output}/companion-matrix.json`, `${JSON.stringify(report, null, 2)}\n`);
