@@ -1,5 +1,5 @@
-stage=start
-result=running
+stage=mobile-home-patch-check
+result=failure
 workflow_sha=53f816541799104f0bc3e7b68235a80e647bc543
-head=53f816541799104f0bc3e7b68235a80e647bc543
-time_utc=2026-08-11T00:52:15Z
+head=5474e1ef5081135def049245ecae03edf666d3cc
+time_utc=2026-08-11T00:52:16Z
