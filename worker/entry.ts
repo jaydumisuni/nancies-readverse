@@ -1,5 +1,6 @@
 import baseWorker from "./index";
 import { handleGroundedBookTurn } from "./grounded-books";
+import { handleGroundedMemoryTurn } from "./grounded-memory";
 import { handleSmartCompanion } from "./smart-companion";
 
 interface Env {
@@ -18,6 +19,8 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/companion/help") {
+      const remembered = await handleGroundedMemoryTurn(request.clone(), env, ctx);
+      if (remembered) return remembered;
       const grounded = await handleGroundedBookTurn(request.clone(), env, ctx);
       if (grounded) return grounded;
       return handleSmartCompanion(request, env, ctx);
