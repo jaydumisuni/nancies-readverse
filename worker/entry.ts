@@ -1,4 +1,5 @@
 import baseWorker from "./index";
+import { handleGroundedBookTurn } from "./grounded-books";
 import { handleSmartCompanion } from "./smart-companion";
 
 interface Env {
@@ -17,6 +18,8 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/companion/help") {
+      const grounded = await handleGroundedBookTurn(request.clone(), env, ctx);
+      if (grounded) return grounded;
       return handleSmartCompanion(request, env, ctx);
     }
     return baseWorker.fetch(request, env, ctx);
