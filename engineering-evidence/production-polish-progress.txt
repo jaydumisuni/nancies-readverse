@@ -1,5 +1,5 @@
-stage=frozen-build
+stage=frozen-assets
 result=pass
 workflow_sha=ec0a4896b3d72dbc13b6154fbd6eace213f24680
-head=209b06cb788cbec5fa852984ee8591346e9ab297
-time_utc=2026-08-11T07:30:56Z
+head=c9159011ebb70dd16a0e4206fcfdc0967b17159f
+time_utc=2026-08-11T07:30:58Z
