@@ -1,3 +1,4 @@
 Trigger the branch-native production polish workflow after its workflow file already exists.
 Diagnostic trigger: 2026-08-11.
 Stepwise production proof trigger.
+Final isolated stepwise trigger after removing competing branch writers.
