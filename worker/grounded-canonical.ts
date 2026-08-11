@@ -92,6 +92,10 @@ async function verifySeed(seed: Seed): Promise<VerifiedBook | null> {
   const second = a && b ? b : null;
   return {
     ...first,
+    // Use our canonical display casing only after a live public catalogue has
+    // independently matched this exact normalized title + author pair.
+    title: seed.title,
+    authors: [seed.author],
     year: first.year || second?.year,
     providers: [...new Set([...(first.providers || []), ...(second?.providers || [])])],
     sourceIds: [...new Set([...(first.sourceIds || []), ...(second?.sourceIds || [])])],
