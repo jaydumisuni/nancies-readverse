@@ -1,0 +1,163 @@
+name: Extract proven NoTVerse release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: github.head_ref == 'release-notverse-production-20260811'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release-notverse-production-20260811
+          fetch-depth: 0
+      - name: Copy only proven production files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin polish-notverse-production-20260806
+          git checkout origin/polish-notverse-production-20260806 -- \
+            package.json \
+            social-worker/index.ts \
+            src/App.tsx \
+            src/main.tsx \
+            src/notverse/NoTVerseViews.tsx \
+            src/notverse/SetupWizard.tsx \
+            src/notverse/production-polish.css \
+            src/notverse/runtime-interaction-fix.ts \
+            worker/index.ts \
+            worker/smart-companion.ts \
+            scripts/verify-notverse-build.mjs \
+            scripts/verify-mobile-notes-chat.mjs \
+            scripts/verify-production-polish.mjs \
+            scripts/verify-public-ratings.mjs \
+            scripts/verify-live-public-ratings.mjs \
+            scripts/verify-live-companion-matrix.mjs
+
+          rm -f .github/workflows/extract-proven-notverse.yml
+
+          cat > .github/workflows/notverse-release-gate.yml <<'YAML'
+          name: NoTVerse release gate
+
+          on:
+            pull_request:
+              branches: [main]
+              types: [opened, synchronize, reopened, ready_for_review]
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: notverse-release-${{ github.event.pull_request.number }}
+            cancel-in-progress: true
+
+          jobs:
+            prove-release:
+              if: github.head_ref == 'release-notverse-production-20260811'
+              runs-on: ubuntu-latest
+              timeout-minutes: 55
+              env:
+                LOCAL_PROOF_DIR: engineering-evidence/release-local
+                LIVE_PROOF_DIR: engineering-evidence/release-live
+                PREVIEW_PROOF_DIR: engineering-evidence/release-preview
+                BRANCH_PREVIEW: https://${{ github.head_ref }}-notverse.pharrtechnolgiescoltd.workers.dev
+              steps:
+                - uses: actions/checkout@v4
+                  with:
+                    fetch-depth: 0
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 22
+                    cache: npm
+                - name: Install exact dependencies
+                  run: npm ci --no-audit --no-fund
+                - name: Strict production build
+                  run: npm run build
+                - name: Static mobile and rating regressions
+                  run: |
+                    node scripts/verify-mobile-notes-chat.mjs
+                    node scripts/verify-public-ratings.mjs
+                - name: Install proof browsers
+                  run: |
+                    npm install --no-save --no-audit --no-fund playwright
+                    npx playwright install --with-deps chromium webkit
+                - name: Start exact generated client
+                  run: |
+                    python3 -m http.server 4173 --directory dist/client > /tmp/notverse-release.log 2>&1 &
+                    for attempt in $(seq 1 60); do
+                      curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+                      sleep 1
+                    done
+                    cat /tmp/notverse-release.log
+                    exit 1
+                - name: Exercise every screen, interaction and viewport locally
+                  env:
+                    NOTVERSE_TEST_URL: http://127.0.0.1:4173
+                    PROOF_DIR: engineering-evidence/release-local
+                  run: node scripts/verify-production-polish.mjs
+                - name: Record exact generated assets
+                  id: assets
+                  shell: bash
+                  run: |
+                    js="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/client/index.html | head -1)"
+                    css="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.css' dist/client/index.html | head -1)"
+                    test -n "$js" && test -n "$css"
+                    echo "js=$js" >> "$GITHUB_OUTPUT"
+                    echo "css=$css" >> "$GITHUB_OUTPUT"
+                - name: Wait for exact Cloudflare branch preview
+                  shell: bash
+                  run: |
+                    mkdir -p "$LIVE_PROOF_DIR"
+                    for attempt in $(seq 1 150); do
+                      html="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/?proof=$attempt" || true)"
+                      health="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/api/health?proof=$attempt" || true)"
+                      if printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.js }}' \
+                        && printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.css }}' \
+                        && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+                        printf '%s\n' "$health" > "$LIVE_PROOF_DIR/health.json"
+                        exit 0
+                      fi
+                      sleep 10
+                    done
+                    echo "Exact branch assets never became live"
+                    exit 1
+                - name: Exercise deployed preview at every viewport
+                  env:
+                    NOTVERSE_TEST_URL: ${{ env.BRANCH_PREVIEW }}
+                    PROOF_DIR: engineering-evidence/release-preview
+                  run: node scripts/verify-production-polish.mjs
+                - name: Test all twelve live companions
+                  env:
+                    NOTVERSE_URL: ${{ env.BRANCH_PREVIEW }}
+                    PROOF_DIR: engineering-evidence/release-live
+                  run: node scripts/verify-live-companion-matrix.mjs
+                - name: Prove live public ratings
+                  env:
+                    NOTVERSE_URL: ${{ env.BRANCH_PREVIEW }}
+                    PROOF_DIR: engineering-evidence/release-live
+                  run: node scripts/verify-live-public-ratings.mjs
+                - name: Upload release proof
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: notverse-release-proof-${{ github.run_attempt }}
+                    path: |
+                      engineering-evidence/release-local
+                      engineering-evidence/release-preview
+                      engineering-evidence/release-live
+                      /tmp/notverse-release.log
+                    if-no-files-found: warn
+                    retention-days: 14
+          YAML
+
+          git config user.name "NoTVerse Release"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Extract clean proven NoTVerse production candidate"
+          git push origin HEAD:release-notverse-production-20260811
