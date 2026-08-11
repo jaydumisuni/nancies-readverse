@@ -1,6 +1,6 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -80,3 +80,30 @@
+@@ -80,3 +80,29 @@
  @media (max-width: 760px) {
 +  /* Mobile navigation owns its own protected strip. The product views scroll
 +     inside the remaining viewport instead of passing interactive controls
