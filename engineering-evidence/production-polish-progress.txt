@@ -1,5 +1,5 @@
-stage=frozen-assets
+stage=frozen-proof-engines
 result=pass
 workflow_sha=fc4e5f2d5d181429407e5bd9565ac8e2d83e8b50
-head=83456c024848a16c1c8c915665ae72ad984ef5a5
-time_utc=2026-08-11T07:51:36Z
+head=3e9a62b7dba55b65f8ce8569d1327adac64648d7
+time_utc=2026-08-11T07:52:36Z
