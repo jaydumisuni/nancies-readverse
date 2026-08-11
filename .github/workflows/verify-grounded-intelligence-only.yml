@@ -1,0 +1,121 @@
+name: Verify NoTVerse grounded intelligence only
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BRANCH_PREVIEW: https://fix-notverse-grounded-companions-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wait for exact grounded branch worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            gambling="$(curl -fsS --max-time 30 -H 'content-type: application/json' -d '{"companion":"Gojo","question":"Do you have recommendations for books I can read on gambling?","history":[]}' "$BRANCH_PREVIEW/api/companion/help" || true)"
+            grief="$(curl -fsS --max-time 30 -H 'content-type: application/json' -d '{"companion":"Hinata","question":"Suggest a gentle novel for someone processing grief, but avoid anything relentlessly bleak.","history":[]}' "$BRANCH_PREVIEW/api/companion/help" || true)"
+            if printf '%s' "$gambling" | grep -Fq 'Addiction by Design' && printf '%s' "$grief" | grep -Fq '"mode":"catalogue-grounded"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Exact grounded worker never became visible on branch preview.' >&2
+          exit 1
+      - name: Prove twelve real companion conversations
+        shell: bash
+        env:
+          NOTVERSE_URL: ${{ env.BRANCH_PREVIEW }}
+        run: |
+          cat > /tmp/prove.mjs <<'JS'
+          const base=process.env.NOTVERSE_URL.replace(/\/$/,'');
+          const cases=[
+            ['Gojo','Recommend three books about decision-making under uncertainty and explain why each is useful.',['decision','uncertainty'],true],
+            ['Itachi','Compare 1984 and Brave New World without spoilers. What different danger does each examine?',['1984','brave new world','control'],false],
+            ['Naruto','I have lost my reading motivation. Give me a realistic way to restart without forcing a huge goal.',['reading','small'],false],
+            ['Kakashi','I half remember a literary novel about a butler looking back on his life and missed choices. What might it be?',['remains of the day','ishiguro','butler'],true],
+            ['Megumi','Explain the difference between a manga chapter, volume and omnibus so a beginner can buy the right thing.',['chapter','volume','omnibus'],false],
+            ['Sasuke','Recommend a concise book about discipline that is not empty motivational hype, and explain the trade-off.',['discipline'],true],
+            ['Maki','Which research methods book is most useful for someone designing their first mixed-methods study, and why?',['research','methods'],true],
+            ['Nobara','Recommend three readable books on fashion history that connect clothing to power and identity.',['fashion','clothing'],true],
+            ['Hinata','Suggest a gentle novel for someone processing grief, but avoid anything relentlessly bleak.',['grief'],true],
+            ['Sakura','What should I read to understand sleep scientifically without drifting into wellness misinformation?',['sleep'],true],
+            ['Temari','Compare principled negotiation with hard bargaining. When does each approach fail?',['negotiation','bargaining'],false],
+            ['Mei Mei','Recommend books on pricing professional services and explain which one gives the fastest practical return.',['pricing','services'],true],
+          ];
+          const assert=(c,m)=>{if(!c)throw new Error(m)};
+          async function ask(companion,question,history=[]){
+            const r=await fetch(`${base}/api/companion/help`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({companion,question,history}),signal:AbortSignal.timeout(60000)});
+            const b=await r.json(); assert(r.ok&&b.ok&&typeof b.answer==='string',`${companion}: ${r.status} ${JSON.stringify(b)}`); return b;
+          }
+          function titles(text){return [...text.matchAll(/\*\*([^*]+)\*\*/g)].map(m=>m[1].trim())}
+          function norm(v){return String(v).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+          const report=[]; const greetings=new Set();
+          for(const [companion,question,expected,grounded] of cases){
+            const greeting=await ask(companion,'Hi'); greetings.add(greeting.answer);
+            assert(greeting.answer.length>=25,`${companion}: thin greeting`);
+            assert(!/paste (?:the |a )?link|attach (?:the |a )?file/i.test(greeting.answer),`${companion}: greeting misrouted`);
+            const main=await ask(companion,question,[{role:'assistant',text:greeting.answer}]);
+            const lower=main.answer.toLowerCase(); assert(expected.some(t=>lower.includes(t)),`${companion}: off-topic main: ${main.answer}`);
+            assert(!/i (?:opened|saved|uploaded|verified) (?:the |your )/i.test(main.answer),`${companion}: unconfirmed action claim`);
+            let evidenceTitles=[];
+            if(grounded){
+              assert(main.mode==='catalogue-grounded',`${companion}: not catalogue-grounded: ${JSON.stringify(main)}`);
+              assert(main.evidence?.type==='public-catalogue'&&Array.isArray(main.evidence.books)&&main.evidence.books.length,`${companion}: missing catalogue evidence`);
+              for(const book of main.evidence.books){
+                assert(book.title&&Array.isArray(book.authors),`${companion}: malformed evidence book`);
+                assert(Array.isArray(book.providers)&&book.providers.length,`${companion}: missing providers`);
+                assert(book.providers.every(p=>p==='Google Books'||p==='Open Library'),`${companion}: unapproved provider ${book.providers}`);
+              }
+              evidenceTitles=main.evidence.books.map(b=>b.title);
+              const rendered=titles(main.answer);
+              assert(rendered.length,`${companion}: no rendered grounded titles`);
+              assert(rendered.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: rendered title outside evidence`);
+              if(companion==='Kakashi') assert(evidenceTitles.some(t=>norm(t).includes('remains of the day')),'Kakashi missed The Remains of the Day');
+            } else {
+              assert(['workers-ai','workers-ai-repair','conversation-router'].includes(main.mode),`${companion}: wrong general route ${main.mode}`);
+              assert(main.answer.length>=90,`${companion}: general answer too thin`);
+            }
+            const followQ='Why is your first conclusion or recommendation the strongest fit for what I asked?';
+            const follow=await ask(companion,followQ,[{role:'assistant',text:greeting.answer},{role:'user',text:question},{role:'assistant',text:main.answer}]);
+            assert(follow.answer.length>=60,`${companion}: thin follow-up`);
+            assert(follow.answer!==main.answer,`${companion}: repeated answer`);
+            if(grounded){
+              assert(follow.mode==='catalogue-grounded-followup',`${companion}: follow-up escaped grounding: ${follow.mode}`);
+              assert(titles(follow.answer).every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: follow-up introduced a new title`);
+            }
+            report.push({companion,greeting:greeting.answer,question,main,follow:follow.answer});
+          }
+          assert(greetings.size>=8,`only ${greetings.size}/12 distinct greetings`);
+          console.log(JSON.stringify({ok:true,companions:report.length,uniqueGreetings:greetings.size,report},null,2));
+          JS
+          node /tmp/prove.mjs | tee /tmp/notverse-companion-intelligence.json
+      - name: Prove live public ratings and no approval placeholder
+        shell: bash
+        env:
+          NOTVERSE_URL: ${{ env.BRANCH_PREVIEW }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/notverse-rating-proof
+          PROOF_DIR=/tmp/notverse-rating-proof node scripts/verify-live-public-ratings.mjs
+          ! grep -RniE 'provider connections pending|ratings?.{0,40}(approval|pending)|approval.{0,40}ratings?' src dist/client 2>/dev/null
+      - name: Upload intelligence proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-grounded-intelligence-proof
+          path: |
+            /tmp/notverse-companion-intelligence.json
+            /tmp/notverse-rating-proof
+          retention-days: 14
