@@ -58,5 +58,24 @@ function syncInteractionState(): void {
 if anchor not in text:
     raise SystemExit("Expected syncInteractionState anchor was not found")
 text = text.replace(anchor, replacement, 1)
-
 path.write_text(text)
+
+# A form control has an intrinsic minimum width in CSS Grid. At the compact
+# tablet breakpoint that can make the middle chat track wider than the fixed
+# companion panel even though the panel itself is inside the viewport. Keep the
+# approved panel dimensions and only allow the composer field to shrink.
+css_path = Path("src/notverse/production-polish.css")
+css = css_path.read_text()
+marker = "/* Compact companion composer must never overflow its panel. */"
+if marker not in css:
+    css += '''\n\n/* Compact companion composer must never overflow its panel. */
+.companion-panel.open .chat-input {
+  grid-template-columns: 34px minmax(0, 1fr) 38px;
+  min-width: 0;
+}
+.companion-panel.open .chat-input input {
+  min-width: 0;
+  max-width: 100%;
+}
+'''
+    css_path.write_text(css)
