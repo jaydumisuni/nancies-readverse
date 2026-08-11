@@ -1,0 +1,18 @@
+--- a/src/notverse/production-polish.css
++++ b/src/notverse/production-polish.css
+@@ -80,3 +80,15 @@
+ @media (max-width: 760px) {
++  .notverse-home {
++    box-sizing: border-box;
++    height: calc(100dvh - 120px);
++    min-height: 0 !important;
++    overflow-y: auto;
++    overscroll-behavior-y: contain;
++    scrollbar-width: none;
++  }
++  .notverse-home::-webkit-scrollbar {
++    display: none;
++  }
++
+   /* A closed mobile chat must not leave hidden controls geometrically sitting
+      underneath the fixed six-tab navigation. */
