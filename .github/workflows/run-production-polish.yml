@@ -1,0 +1,36 @@
+name: Run isolated NoTVerse production polish
+on:
+  push:
+    branches:
+      - polish-notverse-production-20260806
+permissions:
+  contents: write
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: polish-notverse-production-20260806
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Run the isolated production candidate gate
+        run: bash scripts/production-polish-runner.sh
+      - name: Upload retained evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-production-ready-proof
+          path: |
+            engineering-evidence/production-polish-local
+            engineering-evidence/production-polish-preview
+            engineering-evidence/production-polish-live
+            engineering-evidence/production-polish-progress.txt
+            engineering-evidence/production-polish-failure.txt
+            engineering-evidence/production-polish-release-summary.json
+          if-no-files-found: warn
+          retention-days: 14
