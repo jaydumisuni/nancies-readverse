@@ -1,16 +1,30 @@
 --- a/src/notverse/production-polish.css
 +++ b/src/notverse/production-polish.css
-@@ -80,3 +80,15 @@
+@@ -80,3 +80,30 @@
  @media (max-width: 760px) {
-+  .notverse-home {
++  /* Mobile navigation owns its own protected strip. The product views scroll
++     inside the remaining viewport instead of passing interactive controls
++     beneath the fixed six-tab navigation. This changes geometry only. */
++  .main-shell.notverse-shell {
++    --notverse-mobile-nav-space: calc(82px + env(safe-area-inset-bottom));
 +    box-sizing: border-box;
-+    height: calc(100dvh - 120px);
++    height: 100dvh;
 +    min-height: 0 !important;
-+    overflow-y: auto;
++    overflow: hidden !important;
++    padding: 8px 10px var(--notverse-mobile-nav-space) !important;
++  }
++
++  .main-shell.notverse-shell > .notverse-view {
++    box-sizing: border-box;
++    height: calc(100dvh - 60px - var(--notverse-mobile-nav-space));
++    min-height: 0 !important;
++    overflow-y: auto !important;
 +    overscroll-behavior-y: contain;
 +    scrollbar-width: none;
++    padding-bottom: 24px !important;
 +  }
-+  .notverse-home::-webkit-scrollbar {
++
++  .main-shell.notverse-shell > .notverse-view::-webkit-scrollbar {
 +    display: none;
 +  }
 +
