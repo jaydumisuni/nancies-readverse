@@ -260,3 +260,46 @@ Error: iphone/Home top: controls hidden behind mobile navigation: [{"tag":"BUTTO
     at async file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:239:9
 
 Node.js v22.23.1
+
+--- verifier geometry section ---
+
+async function assertNoNavigationOverlap(page, label) {
+  const result = await page.evaluate(() => {
+    const visible = (element) => {
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) > 0 && box.width > 0 && box.height > 0;
+    };
+    const nav = document.querySelector(".notverse-mobile-nav");
+    if (!nav || !visible(nav)) return [];
+    const navBox = nav.getBoundingClientRect();
+    return [...document.querySelectorAll("button,input,textarea,select,a[href]")]
+      .filter((element) => visible(element) && !nav.contains(element))
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        return box.left < navBox.right && box.right > navBox.left && box.top < navBox.bottom && box.bottom > navBox.top;
+      })
+      .map((element) => ({ tag: element.tagName, text: (element.textContent || element.getAttribute("aria-label") || element.getAttribute("placeholder") || "").trim().slice(0, 80) }));
+  });
+  assert(result.length === 0, `${label}: controls hidden behind mobile navigation: ${JSON.stringify(result)}`);
+}
+
+
+async function swipeSetup(page, expectedPage) {
+  const setup = page.locator(".notverse-setup");
+  const box = await setup.boundingBox();
+  assert(box, `setup page ${expectedPage}: setup surface is missing`);
+  const x = Math.round(box.x + box.width * 0.72);
+  const startY = Math.round(box.y + box.height * 0.72);
+  const endY = Math.round(box.y + box.height * 0.28);
+  await setup.dispatchEvent("pointerdown", { pointerId: 1, pointerType: "touch", isPrimary: true, clientX: x, clientY: startY, bubbles: true });
+  await setup.dispatchEvent("pointerup", { pointerId: 1, pointerType: "touch", isPrimary: true, clientX: x, clientY: endY, bubbles: true });
+  await page.waitForFunction((value) => document.querySelector(".notverse-setup")?.getAttribute("data-page") === String(value), expectedPage, { timeout: 2500 });
+  await page.waitForTimeout(90);
+}
+
+async function assertSetupSurface(page, label, mobile) {
+  assert(await page.getByRole("button", { name: /continue|back|start setup|enter/i }).count() === 0, `${label}: forbidden setup navigation button is present`);
+  await assertNoHorizontalOverflow(page, label);
+  const geometry = await page.evaluate(() => {
+    const stack = document.querySelector(".setup-paper-stack")?.getBoundingClientRect();
