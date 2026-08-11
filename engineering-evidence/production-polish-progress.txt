@@ -1,5 +1,5 @@
-stage=strict-build
+stage=proof-engines
 result=pass
 workflow_sha=76d87ca994aa1f675e950d1d61fa5ed63066a151
-head=b930fa5f03ce75f2e2c40d7882c6598ebc06e5c2
-time_utc=2026-08-11T06:56:22Z
+head=4b4d3567d1111fa577a547f0411a7ddb01c55ef0
+time_utc=2026-08-11T06:57:31Z
