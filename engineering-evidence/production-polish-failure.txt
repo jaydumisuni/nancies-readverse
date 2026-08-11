@@ -315,7 +315,7 @@ node:internal/modules/run_main:123
     triggerUncaughtException(
     ^
 
-Error: iphone/Keyboard: chat panel exceeds resized viewport
+Error: iphone/Keyboard: chat panel exceeds resized viewport {"viewportHeight":524,"panelBottom":525.4375,"composerBottom":525.4375,"documentHeight":524}
     at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:41:25)
     at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:391:7
 
