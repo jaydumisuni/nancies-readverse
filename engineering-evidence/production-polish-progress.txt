@@ -1,5 +1,5 @@
-stage=deployed-interaction-proof
-result=pass
+stage=companion-matrix
+result=failure
 workflow_sha=ec0a4896b3d72dbc13b6154fbd6eace213f24680
-head=3f8172987a18eefa5dd054fad1689c1a2d2f92c5
-time_utc=2026-08-11T07:32:36Z
+head=e016da9242d96331781cd214c3f7e8ddc1b4d510
+time_utc=2026-08-11T07:32:59Z
