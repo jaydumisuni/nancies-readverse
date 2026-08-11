@@ -1,5 +1,5 @@
-stage=candidate-frozen
+stage=frozen-assets
 result=pass
 workflow_sha=0fd2e2e50f2c75a743801a580438ee107121d3bc
-head=c7798d93afdce09606f4b59fcd99f00667c4ebaf
-time_utc=2026-08-11T07:19:48Z
+head=0cfd88ea9dbc6e607218d7d1fd01504145b6af93
+time_utc=2026-08-11T07:20:04Z
