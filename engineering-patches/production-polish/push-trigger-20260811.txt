@@ -8,3 +8,4 @@ Protected-nav production proof trigger.
 Clipping-aware proof trigger.
 Production proof v2 trigger.
 Mobile keyboard runtime proof v3 trigger.
+Stable-navigation production proof v4 trigger.
