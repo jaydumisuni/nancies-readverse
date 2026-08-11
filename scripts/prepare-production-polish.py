@@ -138,4 +138,16 @@ replacement = '''async function assertNoNavigationOverlap(page, label) {
 }'''
 
 text = text[:fn_start] + replacement + text[fn_end:]
+
+# Keep keyboard failures diagnostic rather than opaque so geometry corrections
+# are evidence-led, not guessed.
+text = text.replace(
+    '`${viewport.name}/Keyboard: chat panel exceeds resized viewport`',
+    '`${viewport.name}/Keyboard: chat panel exceeds resized viewport ${JSON.stringify(keyboard)}`',
+)
+text = text.replace(
+    '`${viewport.name}/Keyboard: composer hides behind software keyboard area`',
+    '`${viewport.name}/Keyboard: composer hides behind software keyboard area ${JSON.stringify(keyboard)}`',
+)
+
 path.write_text(text)
