@@ -1,5 +1,5 @@
-stage=candidate-applied
+stage=proof-adjusted
 result=pass
 workflow_sha=ac7a5f7c9e41d4b549038921b6d9c41def687958
-head=4fb89e4b8db1b6aa6d7aecef395285cda82f5f7b
-time_utc=2026-08-11T00:57:03Z
+head=c76914fb38972f8b38925b4f645b05e9ef97cbe5
+time_utc=2026-08-11T00:57:04Z
