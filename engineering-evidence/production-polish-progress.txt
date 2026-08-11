@@ -1,5 +1,5 @@
-stage=strict-build
-result=failure
-workflow_sha=12330afefba49d6475ef3e10f8fa0c2248ad6515
-head=802fd2df18f2f1997de8caaa64ddd6d2878358ae
-time_utc=2026-08-11T07:55:44Z
+stage=frozen-start
+result=running
+workflow_sha=612608351aba033c3ea82a85f423119c1f7e9068
+head=612608351aba033c3ea82a85f423119c1f7e9068
+time_utc=2026-08-11T07:58:22Z
