@@ -1,0 +1,93 @@
+name: Verify live NoTVerse production polish
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notverse-live-production-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      LIVE_URL: https://notverse.1ink.online
+      PROOF_DIR: engineering-evidence/live-production-final
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Strict production build
+        run: npm run build
+
+      - name: Install Chromium and WebKit
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+
+      - name: Wait for exact production assets and identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PROOF_DIR"
+          js="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/client/index.html | head -1)"
+          css="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.css' dist/client/index.html | head -1)"
+          test -n "$js" && test -n "$css"
+          printf '{"expectedJs":"%s","expectedCss":"%s"}\n' "$js" "$css" > "$PROOF_DIR/expected-assets.json"
+          for attempt in $(seq 1 150); do
+            html="$(curl -fsS --max-time 20 "$LIVE_URL/?proof=$attempt" || true)"
+            health="$(curl -fsS --max-time 20 "$LIVE_URL/api/health?proof=$attempt" || true)"
+            if printf '%s' "$html" | grep -Fq "$js" \
+              && printf '%s' "$html" | grep -Fq "$css" \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$html" > "$PROOF_DIR/index.html"
+              printf '%s\n' "$health" > "$PROOF_DIR/health.json"
+              printf 'production_assets=match\nproduction_identity=NoTVerse\n' > "$PROOF_DIR/deployment.txt"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Production never served the exact verified bundle and NoTVerse health identity.' >&2
+          exit 1
+
+      - name: Prove every route, focus state and viewport on production
+        env:
+          NOTVERSE_TEST_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/live-production-final
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Hold live multi-turn conversations with all twelve companions
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/live-production-final
+        run: node scripts/verify-live-companion-matrix.mjs
+
+      - name: Prove live public-source rating flow
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/live-production-final
+        run: node scripts/verify-live-public-ratings.mjs
+
+      - name: Upload complete live-production proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-live-production-final-proof
+          path: engineering-evidence/live-production-final
+          if-no-files-found: warn
+          retention-days: 14
