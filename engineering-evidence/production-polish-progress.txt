@@ -1,5 +1,5 @@
-stage=proof-engines
-result=pass
+stage=local-interaction-proof
+result=failure
 workflow_sha=d04dbd02580ea7d5eb70dd6f0415288f847341ed
-head=ffbed6e5778f098d27d225a20f2cd0cb992c02aa
-time_utc=2026-08-11T01:06:55Z
+head=88f992f57aff7e8641970c6b7cbddf4e4e95c0f8
+time_utc=2026-08-11T01:07:16Z
