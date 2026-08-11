@@ -1,0 +1,37 @@
+name: Extract NoTVerse polish verifier
+
+on:
+  push:
+    branches:
+      - polish-notverse-production-20260806
+    paths:
+      - engineering-evidence/extract-trigger.txt
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: polish-notverse-production-20260806
+          fetch-depth: 0
+      - name: Apply candidate and export verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat engineering-patches/production-polish/part-*.b64 | base64 --decode > /tmp/product.patch.gz
+          printf '%s  %s\n' '6c19abd69c0d89831d4a4ccaffe1805f547794265179cf9f01908e366a4d1db2' /tmp/product.patch.gz | sha256sum --check
+          gzip -dc /tmp/product.patch.gz > /tmp/product.patch
+          git apply /tmp/product.patch
+          git apply engineering-patches/production-polish/short-phone-home.patch
+          git apply engineering-patches/production-polish/mobile-home-viewport.patch
+          python3 scripts/prepare-production-polish.py
+          cp scripts/verify-production-polish.mjs engineering-evidence/verify-production-polish-current.mjs
+          git add engineering-evidence/verify-production-polish-current.mjs
+          git config user.name 'NoTVerse Verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Export NoTVerse polish verifier [skip ci]'
+          git push origin HEAD:polish-notverse-production-20260806
