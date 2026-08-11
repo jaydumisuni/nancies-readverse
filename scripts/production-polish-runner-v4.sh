@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Once the exact candidate has passed the local Chromium/WebKit matrix and has
+# been frozen on this draft branch, do not re-apply the product patch. Continue
+# with the exact deployed bundle, all twelve live companions and public ratings.
+if [[ -f engineering-evidence/production-polish-assets.json && -f src/notverse/production-polish.css ]]; then
+  bash scripts/verify-frozen-production-candidate.sh
+  exit $?
+fi
+
 python3 - <<'PY'
 from pathlib import Path
 source = Path('scripts/production-polish-runner-v2.sh').read_text()
