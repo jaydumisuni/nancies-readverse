@@ -1,5 +1,5 @@
-stage=frozen-assets
-result=pass
-workflow_sha=8d3b15826a0587a20bde394b41caf7b2271c790e
-head=e0ccdc657a314381ff52d2e3e6be37d6fa7fddce
-time_utc=2026-08-11T07:46:51Z
+stage=frozen-start
+result=running
+workflow_sha=fc4e5f2d5d181429407e5bd9565ac8e2d83e8b50
+head=fc4e5f2d5d181429407e5bd9565ac8e2d83e8b50
+time_utc=2026-08-11T07:51:13Z
