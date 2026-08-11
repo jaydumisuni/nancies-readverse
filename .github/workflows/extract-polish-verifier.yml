@@ -18,7 +18,7 @@ jobs:
         with:
           ref: polish-notverse-production-20260806
           fetch-depth: 0
-      - name: Apply candidate and export verifier
+      - name: Apply candidate and export inspected files
         shell: bash
         run: |
           set -euo pipefail
@@ -29,9 +29,12 @@ jobs:
           git apply engineering-patches/production-polish/short-phone-home.patch
           git apply engineering-patches/production-polish/mobile-home-viewport.patch
           python3 scripts/prepare-production-polish.py
-          cp scripts/verify-production-polish.mjs engineering-evidence/verify-production-polish-current.mjs
-          git add engineering-evidence/verify-production-polish-current.mjs
+          mkdir -p engineering-evidence/production-polish-inspection
+          cp scripts/verify-production-polish.mjs engineering-evidence/production-polish-inspection/verify-production-polish-current.mjs
+          cp src/notverse/runtime-interaction-fix.ts engineering-evidence/production-polish-inspection/runtime-interaction-fix.ts
+          cp src/notverse/production-polish.css engineering-evidence/production-polish-inspection/production-polish.css
+          git add engineering-evidence/production-polish-inspection
           git config user.name 'NoTVerse Verification'
           git config user.email 'actions@users.noreply.github.com'
-          git commit -m 'Export NoTVerse polish verifier [skip ci]'
+          git commit -m 'Export NoTVerse polish inspection files [skip ci]'
           git push origin HEAD:polish-notverse-production-20260806
