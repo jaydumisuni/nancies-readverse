@@ -1,0 +1,124 @@
+name: Diagnose NoTVerse production polish locally
+on:
+  push:
+    branches:
+      - polish-notverse-production-20260806
+permissions:
+  contents: write
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: polish-notverse-production-20260806
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply candidate and run local proof with retained diagnostics
+        shell: bash
+        run: |
+          set +e
+          exec > >(tee /tmp/diag-full.log) 2>&1
+          stage='apply'
+          cat engineering-patches/production-polish/part-*.b64 | base64 --decode > /tmp/p.patch.gz
+          rc=$?
+          if [ $rc -eq 0 ]; then
+            printf '%s  %s\n' '6c19abd69c0d89831d4a4ccaffe1805f547794265179cf9f01908e366a4d1db2' /tmp/p.patch.gz | sha256sum --check
+            rc=$?
+          fi
+          if [ $rc -eq 0 ]; then gzip -dc /tmp/p.patch.gz > /tmp/p.patch; rc=$?; fi
+          if [ $rc -eq 0 ]; then git apply --check /tmp/p.patch; rc=$?; fi
+          if [ $rc -eq 0 ]; then git apply /tmp/p.patch; rc=$?; fi
+          if [ $rc -eq 0 ]; then git apply --check engineering-patches/production-polish/short-phone-home.patch; rc=$?; fi
+          if [ $rc -eq 0 ]; then git apply engineering-patches/production-polish/short-phone-home.patch; rc=$?; fi
+
+          if [ $rc -eq 0 ]; then
+            stage='proof-script-adjustment'
+            python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-production-polish.mjs')
+          text = path.read_text()
+          old_nav = 'page.locator(`${root} button`).filter({ hasText: label })'
+          new_nav = 'page.locator(root).getByRole("button", { name: label, exact: true })'
+          if old_nav not in text:
+              raise SystemExit('Expected exact navigation proof locator was not found')
+          text = text.replace(old_nav, new_nav, 1)
+          start_marker = '  await page.route("**/api/discovery/search", async (route) => {'
+          end_marker = '  await page.route("**/api/companion/help", async (route) => {'
+          start = text.find(start_marker)
+          end = text.find(end_marker, start + 1)
+          if start < 0 or end < 0:
+              raise SystemExit('Expected deterministic discovery proof route was not found')
+          route = '''  await page.route("**/api/discovery/search", async (route) => {
+            const body = route.request().postDataJSON() || {};
+            const query = String(body.query || "").toLowerCase();
+            const gambling = /gambl|casino|poker|odds|bet/.test(query);
+            const candidates = gambling ? [
+              { title: "Addiction by Design", authors: ["Natasha Dow Schüll"], year: 2012, description: "How machine gambling environments are engineered to keep people playing.", whyMatch: "A direct match for gambling-system design and behavioural psychology.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780691160887" } },
+              { title: "The Biggest Bluff", authors: ["Maria Konnikova"], year: 2020, description: "Poker, psychology and decisions under uncertainty.", whyMatch: "A strong match for poker, probability and decision-making under uncertainty.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780525522621" } },
+              { title: "Thinking in Bets", authors: ["Annie Duke"], year: 2018, description: "Probability, incomplete information and better decisions.", whyMatch: "A useful probability-and-decisions companion to gambling-specific reading.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780735216358" } },
+            ] : [{
+              title: "Pride and Prejudice", authors: ["Jane Austen"], year: 1813,
+              description: "A novel of manners, judgement and self-knowledge.",
+              whyMatch: "Matched across public book catalogues using title, creator and edition identifiers.",
+              provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780141439518" },
+              rating: { overall: 4.26, ratingCount: 2000, sourceCount: 2, sources: [
+                { name: "Google Books", sourceId: "google-pride", rating: 4.4, ratingCount: 1200, confidence: 0.96 },
+                { name: "Open Library", sourceId: "/works/OL66554W", rating: 4.1, ratingCount: 800, confidence: 0.9 },
+              ] },
+            }];
+            await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, candidates }) });
+          });
+'''
+          path.write_text(text[:start] + route + text[end:])
+          PY
+            rc=$?
+          fi
+
+          if [ $rc -eq 0 ]; then stage='npm-ci'; npm ci --no-audit --no-fund; rc=$?; fi
+          if [ $rc -eq 0 ]; then stage='build'; npm run build; rc=$?; fi
+          if [ $rc -eq 0 ]; then stage='playwright-package'; npm install --no-save --no-audit --no-fund playwright; rc=$?; fi
+          if [ $rc -eq 0 ]; then stage='playwright-browser'; npx playwright install --with-deps chromium webkit; rc=$?; fi
+          if [ $rc -eq 0 ]; then
+            stage='serve'
+            cat > /tmp/serve.py <<'PY'
+          import json
+          from functools import partial
+          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+          class Handler(SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.split('?', 1)[0] == '/api/auth/google/status':
+                      body = json.dumps({'configured': False, 'connected': False, 'account': None}).encode()
+                      self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body); return
+                  return super().do_GET()
+          ThreadingHTTPServer(('127.0.0.1',4173), partial(Handler,directory='dist/client')).serve_forever()
+          PY
+            python3 /tmp/serve.py >/tmp/serve.log 2>&1 &
+            for n in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+            curl -fsS http://127.0.0.1:4173/ >/dev/null
+            rc=$?
+          fi
+          if [ $rc -eq 0 ]; then stage='production-polish-proof'; NOTVERSE_TEST_URL=http://127.0.0.1:4173 PROOF_DIR=engineering-evidence/production-polish-local node scripts/verify-production-polish.mjs; rc=$?; fi
+
+          {
+            echo "stage=$stage"
+            echo "exit_code=$rc"
+            echo "head=$(git rev-parse HEAD)"
+            echo '--- diagnostic tail ---'
+            tail -n 220 /tmp/diag-full.log
+            echo '--- server tail ---'
+            tail -n 80 /tmp/serve.log 2>/dev/null || true
+          } > production-polish-diagnostic.txt
+
+          git reset --hard HEAD
+          git clean -fdx -e production-polish-diagnostic.txt
+          git config user.name 'NoTVerse Verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add production-polish-diagnostic.txt
+          git commit -m "Record NoTVerse production-polish diagnostic (${stage})"
+          git push origin HEAD:polish-notverse-production-20260806
+          exit 0
