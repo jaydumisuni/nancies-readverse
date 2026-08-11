@@ -1,5 +1,8 @@
 FAILED_STAGE=local-interaction-proof
 
+Selecting previously unselected package libwayland-server0:amd64.
+Preparing to unpack .../163-libwayland-server0_1.22.0-2.1build1_amd64.deb ...
+Unpacking libwayland-server0:amd64 (1.22.0-2.1build1) ...
 Selecting previously unselected package libwildmidi2:amd64.
 Preparing to unpack .../164-libwildmidi2_0.4.3-1build3_amd64.deb ...
 Unpacking libwildmidi2:amd64 (0.4.3-1build3) ...
@@ -311,12 +314,9 @@ node:internal/modules/run_main:123
     triggerUncaughtException(
     ^
 
-Error: tablet/Chat: focused input leaves the viewport horizontally {"fontSize":11.52,"scale":1,"box":{"left":884,"right":1136.796875,"top":958.5,"bottom":998.5},"viewport":{"width":820,"height":1024}}
+Error: laptop/Inbox: focused input leaves the viewport vertically {"fontSize":16,"scale":1,"box":{"left":658.890625,"right":1205.734375,"top":803.6875,"bottom":848.6875},"viewport":{"width":1366,"height":768}}
     at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:41:25)
-    at assertFocusedInput (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:186:3)
-    at runNextTicks (node:internal/process/task_queues:64:5)
-    at process.processImmediate (node:internal/timers:452:9)
-    at process.callbackTrampoline (node:internal/async_hooks:130:17)
-    at async file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:306:23
+    at assertFocusedInput (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:187:3)
+    at async file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:291:9
 
 Node.js v22.23.1
