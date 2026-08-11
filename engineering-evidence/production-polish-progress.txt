@@ -1,5 +1,5 @@
-stage=candidate-applied
+stage=strict-build
 result=pass
 workflow_sha=fa9a1aad8d6eb0b7f907dc87d1dc9a9e41a62575
-head=ede69499ed5f3d00fed7a590e79c3f065b97263c
-time_utc=2026-08-11T01:19:09Z
+head=bb27659c86d09e842a8e4807799a91b00a18cb1c
+time_utc=2026-08-11T01:19:28Z
