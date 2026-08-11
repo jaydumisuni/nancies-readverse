@@ -1,5 +1,5 @@
-stage=frozen-start
-result=running
+stage=frozen-build
+result=pass
 workflow_sha=612608351aba033c3ea82a85f423119c1f7e9068
-head=612608351aba033c3ea82a85f423119c1f7e9068
-time_utc=2026-08-11T07:58:22Z
+head=0538011c2bdfcc396db23f80d839c555a9eddc76
+time_utc=2026-08-11T07:58:42Z
