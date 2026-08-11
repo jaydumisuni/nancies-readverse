@@ -1,0 +1,441 @@
+{
+  "ok": true,
+  "baseURL": "http://127.0.0.1:4173",
+  "viewports": [
+    {
+      "name": "short-phone",
+      "width": 360,
+      "height": 640,
+      "mobile": true,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 16,
+        "scale": 1,
+        "box": {
+          "left": 47,
+          "right": 307,
+          "top": 589.5,
+          "bottom": 629.5
+        },
+        "viewport": {
+          "width": 360,
+          "height": 640
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 360,
+          "height": 640
+        },
+        "panel": {
+          "left": 0,
+          "right": 360,
+          "top": 0,
+          "bottom": 638
+        },
+        "composer": {
+          "left": 0,
+          "right": 360,
+          "top": 580,
+          "bottom": 638
+        },
+        "navigation": {
+          "opacity": "0",
+          "pointerEvents": "none",
+          "visibility": "hidden"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 360,
+          "height": 640
+        }
+      }
+    },
+    {
+      "name": "iphone",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 16,
+        "scale": 1,
+        "box": {
+          "left": 47,
+          "right": 337,
+          "top": 793.5,
+          "bottom": 833.5
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "panel": {
+          "left": 0,
+          "right": 390,
+          "top": 0,
+          "bottom": 842
+        },
+        "composer": {
+          "left": 0,
+          "right": 390,
+          "top": 784,
+          "bottom": 842
+        },
+        "navigation": {
+          "opacity": "0",
+          "pointerEvents": "none",
+          "visibility": "hidden"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 390,
+          "height": 844
+        }
+      }
+    },
+    {
+      "name": "large-phone",
+      "width": 430,
+      "height": 932,
+      "mobile": true,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 16,
+        "scale": 1,
+        "box": {
+          "left": 47,
+          "right": 377,
+          "top": 881.5,
+          "bottom": 921.5
+        },
+        "viewport": {
+          "width": 430,
+          "height": 932
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "panel": {
+          "left": 0,
+          "right": 430,
+          "top": 0,
+          "bottom": 930
+        },
+        "composer": {
+          "left": 0,
+          "right": 430,
+          "top": 872,
+          "bottom": 930
+        },
+        "navigation": {
+          "opacity": "0",
+          "pointerEvents": "none",
+          "visibility": "hidden"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 430,
+          "height": 932
+        }
+      }
+    },
+    {
+      "name": "tablet",
+      "width": 820,
+      "height": 1024,
+      "mobile": false,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 11.52,
+        "scale": 1,
+        "box": {
+          "left": 499.203125,
+          "right": 752,
+          "top": 958.5,
+          "bottom": 998.5
+        },
+        "viewport": {
+          "width": 820,
+          "height": 1024
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 820,
+          "height": 1024
+        },
+        "panel": {
+          "left": 447.203125,
+          "right": 808,
+          "top": 12,
+          "bottom": 1012
+        },
+        "composer": {
+          "left": 448.203125,
+          "right": 807,
+          "top": 945,
+          "bottom": 1011
+        },
+        "navigation": {
+          "opacity": "1",
+          "pointerEvents": "auto",
+          "visibility": "visible"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 820,
+          "height": 1024
+        }
+      }
+    },
+    {
+      "name": "laptop",
+      "width": 1366,
+      "height": 768,
+      "mobile": false,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 11.52,
+        "scale": 1,
+        "box": {
+          "left": 980.546875,
+          "right": 1296,
+          "top": 700.5,
+          "bottom": 740.5
+        },
+        "viewport": {
+          "width": 1366,
+          "height": 768
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 1366,
+          "height": 768
+        },
+        "panel": {
+          "left": 928.546875,
+          "right": 1352,
+          "top": 14,
+          "bottom": 754
+        },
+        "composer": {
+          "left": 929.546875,
+          "right": 1351,
+          "top": 687,
+          "bottom": 753
+        },
+        "navigation": {
+          "opacity": "1",
+          "pointerEvents": "auto",
+          "visibility": "visible"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 1366,
+          "height": 768
+        }
+      }
+    },
+    {
+      "name": "desktop",
+      "width": 1920,
+      "height": 1080,
+      "mobile": false,
+      "screens": [
+        "Home",
+        "Search",
+        "Notes",
+        "Library",
+        "Inbox",
+        "Me"
+      ],
+      "chatInput": {
+        "fontSize": 11.52,
+        "scale": 1,
+        "box": {
+          "left": 1528,
+          "right": 1850,
+          "top": 1012.5,
+          "bottom": 1052.5
+        },
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+      "chatGeometry": {
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "panel": {
+          "left": 1476,
+          "right": 1906,
+          "top": 14,
+          "bottom": 1066
+        },
+        "composer": {
+          "left": 1477,
+          "right": 1905,
+          "top": 999,
+          "bottom": 1065
+        },
+        "navigation": {
+          "opacity": "1",
+          "pointerEvents": "auto",
+          "visibility": "visible"
+        },
+        "history": {
+          "overflowY": "auto",
+          "scrollbarWidth": "none"
+        },
+        "document": {
+          "width": 1920,
+          "height": 1080
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    "engineering-evidence/production-polish-local/setup-mobile-page-1.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-2.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-3.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-4.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-5.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-6.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-7.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-8.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-9.png",
+    "engineering-evidence/production-polish-local/setup-mobile-page-10.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-1.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-2.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-3.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-4.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-5.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-6.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-7.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-8.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-9.png",
+    "engineering-evidence/production-polish-local/setup-desktop-page-10.png",
+    "engineering-evidence/production-polish-local/short-phone-home.png",
+    "engineering-evidence/production-polish-local/short-phone-search.png",
+    "engineering-evidence/production-polish-local/short-phone-notes.png",
+    "engineering-evidence/production-polish-local/short-phone-library.png",
+    "engineering-evidence/production-polish-local/short-phone-inbox.png",
+    "engineering-evidence/production-polish-local/short-phone-me.png",
+    "engineering-evidence/production-polish-local/short-phone-chat.png",
+    "engineering-evidence/production-polish-local/short-phone-chat-keyboard.png",
+    "engineering-evidence/production-polish-local/iphone-home.png",
+    "engineering-evidence/production-polish-local/iphone-search.png",
+    "engineering-evidence/production-polish-local/iphone-notes.png",
+    "engineering-evidence/production-polish-local/iphone-library.png",
+    "engineering-evidence/production-polish-local/iphone-inbox.png",
+    "engineering-evidence/production-polish-local/iphone-me.png",
+    "engineering-evidence/production-polish-local/iphone-chat.png",
+    "engineering-evidence/production-polish-local/iphone-chat-keyboard.png",
+    "engineering-evidence/production-polish-local/large-phone-home.png",
+    "engineering-evidence/production-polish-local/large-phone-search.png",
+    "engineering-evidence/production-polish-local/large-phone-notes.png",
+    "engineering-evidence/production-polish-local/large-phone-library.png",
+    "engineering-evidence/production-polish-local/large-phone-inbox.png",
+    "engineering-evidence/production-polish-local/large-phone-me.png",
+    "engineering-evidence/production-polish-local/large-phone-chat.png",
+    "engineering-evidence/production-polish-local/large-phone-chat-keyboard.png",
+    "engineering-evidence/production-polish-local/tablet-home.png",
+    "engineering-evidence/production-polish-local/tablet-search.png",
+    "engineering-evidence/production-polish-local/tablet-notes.png",
+    "engineering-evidence/production-polish-local/tablet-library.png",
+    "engineering-evidence/production-polish-local/tablet-inbox.png",
+    "engineering-evidence/production-polish-local/tablet-me.png",
+    "engineering-evidence/production-polish-local/tablet-chat.png",
+    "engineering-evidence/production-polish-local/laptop-home.png",
+    "engineering-evidence/production-polish-local/laptop-search.png",
+    "engineering-evidence/production-polish-local/laptop-notes.png",
+    "engineering-evidence/production-polish-local/laptop-library.png",
+    "engineering-evidence/production-polish-local/laptop-inbox.png",
+    "engineering-evidence/production-polish-local/laptop-me.png",
+    "engineering-evidence/production-polish-local/laptop-chat.png",
+    "engineering-evidence/production-polish-local/desktop-home.png",
+    "engineering-evidence/production-polish-local/desktop-search.png",
+    "engineering-evidence/production-polish-local/desktop-notes.png",
+    "engineering-evidence/production-polish-local/desktop-library.png",
+    "engineering-evidence/production-polish-local/desktop-inbox.png",
+    "engineering-evidence/production-polish-local/desktop-me.png",
+    "engineering-evidence/production-polish-local/desktop-chat.png",
+    "engineering-evidence/production-polish-local/webkit-iphone-chat-keyboard.png"
+  ],
+  "checks": [
+    "all ten swipe-only setup pages and exact approved branding",
+    "six-part navigation in every viewport",
+    "no horizontal overflow",
+    "no controls hidden behind mobile navigation",
+    "Search, global Search, Inbox and chat inputs stay at 16px on mobile",
+    "Search result renders weighted public ratings",
+    "mobile Notes stay above navigation and reserve swipe gestures",
+    "chat stays inside normal and keyboard-sized viewports",
+    "mobile navigation becomes inactive while chat is open",
+    "multi-turn chat remains usable"
+  ],
+  "errors": []
+}

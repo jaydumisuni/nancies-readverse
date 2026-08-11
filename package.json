@@ -9,7 +9,7 @@
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:guided": "node scripts/verify-guided-discovery-build.mjs",
     "verify:mobile-chat": "node scripts/verify-mobile-notes-chat.mjs",
-    "build": "npm run clean && npm run verify:architecture && npm run verify:mobile-chat && tsc --noEmit && vite build && node scripts/configure-workers-build-deploy.mjs && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social",
+    "build": "npm run clean && npm run verify:architecture && npm run verify:mobile-chat && tsc --noEmit && vite build && node scripts/configure-workers-build-deploy.mjs && npm run verify:ratings && npm run verify:guided && npm run verify:finish && npm run verify:notverse && npm run check:social",
     "preview": "vite preview",
     "deploy": "wrangler deploy --config dist/notverse/wrangler.json",
     "deploy:preview": "wrangler versions upload --config dist/notverse/wrangler.json",
@@ -17,7 +17,8 @@
     "cf-typegen": "wrangler types",
     "verify:finish": "node scripts/verify-finished-readverse.mjs",
     "verify:notverse": "node scripts/verify-notverse-build.mjs",
-    "check:social": "tsc --noEmit -p social-worker/tsconfig.json"
+    "check:social": "tsc --noEmit -p social-worker/tsconfig.json",
+    "verify:ratings": "node scripts/verify-public-ratings.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "^6.1.200",

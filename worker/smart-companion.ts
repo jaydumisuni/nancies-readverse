@@ -80,6 +80,9 @@ export async function handleSmartCompanion(
     "Use recent history to understand follow-ups such as it, that, yes, another one and go ahead. Do not reset the conversation.",
     "When the user supplies a source URL, the NoTVerse client verifies it. Never claim a file opened, source resolved, setting saved or Google action completed without confirmed client evidence.",
     "Reading files remain temporary unless the user explicitly saves them. Do not help bypass DRM, paywalls, authentication, CAPTCHAs or access controls.",
+    "Answer with concrete insight rather than a generic acknowledgement. When useful, state the key point, explain why, and give one practical next step.",
+    "If the user challenges, corrects or asks why, respond to that exact turn using the previous answer instead of restarting the topic.",
+    "Never invent a title, author, rating, source result or factual claim. State uncertainty briefly when evidence is insufficient.",
     "Be concise, useful, spoiler-aware, natural and honest. Avoid canned signature sentences and repeated flourishes.",
   ].join(" ");
 
@@ -100,7 +103,7 @@ export async function handleSmartCompanion(
         temperature: recommendation ? 0.62 : 0.75,
       });
       const answer = extractText(result);
-      if (answer && !isMismatchedAnswer(question, answer)) {
+      if (answer && !isLowQualityAnswer(question, answer, history)) {
         return json({ ok: true, answer, mode: "workers-ai", model, companion });
       }
     } catch (error) {
@@ -214,10 +217,26 @@ function recommendationTopic(value: string): string {
   return cleaned.slice(0, 120);
 }
 
-function isMismatchedAnswer(question: string, answer: string): boolean {
+function isLowQualityAnswer(
+  question: string,
+  answer: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): boolean {
+  const clean = answer.trim();
+  if (!clean) return true;
   const asksForRecommendation = isRecommendationRequest(question);
-  const sourceOnly = /paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(answer);
-  return asksForRecommendation && sourceOnly;
+  const sourceOnly = /paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(clean);
+  if (asksForRecommendation && sourceOnly) return true;
+  if (asksForRecommendation && clean.length < 180) return true;
+  if (!/^(hi|hey|hello|yo|sup|thanks|thank you|ok|okay)[.!?]*$/i.test(question.trim()) && clean.length < 45) return true;
+  if (/^(?:i can help|i(?:'m| am) here to help|tell me more|what would you like)[.!?\s]*$/i.test(clean)) return true;
+  const previousAssistant = [...history].reverse().find((turn) => turn.role === "assistant")?.content;
+  if (previousAssistant && normaliseForComparison(previousAssistant) === normaliseForComparison(clean)) return true;
+  return false;
+}
+
+function normaliseForComparison(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 500);
 }
 
 function extractText(result: unknown): string {

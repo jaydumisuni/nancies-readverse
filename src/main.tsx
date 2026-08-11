@@ -7,6 +7,7 @@ import "./notverse/notverse-branding-fix.css";
 import "./notverse/mobile-geometry-fix.css";
 import "./notverse/adaptive-interaction-fix.css";
 import "./notverse/final-viewport-stability.css";
+import "./notverse/production-polish.css";
 import "./notverse/runtime-interaction-fix";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 

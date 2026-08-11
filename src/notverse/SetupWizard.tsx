@@ -166,5 +166,5 @@ function CommunityPage({ preferences, onPreferences }: { preferences: NoTVersePr
 }
 
 function SetupComplete() {
-  return <div className="setup-complete-page"><span className="cover-notebook">▤</span><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy. Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
+  return <div className="setup-complete-page"><span className="cover-notebook" role="img" aria-label="NoTVerse" /><h1>You&apos;re all set.</h1><h2>Your NoTVerse is ready.</h2><p><strong>Created for Nancy. Shared with the world.</strong></p><ul><li>▣ Private by default</li><li>♙ Your world, your rules</li><li>◎ Share when you choose</li></ul><em>Your stories.<br />Your Notes.<br />Your Verse.</em></div>;
 }
