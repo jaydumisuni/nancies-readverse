@@ -32,14 +32,17 @@ replacement = '''function applyMobileChatGeometry(): void {
   }
 
   const visualViewport = window.visualViewport;
+  const viewportTop = Math.max(
+    0,
+    Math.min(window.innerHeight - 1, Math.round(visualViewport?.offsetTop || 0)),
+  );
   const availableHeight = Math.max(
     1,
     Math.min(
-      window.innerHeight,
+      window.innerHeight - viewportTop,
       Math.round(visualViewport?.height || window.innerHeight),
     ),
   );
-  const viewportTop = Math.max(0, Math.round(visualViewport?.offsetTop || 0));
 
   panel.style.setProperty("top", `${viewportTop}px`, "important");
   panel.style.setProperty("bottom", "auto", "important");
