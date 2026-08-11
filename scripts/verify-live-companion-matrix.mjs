@@ -44,11 +44,9 @@ for (const [companion, question, expected] of cases) {
   assert(greeting.answer.length >= 25, `${companion}: greeting is too thin: ${JSON.stringify(greeting)}`);
   assert(!/paste (?:the |a )?link|attach (?:the |a )?file/i.test(greeting.answer), `${companion}: greeting was misrouted to source handling: ${JSON.stringify(greeting)}`);
 
-  const history = [
-    { role: "assistant", text: greeting.answer },
-    { role: "user", text: question },
-  ];
-  const main = await ask(companion, question, history.slice(0, 1));
+  const main = await ask(companion, question, [{ role: "assistant", text: greeting.answer }]);
+  assert(main.mode !== "contextual-rules", `${companion}: substantive answer fell back to deterministic rules instead of live companion intelligence: ${JSON.stringify(main)}`);
+  assert(typeof main.model === "string" && main.model.length > 0, `${companion}: substantive answer did not report a live AI model: ${JSON.stringify(main)}`);
   assert(main.answer.length >= 90, `${companion}: main answer is too generic (${main.answer.length} characters): ${JSON.stringify(main)}`);
   assert(!/paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(main.answer), `${companion}: ordinary question was misrouted to source handling: ${JSON.stringify(main)}`);
   assert(!/i (?:opened|saved|uploaded|verified) (?:the |your )/i.test(main.answer), `${companion}: answer claimed an unconfirmed action: ${JSON.stringify(main)}`);
@@ -62,9 +60,11 @@ for (const [companion, question, expected] of cases) {
     { role: "assistant", text: main.answer },
   ];
   const follow = await ask(companion, followQuestion, followHistory);
+  assert(follow.mode !== "contextual-rules", `${companion}: follow-up fell back to deterministic rules instead of using conversation intelligence: ${JSON.stringify(follow)}`);
+  assert(typeof follow.model === "string" && follow.model.length > 0, `${companion}: follow-up did not report a live AI model: ${JSON.stringify(follow)}`);
   assert(follow.answer.length >= 60, `${companion}: follow-up answer is too thin: ${JSON.stringify(follow)}`);
   assert(follow.answer !== main.answer, `${companion}: follow-up repeated the previous answer: ${JSON.stringify(follow)}`);
-  assert(!/ask me about a book|tell me more|what would you like/i.test(follow.answer), `${companion}: follow-up reset to generic conversation: ${JSON.stringify(follow)}`);
+  assert(!/ask me about a book|tell me more|what would you like|try that question again/i.test(follow.answer), `${companion}: follow-up reset to generic conversation: ${JSON.stringify(follow)}`);
 
   report.cases.push({ companion, question, greeting, main, followQuestion, follow });
   await writeFile(`${output}/companion-matrix-partial.json`, `${JSON.stringify(report, null, 2)}\n`);
@@ -73,6 +73,7 @@ for (const [companion, question, expected] of cases) {
 assert(greetings.size >= 8, `companion greetings are not distinct enough (${greetings.size}/12 unique)`);
 report.checks = [
   "all twelve companions answer a greeting naturally",
+  "all twelve substantive turns use live AI rather than deterministic fallback",
   "all twelve answer the actual topic rather than source-upload instructions",
   "main answers contain topic-relevant substance",
   "follow-ups use conversation history instead of resetting",
