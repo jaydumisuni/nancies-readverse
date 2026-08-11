@@ -1,4 +1,5 @@
 import baseWorker from "./index";
+import { handleCanonicalTopicTurn } from "./grounded-canonical";
 import { handleGroundedReaderTurn } from "./grounded-reader";
 import { handleSmartCompanion } from "./smart-companion";
 
@@ -18,6 +19,8 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/companion/help") {
+      const canonical = await handleCanonicalTopicTurn(request.clone(), env, ctx);
+      if (canonical) return canonical;
       const grounded = await handleGroundedReaderTurn(request.clone(), env, ctx);
       if (grounded) return grounded;
       return handleSmartCompanion(request, env, ctx);
