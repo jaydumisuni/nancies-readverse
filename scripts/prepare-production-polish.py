@@ -15,16 +15,24 @@ else:
     if previous_exact in text:
         text = text.replace(previous_exact, new_nav, 1)
 
+# A focus proof should model the user's real action: bring an off-fold field
+# into view, then focus it. This still fails genuine clipping/overlap but does
+# not treat a legitimately scrollable laptop Inbox as a broken layout.
+old_focus = '''  const input = page.locator(selector).first();
+  await input.focus();
+'''
+new_focus = '''  const input = page.locator(selector).first();
+  await input.scrollIntoViewIfNeeded();
+  await input.focus();
+'''
+if old_focus not in text:
+    raise SystemExit("Expected focused-input proof sequence was not found")
+text = text.replace(old_focus, new_focus, 1)
+
 # Preserve exact input geometry in assertion failures so layout corrections are
 # made from evidence instead of guessing.
-text = text.replace(
-    '`${label}: focused input leaves the viewport horizontally`',
-    '`${label}: focused input leaves the viewport horizontally ${JSON.stringify(state)}`',
-)
-text = text.replace(
-    '`${label}: focused input leaves the viewport vertically`',
-    '`${label}: focused input leaves the viewport vertically ${JSON.stringify(state)}`',
-)
+text = text.replace('`${label}: focused input leaves the viewport horizontally`','`${label}: focused input leaves the viewport horizontally ${JSON.stringify(state)}`')
+text = text.replace('`${label}: focused input leaves the viewport vertically`','`${label}: focused input leaves the viewport vertically ${JSON.stringify(state)}`')
 
 # Companion panels animate in on tablet/desktop. Visibility alone becomes true
 # before the transform has fully settled, so prove the panel is actually inside
@@ -65,22 +73,14 @@ discovery_route = '''  await page.route("**/api/discovery/search", async (route)
       { title: "The Biggest Bluff", authors: ["Maria Konnikova"], year: 2020, description: "Poker, psychology and decisions under uncertainty.", whyMatch: "A strong match for poker, probability and decision-making under uncertainty.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780525522621" } },
       { title: "Thinking in Bets", authors: ["Annie Duke"], year: 2018, description: "Probability, incomplete information and better decisions.", whyMatch: "A useful probability-and-decisions companion to gambling-specific reading.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780735216358" } },
     ] : [{
-      title: "Pride and Prejudice",
-      authors: ["Jane Austen"],
-      year: 1813,
+      title: "Pride and Prejudice", authors: ["Jane Austen"], year: 1813,
       description: "A novel of manners, judgement and self-knowledge.",
       whyMatch: "Matched across public book catalogues using title, creator and edition identifiers.",
-      provider: "Google Books · Open Library",
-      identifiers: { ISBN_13: "9780141439518" },
-      rating: {
-        overall: 4.26,
-        ratingCount: 2000,
-        sourceCount: 2,
-        sources: [
-          { name: "Google Books", sourceId: "google-pride", rating: 4.4, ratingCount: 1200, confidence: 0.96 },
-          { name: "Open Library", sourceId: "/works/OL66554W", rating: 4.1, ratingCount: 800, confidence: 0.90 },
-        ],
-      },
+      provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780141439518" },
+      rating: { overall: 4.26, ratingCount: 2000, sourceCount: 2, sources: [
+        { name: "Google Books", sourceId: "google-pride", rating: 4.4, ratingCount: 1200, confidence: 0.96 },
+        { name: "Open Library", sourceId: "/works/OL66554W", rating: 4.1, ratingCount: 800, confidence: 0.90 },
+      ] },
     }];
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, candidates }) });
   });
@@ -94,21 +94,17 @@ fn_end = text.find('\n}\n\n', fn_start)
 if fn_end < 0:
     raise SystemExit("Could not determine overlap assertion boundary")
 fn_end += 3
-
 replacement = '''async function assertNoNavigationOverlap(page, label) {
   const result = await page.evaluate(() => {
     const clippedRect = (element) => {
       const style = getComputedStyle(element);
       if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) <= 0) return null;
       const source = element.getBoundingClientRect();
-      let left = Math.max(0, source.left);
-      let top = Math.max(0, source.top);
-      let right = Math.min(innerWidth, source.right);
-      let bottom = Math.min(innerHeight, source.bottom);
+      let left = Math.max(0, source.left), top = Math.max(0, source.top), right = Math.min(innerWidth, source.right), bottom = Math.min(innerHeight, source.bottom);
       for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-        const parentStyle = getComputedStyle(parent);
-        const clipsX = /(hidden|auto|scroll|clip)/.test(parentStyle.overflowX) || /(hidden|auto|scroll|clip)/.test(parentStyle.overflow);
-        const clipsY = /(hidden|auto|scroll|clip)/.test(parentStyle.overflowY) || /(hidden|auto|scroll|clip)/.test(parentStyle.overflow);
+        const s = getComputedStyle(parent);
+        const clipsX = /(hidden|auto|scroll|clip)/.test(s.overflowX) || /(hidden|auto|scroll|clip)/.test(s.overflow);
+        const clipsY = /(hidden|auto|scroll|clip)/.test(s.overflowY) || /(hidden|auto|scroll|clip)/.test(s.overflow);
         if (!clipsX && !clipsY) continue;
         const box = parent.getBoundingClientRect();
         if (clipsX) { left = Math.max(left, box.left); right = Math.min(right, box.right); }
@@ -128,8 +124,6 @@ replacement = '''async function assertNoNavigationOverlap(page, label) {
   assert(result.length === 0, `${label}: controls hidden behind mobile navigation: ${JSON.stringify(result)}`);
 }'''
 text = text[:fn_start] + replacement + text[fn_end:]
-
 text = text.replace('`${viewport.name}/Keyboard: chat panel exceeds resized viewport`','`${viewport.name}/Keyboard: chat panel exceeds resized viewport ${JSON.stringify(keyboard)}`')
 text = text.replace('`${viewport.name}/Keyboard: composer hides behind software keyboard area`','`${viewport.name}/Keyboard: composer hides behind software keyboard area ${JSON.stringify(keyboard)}`')
-
 path.write_text(text)
