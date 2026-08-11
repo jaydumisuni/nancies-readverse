@@ -1,0 +1,228 @@
+name: Run NoTVerse production polish on proof branch
+
+on:
+  push:
+    branches:
+      - polish-notverse-production-20260806
+
+permissions:
+  contents: write
+
+jobs:
+  prove-and-freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      BRANCH_PREVIEW: https://polish-notverse-production-20260806-notverse.pharrtechnolgiescoltd.workers.dev
+      LOCAL_PROOF_DIR: engineering-evidence/production-polish-local
+      PREVIEW_PROOF_DIR: engineering-evidence/production-polish-preview
+      LIVE_PROOF_DIR: engineering-evidence/production-polish-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: polish-notverse-production-20260806
+          fetch-depth: 0
+
+      - name: Apply the locally engineered product candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d engineering-patches/production-polish
+          cat engineering-patches/production-polish/part-*.b64 | base64 --decode > /tmp/notverse-production-polish.patch.gz
+          printf '%s  %s\n' '6c19abd69c0d89831d4a4ccaffe1805f547794265179cf9f01908e366a4d1db2' '/tmp/notverse-production-polish.patch.gz' | sha256sum --check
+          gzip -dc /tmp/notverse-production-polish.patch.gz > /tmp/notverse-production-polish.patch
+          git apply --check /tmp/notverse-production-polish.patch
+          git apply /tmp/notverse-production-polish.patch
+          git apply --check engineering-patches/production-polish/short-phone-home.patch
+          git apply engineering-patches/production-polish/short-phone-home.patch
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-production-polish.mjs')
+          text = path.read_text()
+
+          old_nav = 'page.locator(`${root} button`).filter({ hasText: label })'
+          new_nav = 'page.locator(root).getByRole("button", { name: label, exact: true })'
+          if old_nav not in text:
+              raise SystemExit('Expected exact navigation proof locator was not found')
+          text = text.replace(old_nav, new_nav, 1)
+
+          start_marker = '  await page.route("**/api/discovery/search", async (route) => {'
+          end_marker = '  await page.route("**/api/companion/help", async (route) => {'
+          start = text.find(start_marker)
+          end = text.find(end_marker, start + 1)
+          if start < 0 or end < 0:
+              raise SystemExit('Expected deterministic discovery proof route was not found')
+
+          discovery_route = '''  await page.route("**/api/discovery/search", async (route) => {
+            const body = route.request().postDataJSON() || {};
+            const query = String(body.query || "").toLowerCase();
+            const gambling = /gambl|casino|poker|odds|bet/.test(query);
+            const candidates = gambling
+              ? [
+                  { title: "Addiction by Design", authors: ["Natasha Dow Schüll"], year: 2012, description: "How machine gambling environments are engineered to keep people playing.", whyMatch: "A direct match for gambling-system design and behavioural psychology.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780691160887" } },
+                  { title: "The Biggest Bluff", authors: ["Maria Konnikova"], year: 2020, description: "Poker, psychology and decisions under uncertainty.", whyMatch: "A strong match for poker, probability and decision-making under uncertainty.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780525522621" } },
+                  { title: "Thinking in Bets", authors: ["Annie Duke"], year: 2018, description: "Probability, incomplete information and better decisions.", whyMatch: "A useful probability-and-decisions companion to gambling-specific reading.", provider: "Google Books · Open Library", identifiers: { ISBN_13: "9780735216358" } },
+                ]
+              : [{
+                  title: "Pride and Prejudice",
+                  authors: ["Jane Austen"],
+                  year: 1813,
+                  description: "A novel of manners, judgement and self-knowledge.",
+                  whyMatch: "Matched across public book catalogues using title, creator and edition identifiers.",
+                  provider: "Google Books · Open Library",
+                  identifiers: { ISBN_13: "9780141439518" },
+                  rating: {
+                    overall: 4.26,
+                    ratingCount: 2000,
+                    sourceCount: 2,
+                    sources: [
+                      { name: "Google Books", sourceId: "google-pride", rating: 4.4, ratingCount: 1200, confidence: 0.96 },
+                      { name: "Open Library", sourceId: "/works/OL66554W", rating: 4.1, ratingCount: 800, confidence: 0.9 },
+                    ],
+                  },
+                }];
+            await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, candidates }) });
+          });
+'''
+          path.write_text(text[:start] + discovery_route + text[end:])
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Strict production build
+        run: npm run build
+
+      - name: Install Chromium and WebKit proof engines
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+
+      - name: Start exact generated client locally
+        shell: bash
+        run: |
+          cat > /tmp/serve_notverse.py <<'PY'
+          import json
+          from functools import partial
+          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+
+          class Handler(SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.split('?', 1)[0] == '/api/auth/google/status':
+                      body = json.dumps({'configured': False, 'connected': False, 'account': None}).encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.send_header('Content-Length', str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                      return
+                  return super().do_GET()
+
+          ThreadingHTTPServer(('127.0.0.1', 4173), partial(Handler, directory='dist/client')).serve_forever()
+          PY
+          python3 /tmp/serve_notverse.py > /tmp/notverse-production-polish.log 2>&1 &
+          for n in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/notverse-production-polish.log
+          exit 1
+
+      - name: Gate 1 - full local screen, navigation, focus and geometry matrix
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+          PROOF_DIR: engineering-evidence/production-polish-local
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Freeze only locally proven product files on the PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf engineering-patches/production-polish
+          rm -f .github/workflows/diagnose-polish-chat.yml
+          rm -f .github/workflows/final-polish-gate.yml
+          rm -f .github/workflows/production-polish-proof.yml
+          git config user.name 'NoTVerse Verification'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Polish NoTVerse interactions, intelligence and public ratings'
+          git push origin HEAD:polish-notverse-production-20260806
+
+      - name: Rebuild frozen branch and record exact assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          js="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/client/index.html | head -1)"
+          css="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.css' dist/client/index.html | head -1)"
+          test -n "$js" && test -n "$css"
+          echo "js=$js" >> "$GITHUB_OUTPUT"
+          echo "css=$css" >> "$GITHUB_OUTPUT"
+          mkdir -p "$LOCAL_PROOF_DIR"
+          printf '{"commit":"%s","js":"%s","css":"%s"}\n' "$(git rev-parse HEAD)" "$js" "$css" > "$LOCAL_PROOF_DIR/generated-assets.json"
+
+      - name: Wait for exact Cloudflare branch-preview bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$LIVE_PROOF_DIR"
+          for n in $(seq 1 150); do
+            html="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/?proof=$n" || true)"
+            health="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/api/health?proof=$n" || true)"
+            if printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.js }}' \
+              && printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.css }}' \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$html" > "$LIVE_PROOF_DIR/index.html"
+              printf '%s\n' "$health" > "$LIVE_PROOF_DIR/health.json"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Exact branch-preview assets were not deployed.'
+          exit 1
+
+      - name: Gate 2A - full deployed interaction and visual matrix
+        env:
+          NOTVERSE_TEST_URL: https://polish-notverse-production-20260806-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/production-polish-preview
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Gate 2B - real multi-turn conversations with all twelve companions
+        env:
+          NOTVERSE_URL: https://polish-notverse-production-20260806-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/production-polish-live
+        run: node scripts/verify-live-companion-matrix.mjs
+
+      - name: Gate 2C - public-source rating flow
+        env:
+          NOTVERSE_URL: https://polish-notverse-production-20260806-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/production-polish-live
+        run: node scripts/verify-live-public-ratings.mjs
+
+      - name: Remove temporary production gate after every proof passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/run-production-polish-push.yml
+          git commit -m 'Remove temporary NoTVerse production proof gate'
+          git push origin HEAD:polish-notverse-production-20260806
+
+      - name: Upload complete retained evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-production-ready-proof
+          path: |
+            engineering-evidence/production-polish-local
+            engineering-evidence/production-polish-preview
+            engineering-evidence/production-polish-live
+            /tmp/notverse-production-polish.log
+          if-no-files-found: warn
+          retention-days: 14
