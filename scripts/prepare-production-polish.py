@@ -3,12 +3,17 @@ from pathlib import Path
 path = Path("scripts/verify-production-polish.mjs")
 text = path.read_text()
 
-# Make navigation assertions target the exact six-tab labels rather than
-# accidentally matching nested/partial button text.
+# Match the visible six-tab label exactly. Role names can include icon metadata,
+# while a plain hasText string makes "Me" match "Home". Exact visible text is
+# the stable product contract we actually need to prove.
 old_nav = 'page.locator(`${root} button`).filter({ hasText: label })'
-new_nav = 'page.locator(root).getByRole("button", { name: label, exact: true })'
+new_nav = 'page.locator(`${root} button`).filter({ hasText: new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*$`, "i") }).first()'
 if old_nav in text:
     text = text.replace(old_nav, new_nav, 1)
+else:
+    previous_exact = 'page.locator(root).getByRole("button", { name: label, exact: true })'
+    if previous_exact in text:
+        text = text.replace(previous_exact, new_nav, 1)
 
 # Local browser proof uses deterministic catalogue responses so it validates the
 # UI and interaction contract without depending on external network timing.
