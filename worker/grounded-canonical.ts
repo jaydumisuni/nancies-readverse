@@ -11,6 +11,15 @@ type VerifiedBook = {
 };
 
 type Seed = { title: string; author: string };
+type TopicPack = {
+  id: "gambling" | "grief" | "sleep" | "pricing";
+  matches(question: string): boolean;
+  seeds: Seed[];
+  minVerified: number;
+  intro: string;
+  reasons: string[];
+  tail: string;
+};
 
 const HEADERS = {
   accept: "application/json",
@@ -24,15 +33,87 @@ const OPENERS: Record<string, string> = {
   Temari: "Yes. We can rank this efficiently.", "Mei Mei": "Certainly. It should justify your time.",
 };
 
-const GAMBLING_SEEDS: Seed[] = [
-  { title: "Addiction by Design", author: "Natasha Dow Schüll" },
-  { title: "The Biggest Bluff", author: "Maria Konnikova" },
-  { title: "Thinking in Bets", author: "Annie Duke" },
-  { title: "The Theory of Gambling and Statistical Logic", author: "Richard A. Epstein" },
+const TOPICS: TopicPack[] = [
+  {
+    id: "gambling",
+    matches: (q) => /\b(?:recommend(?:ation|ations|ed)?|suggest(?:ion|ions|ed)?|books?\s+(?:about|on|for)|what should i read)\b/i.test(q)
+      && /\b(?:gambling|casino|betting|wager|poker)\b/i.test(q),
+    seeds: [
+      { title: "Addiction by Design", author: "Natasha Dow Schüll" },
+      { title: "The Biggest Bluff", author: "Maria Konnikova" },
+      { title: "Thinking in Bets", author: "Annie Duke" },
+      { title: "The Theory of Gambling and Statistical Logic", author: "Richard A. Epstein" },
+    ],
+    minVerified: 3,
+    intro: "I checked these gambling titles against live public book catalogues before recommending them.",
+    reasons: [
+      "Strongest fit: it approaches gambling as a designed behavioural system, which gives you more than rules or anecdotes.",
+      "Fit: it connects poker, uncertainty and decision-making in a readable real-world frame.",
+      "Fit: it focuses on decisions under uncertainty and the quality of a bet rather than pretending outcomes prove the decision was good.",
+    ],
+    tail: "If you want the probability/statistics side specifically, I can narrow this verified list in that direction.",
+  },
+  {
+    id: "grief",
+    matches: (q) => /\b(?:grief|grieving|bereavement|mourning|loss)\b/i.test(q)
+      && /\b(?:novel|fiction|book|read|suggest|recommend)\b/i.test(q),
+    seeds: [
+      { title: "A Man Called Ove", author: "Fredrik Backman" },
+      { title: "The Reading List", author: "Sara Nisha Adams" },
+      { title: "The Collected Regrets of Clover", author: "Mikki Brammer" },
+      { title: "The Storied Life of A.J. Fikry", author: "Gabrielle Zevin" },
+    ],
+    minVerified: 1,
+    intro: "I checked these gentler grief novels against live public book catalogues before suggesting them.",
+    reasons: [
+      "Strongest fit: grief is central, but warmth, community and dry humour keep the story from becoming relentlessly bleak.",
+      "Fit: it uses reading and human connection as a route through loneliness and grief rather than treating loss as spectacle.",
+      "Fit: it stays close to grief and mortality while leaving room for tenderness, change and ordinary life.",
+    ],
+    tail: "If you tell me whether you want quiet, funny, romantic or family-centred, I can narrow the verified grief choices further.",
+  },
+  {
+    id: "sleep",
+    matches: (q) => /\b(?:sleep|insomnia|circadian)\b/i.test(q)
+      && /\b(?:scientific|science|read|book|understand|research)\b/i.test(q),
+    seeds: [
+      { title: "Why We Sleep", author: "Matthew Walker" },
+      { title: "The Sleep Solution", author: "W. Chris Winter" },
+      { title: "The Secret World of Sleep", author: "Penelope A. Lewis" },
+      { title: "The Promise of Sleep", author: "William C. Dement" },
+    ],
+    minVerified: 1,
+    intro: "I checked these sleep books against live public catalogues first; they are better starting points for scientific sleep reading than wellness-style claims with no source trail.",
+    reasons: [
+      "Strongest fit: it gives a broad map of sleep science and why sleep matters; treat individual claims as starting points to verify against current research rather than as unquestionable rules.",
+      "Fit: it is written from clinical sleep-medicine practice and is useful for separating common sleep problems from generic wellness advice.",
+      "Fit: it focuses on what the sleeping brain is doing, giving you a neuroscience-oriented route into the subject.",
+    ],
+    tail: "If you want the most academic route, I can narrow this to textbooks and review literature instead of popular-science books.",
+  },
+  {
+    id: "pricing",
+    matches: (q) => /\b(?:pricing|fees?|rates?|value pricing)\b/i.test(q)
+      && /\b(?:professional|services|consulting|consultant|agency|creative)\b/i.test(q),
+    seeds: [
+      { title: "Implementing Value Pricing", author: "Ronald J. Baker" },
+      { title: "Million Dollar Consulting", author: "Alan Weiss" },
+      { title: "The Win Without Pitching Manifesto", author: "Blair Enns" },
+      { title: "Pricing Creativity", author: "Blair Enns" },
+    ],
+    minVerified: 1,
+    intro: "I checked these pricing and professional-services titles against live public book catalogues before ranking them.",
+    reasons: [
+      "Strongest fit: it directly challenges hourly billing and gives a value-pricing framework, so the practical return is closest to the pricing decision itself.",
+      "Fit: it connects consulting economics, positioning and fees, which is useful when the service itself is the product.",
+      "Fit: it is especially useful when expertise is sold through proposals, pitches or creative services and pricing power depends on positioning.",
+    ],
+    tail: "If you tell me whether you sell consulting, repair, agency or creative work, I can narrow the verified pricing list to the fastest practical fit.",
+  },
 ];
 
 /**
- * High-signal subject anchors for cases where broad catalogue ranking tends to return
+ * High-signal topic anchors for cases where broad catalogue ranking tends to return
  * lexical noise. A seed is never user-visible merely because it is listed here: it
  * must first be independently returned by a live public catalogue with matching title
  * and author. This is retrieval seeding, not a fabricated recommendation list.
@@ -46,41 +127,33 @@ export async function handleCanonicalTopicTurn(
   let body: CanonicalBody;
   try { body = await request.json() as CanonicalBody; } catch { return null; }
   const question = typeof body.question === "string" ? body.question.trim() : "";
-  if (!isGamblingRecommendation(question)) return null;
+  const topic = TOPICS.find((candidate) => candidate.matches(question));
+  if (!topic) return null;
   const companion = typeof body.companion === "string" && body.companion.trim() ? body.companion.trim() : "Gojo";
 
-  const settled = await Promise.allSettled(GAMBLING_SEEDS.map(verifySeed));
+  const settled = await Promise.allSettled(topic.seeds.map(verifySeed));
   const books = settled.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
   const unique = dedupe(books).slice(0, 4);
-  if (unique.length < 3) return null;
+  if (unique.length < topic.minVerified) return null;
 
   const opener = OPENERS[companion] ?? OPENERS.Gojo;
-  const lines = [`${opener} I checked these gambling titles against live public book catalogues before recommending them.`];
+  const lines = [`${opener} ${topic.intro}`];
   unique.slice(0, 3).forEach((book, index) => {
     const author = book.authors.join(", ") || "author not listed in the catalogue result";
     const year = book.year ? ` (${book.year})` : "";
-    const reason = index === 0
-      ? "Strongest fit: it approaches gambling as a designed behavioural system, which gives you more than rules or anecdotes."
-      : index === 1
-        ? "Fit: it connects poker, uncertainty and decision-making in a readable real-world frame."
-        : "Fit: it focuses on decisions under uncertainty and the quality of a bet rather than pretending outcomes prove the decision was good.";
+    const reason = topic.reasons[index] || topic.reasons.at(-1) || "Fit: the public catalogue verified this title and author for the topic you asked about.";
     lines.push(`${index + 1}. **${book.title}** — ${author}${year}\n${reason}`);
   });
-  lines.push("If you want the probability/statistics side specifically, I can narrow this verified list in that direction.");
+  lines.push(topic.tail);
 
   return json({
     ok: true,
     answer: lines.join("\n\n"),
     mode: "catalogue-grounded",
-    model: "verified-public-catalogue+canonical-topic-seeds",
+    model: `verified-public-catalogue+canonical-topic-seeds:${topic.id}`,
     companion,
-    evidence: { type: "public-catalogue", intent: "recommend", books: unique.slice(0, 3) },
+    evidence: { type: "public-catalogue", intent: "recommend", topic: topic.id, books: unique.slice(0, 3) },
   });
-}
-
-function isGamblingRecommendation(question: string): boolean {
-  return /\b(?:recommend(?:ation|ations|ed)?|suggest(?:ion|ions|ed)?|books?\s+(?:about|on|for)|what should i read)\b/i.test(question)
-    && /\b(?:gambling|casino|betting|wager|poker)\b/i.test(question);
 }
 
 async function verifySeed(seed: Seed): Promise<VerifiedBook | null> {
@@ -92,8 +165,8 @@ async function verifySeed(seed: Seed): Promise<VerifiedBook | null> {
   const second = a && b ? b : null;
   return {
     ...first,
-    // Use our canonical display casing only after a live public catalogue has
-    // independently matched this exact normalized title + author pair.
+    // Use canonical display text only after a live catalogue independently matched
+    // this exact normalized title + author pair.
     title: seed.title,
     authors: [seed.author],
     year: first.year || second?.year,
