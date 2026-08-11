@@ -1,5 +1,29 @@
-FAILED_STAGE=local-interaction-proof
+FAILED_STAGE=companion-matrix
 
+Selecting previously unselected package libopenni2-0:amd64.
+Preparing to unpack .../155-libopenni2-0_2.2.0.33+dfsg-18_amd64.deb ...
+Unpacking libopenni2-0:amd64 (2.2.0.33+dfsg-18) ...
+Selecting previously unselected package libqrencode4:amd64.
+Preparing to unpack .../156-libqrencode4_4.1.1-1build2_amd64.deb ...
+Unpacking libqrencode4:amd64 (4.1.1-1build2) ...
+Selecting previously unselected package libsecret-common.
+Preparing to unpack .../157-libsecret-common_0.21.4-1build3_all.deb ...
+Unpacking libsecret-common (0.21.4-1build3) ...
+Selecting previously unselected package libsecret-1-0:amd64.
+Preparing to unpack .../158-libsecret-1-0_0.21.4-1build3_amd64.deb ...
+Unpacking libsecret-1-0:amd64 (0.21.4-1build3) ...
+Selecting previously unselected package libsndio7.0:amd64.
+Preparing to unpack .../159-libsndio7.0_1.9.0-0.3build3_amd64.deb ...
+Unpacking libsndio7.0:amd64 (1.9.0-0.3build3) ...
+Selecting previously unselected package libsoundtouch1:amd64.
+Preparing to unpack .../160-libsoundtouch1_2.3.2+ds1-1build1_amd64.deb ...
+Unpacking libsoundtouch1:amd64 (2.3.2+ds1-1build1) ...
+Selecting previously unselected package libspandsp2t64:amd64.
+Preparing to unpack .../161-libspandsp2t64_0.0.6+dfsg-2.1build1_amd64.deb ...
+Unpacking libspandsp2t64:amd64 (0.0.6+dfsg-2.1build1) ...
+Selecting previously unselected package libsrtp2-1:amd64.
+Preparing to unpack .../162-libsrtp2-1_2.5.0-3build1_amd64.deb ...
+Unpacking libsrtp2-1:amd64 (2.5.0-3build1) ...
 Selecting previously unselected package libwayland-server0:amd64.
 Preparing to unpack .../163-libwayland-server0_1.22.0-2.1build1_amd64.deb ...
 Unpacking libwayland-server0:amd64 (1.22.0-2.1build1) ...
@@ -309,14 +333,30 @@ Downloading WebKit 26.5 (playwright webkit v2336) from https://cdn.playwright.de
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 102 MiB
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 102 MiB
 WebKit 26.5 (playwright webkit v2336) downloaded to /home/runner/.cache/ms-playwright/webkit-2336
-curl: (7) Failed to connect to 127.0.0.1 port 4173 after 0 ms: Couldn't connect to server
-node:internal/modules/run_main:123
-    triggerUncaughtException(
-    ^
+{
+  "ok": true,
+  "viewports": 6,
+  "screenshots": 66,
+  "checks": [
+    "all ten swipe-only setup pages and exact approved branding",
+    "six-part navigation in every viewport",
+    "no horizontal overflow",
+    "no controls hidden behind mobile navigation",
+    "Search, global Search, Inbox and chat inputs stay at 16px on mobile",
+    "Search result renders weighted public ratings",
+    "mobile Notes stay above navigation and reserve swipe gestures",
+    "chat stays inside normal and keyboard-sized viewports",
+    "mobile navigation becomes inactive while chat is open",
+    "multi-turn chat remains usable"
+  ]
+}
+file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:24
+  if (!condition) throw new Error(message);
+                        ^
 
-Error: laptop/Inbox: focused input leaves the viewport vertically {"fontSize":16,"scale":1,"box":{"left":658.890625,"right":1205.734375,"top":803.6875,"bottom":848.6875},"viewport":{"width":1366,"height":768}}
-    at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:41:25)
-    at assertFocusedInput (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:187:3)
-    at async file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-production-polish.mjs:291:9
+Error: Itachi: main answer is too generic (63 characters)
+    at assert (file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:24:25)
+    at file:///home/runner/work/nancies-readverse/nancies-readverse/scripts/verify-live-companion-matrix.mjs:52:3
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
 
 Node.js v22.23.1
