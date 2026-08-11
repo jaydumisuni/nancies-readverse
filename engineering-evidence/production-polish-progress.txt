@@ -1,5 +1,5 @@
-stage=proof-adjusted
+stage=strict-build
 result=pass
 workflow_sha=0e3b72fef6959e76b544633590405a6082365acb
-head=e0e3b16e2d38b81cf9b88e42853bbadeed1f75ec
-time_utc=2026-08-11T00:34:45Z
+head=bffeb429ee6f5a54b9a3c90151642de7ab375ede
+time_utc=2026-08-11T00:35:04Z
