@@ -36,6 +36,10 @@ jobs:
           text = text.replace('git commit -m "$message" -- "$@"', 'git commit -m "$message [skip ci]" -- "$@"')
           text = text.replace("git commit -m 'Polish NoTVerse interactions, intelligence and public ratings'", "git commit -m 'Polish NoTVerse interactions, intelligence and public ratings [skip ci]'")
           text = text.replace("git commit -m 'Freeze proven NoTVerse production candidate'", "git commit -m 'Freeze proven NoTVerse production candidate [skip ci]'")
+          old = '    tail -n 260 "$RUNLOG" 2>/dev/null || true\n'
+          new = old + '    printf "\\n--- verifier geometry section ---\\n"\n    sed -n "105,145p" scripts/verify-production-polish.mjs 2>/dev/null || true\n'
+          if old in text:
+              text = text.replace(old, new, 1)
           path.write_text(text)
           PY
       - name: Run the production candidate gate
