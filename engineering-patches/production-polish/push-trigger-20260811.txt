@@ -4,3 +4,4 @@ Stepwise production proof trigger.
 Final isolated stepwise trigger after removing competing branch writers.
 Minimal runner trigger.
 Mobile Home viewport correction trigger.
+Protected-nav production proof trigger.
