@@ -1,0 +1,221 @@
+name: Verify grounded NoTVerse companion release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notverse-grounded-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prove:
+    if: github.head_ref == 'fix-notverse-grounded-companions-20260811'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      BRANCH_PREVIEW: https://fix-notverse-grounded-companions-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+      LOCAL_PROOF_DIR: engineering-evidence/grounded-release-local
+      PREVIEW_PROOF_DIR: engineering-evidence/grounded-release-preview
+      LIVE_PROOF_DIR: engineering-evidence/grounded-release-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Strict product build
+        run: npm run build
+
+      - name: Install Chromium and WebKit
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+
+      - name: Start exact generated client locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/serve_notverse.py <<'PY'
+          import json
+          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+          from functools import partial
+          class Handler(SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.split('?', 1)[0] == '/api/auth/google/status':
+                      payload = json.dumps({'configured': False, 'connected': False, 'account': None}).encode()
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.send_header('Content-Length', str(len(payload)))
+                      self.end_headers()
+                      self.wfile.write(payload)
+                      return
+                  return super().do_GET()
+          ThreadingHTTPServer(('127.0.0.1', 4173), partial(Handler, directory='dist/client')).serve_forever()
+          PY
+          python3 /tmp/serve_notverse.py >/tmp/notverse-grounded-local.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/notverse-grounded-local.log
+          exit 1
+
+      - name: Exercise every route, focus state and viewport locally
+        env:
+          NOTVERSE_TEST_URL: http://127.0.0.1:4173
+          PROOF_DIR: engineering-evidence/grounded-release-local
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Record exact generated client assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          js="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/client/index.html | head -1)"
+          css="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.css' dist/client/index.html | head -1)"
+          test -n "$js" && test -n "$css"
+          echo "js=$js" >> "$GITHUB_OUTPUT"
+          echo "css=$css" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for exact Cloudflare branch preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$LIVE_PROOF_DIR"
+          for attempt in $(seq 1 150); do
+            html="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/?proof=$attempt" || true)"
+            health="$(curl -fsS --max-time 20 "$BRANCH_PREVIEW/api/health?proof=$attempt" || true)"
+            if printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.js }}' \
+              && printf '%s' "$html" | grep -Fq '${{ steps.assets.outputs.css }}' \
+              && printf '%s' "$health" | grep -Fq '"app":"NoTVerse"'; then
+              printf '%s\n' "$html" > "$LIVE_PROOF_DIR/index.html"
+              printf '%s\n' "$health" > "$LIVE_PROOF_DIR/health.json"
+              printf 'branch_assets=match\nbranch_identity=NoTVerse\n' > "$LIVE_PROOF_DIR/deployment.txt"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Exact correction-branch bundle never became live.' >&2
+          exit 1
+
+      - name: Re-exercise every interaction on deployed branch preview
+        env:
+          NOTVERSE_TEST_URL: https://fix-notverse-grounded-companions-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/grounded-release-preview
+        run: node scripts/verify-production-polish.mjs
+
+      - name: Prove twelve companion conversations and catalogue grounding
+        shell: bash
+        env:
+          NOTVERSE_URL: https://fix-notverse-grounded-companions-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+        run: |
+          set -euo pipefail
+          mkdir -p "$LIVE_PROOF_DIR"
+          cat > /tmp/verify_grounded.mjs <<'JS'
+          import { writeFile } from 'node:fs/promises';
+          const base = process.env.NOTVERSE_URL.replace(/\/$/, '');
+          const out = process.env.LIVE_PROOF_DIR;
+          const cases = [
+            ['Gojo','Recommend three books about decision-making under uncertainty and explain why each is useful.',['decision','uncertainty'],true],
+            ['Itachi','Compare 1984 and Brave New World without spoilers. What different danger does each examine?',['1984','brave new world','control'],false],
+            ['Naruto','I have lost my reading motivation. Give me a realistic way to restart without forcing a huge goal.',['reading','small'],false],
+            ['Kakashi','I half remember a literary novel about a butler looking back on his life and missed choices. What might it be?',['remains of the day','ishiguro','butler'],true],
+            ['Megumi','Explain the difference between a manga chapter, volume and omnibus so a beginner can buy the right thing.',['chapter','volume','omnibus'],false],
+            ['Sasuke','Recommend a concise book about discipline that is not empty motivational hype, and explain the trade-off.',['discipline'],true],
+            ['Maki','Which research methods book is most useful for someone designing their first mixed-methods study, and why?',['research','methods'],true],
+            ['Nobara','Recommend three readable books on fashion history that connect clothing to power and identity.',['fashion','clothing'],true],
+            ['Hinata','Suggest a gentle novel for someone processing grief, but avoid anything relentlessly bleak.',['grief'],true],
+            ['Sakura','What should I read to understand sleep scientifically without drifting into wellness misinformation?',['sleep'],true],
+            ['Temari','Compare principled negotiation with hard bargaining. When does each approach fail?',['negotiation','bargaining'],false],
+            ['Mei Mei','Recommend books on pricing professional services and explain which one gives the fastest practical return.',['pricing','services'],true],
+          ];
+          const assert=(c,m)=>{if(!c)throw new Error(m)};
+          async function ask(companion,question,history=[]){
+            const r=await fetch(`${base}/api/companion/help`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({companion,question,history}),signal:AbortSignal.timeout(60000)});
+            const b=await r.json(); assert(r.ok&&b.ok&&typeof b.answer==='string',`${companion}: ${r.status} ${JSON.stringify(b)}`); return b;
+          }
+          function boldTitles(text){return [...text.matchAll(/\*\*([^*]+)\*\*/g)].map(m=>m[1].trim())}
+          function norm(v){return String(v).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+          const report={ok:false,base,generatedAt:new Date().toISOString(),cases:[]}; const greetings=new Set();
+          for(const [companion,question,expected,grounded] of cases){
+            const greeting=await ask(companion,'Hi'); greetings.add(greeting.answer);
+            assert(greeting.answer.length>=25,`${companion}: thin greeting`);
+            assert(!/paste (?:the |a )?link|attach (?:the |a )?file/i.test(greeting.answer),`${companion}: greeting misrouted`);
+            const main=await ask(companion,question,[{role:'assistant',text:greeting.answer}]);
+            const lower=main.answer.toLowerCase(); assert(expected.some(t=>lower.includes(t)),`${companion}: off-topic main: ${main.answer}`);
+            assert(!/i (?:opened|saved|uploaded|verified) (?:the |your )/i.test(main.answer),`${companion}: unconfirmed action claim`);
+            let evidenceTitles=[];
+            if(grounded){
+              assert(main.mode==='catalogue-grounded',`${companion}: factual book turn was not catalogue-grounded: ${JSON.stringify(main)}`);
+              assert(main.evidence?.type==='public-catalogue'&&Array.isArray(main.evidence.books)&&main.evidence.books.length,`${companion}: missing catalogue evidence`);
+              for(const book of main.evidence.books){
+                assert(book.title&&Array.isArray(book.authors),`${companion}: malformed evidence book`);
+                assert(Array.isArray(book.providers)&&book.providers.length,`${companion}: missing provider evidence`);
+                assert(book.providers.every(p=>p==='Google Books'||p==='Open Library'),`${companion}: unapproved provider ${book.providers}`);
+              }
+              evidenceTitles=main.evidence.books.map(b=>b.title);
+              const rendered=boldTitles(main.answer);
+              assert(rendered.length>0,`${companion}: no rendered grounded titles`);
+              assert(rendered.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: rendered title not in evidence: ${rendered} vs ${evidenceTitles}`);
+              if(companion==='Kakashi') assert(evidenceTitles.some(t=>norm(t).includes('remains of the day')),`Kakashi: remembered-title identification missed The Remains of the Day: ${evidenceTitles}`);
+            } else {
+              assert(main.mode==='workers-ai'||main.mode==='workers-ai-repair'||main.mode==='conversation-router',`${companion}: general turn failed intelligence route: ${JSON.stringify(main)}`);
+              assert(main.answer.length>=90,`${companion}: general answer too thin`);
+            }
+            const followQ='Why is your first conclusion or recommendation the strongest fit for what I asked?';
+            const follow=await ask(companion,followQ,[{role:'assistant',text:greeting.answer},{role:'user',text:question},{role:'assistant',text:main.answer}]);
+            assert(follow.answer.length>=60,`${companion}: thin follow-up`);
+            assert(follow.answer!==main.answer,`${companion}: repeated answer`);
+            if(grounded){
+              assert(follow.mode==='catalogue-grounded-followup',`${companion}: grounded follow-up escaped evidence path: ${JSON.stringify(follow)}`);
+              const followTitles=boldTitles(follow.answer);
+              assert(followTitles.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: follow-up introduced unverified title ${followTitles} vs ${evidenceTitles}`);
+            }
+            report.cases.push({companion,question,greeting,main,followQuestion:followQ,follow});
+            await writeFile(`${out}/companion-grounding-partial.json`,JSON.stringify(report,null,2)+'\n');
+          }
+          assert(greetings.size>=8,`only ${greetings.size}/12 distinct greetings`);
+          report.ok=true; report.uniqueGreetings=greetings.size;
+          await writeFile(`${out}/companion-grounding.json`,JSON.stringify(report,null,2)+'\n');
+          console.log(JSON.stringify({ok:true,companions:report.cases.length,uniqueGreetings:greetings.size},null,2));
+          JS
+          LIVE_PROOF_DIR="$LIVE_PROOF_DIR" node /tmp/verify_grounded.mjs
+
+      - name: Prove public ratings and absence of approval placeholder
+        shell: bash
+        env:
+          NOTVERSE_URL: https://fix-notverse-grounded-companions-20260811-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/grounded-release-live
+        run: |
+          set -euo pipefail
+          html="$(curl -fsS "$NOTVERSE_URL/")"
+          if printf '%s' "$html" | grep -Eiq 'provider connections pending|ratings are shown only when approved sources agree|approval pending'; then
+            echo 'Obsolete rating approval/pending copy is still rendered.' >&2
+            exit 1
+          fi
+          node scripts/verify-live-public-ratings.mjs
+
+      - name: Upload complete correction proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notverse-grounded-production-proof
+          path: |
+            engineering-evidence/grounded-release-local
+            engineering-evidence/grounded-release-preview
+            engineering-evidence/grounded-release-live
+            /tmp/notverse-grounded-local.log
+          if-no-files-found: warn
+          retention-days: 14
