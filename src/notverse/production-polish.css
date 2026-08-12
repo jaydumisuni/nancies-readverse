@@ -129,6 +129,16 @@
     max-width: 100%;
   }
 
+  /* Once a user starts a real draft, open the composer like a proper editor
+     instead of leaving it as an old one-line chat field. This gives enough
+     vertical room to reread and correct the beginning without horizontal
+     scrolling. It collapses again as soon as the draft is sent/cleared. */
+  .companion-panel.open .chat-composer-editor:not(:placeholder-shown) {
+    height: min(260px, 42dvh) !important;
+    max-height: min(260px, 42dvh) !important;
+    overflow-y: auto !important;
+  }
+
   .notverse-search-box {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
@@ -374,12 +384,38 @@
     line-height: 1.25;
   }
 
+  /* On a 640px phone the conversation picker and thread header were using
+     enough vertical space to force the newest bubble behind the composer.
+     Keep both controls, but compact them so the active message has a real
+     readable viewport of its own. */
   .inbox-layout {
-    grid-template-rows: 82px minmax(0, 1fr);
+    grid-template-rows: 64px minmax(0, 1fr);
   }
 
   .inbox-layout > aside {
-    max-height: 82px !important;
+    max-height: 64px !important;
+  }
+
+  .inbox-layout > aside > button {
+    min-height: 58px;
+    padding: 6px 8px !important;
+  }
+
+  .inbox-layout > main > header {
+    min-height: 52px;
+    padding: 7px 10px !important;
+    gap: 8px !important;
+  }
+
+  .inbox-layout > main > header > span {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px;
+  }
+
+  .inbox-layout > main > header small {
+    font-size: 9px !important;
+    line-height: 1.2;
   }
 
   .message-thread {
