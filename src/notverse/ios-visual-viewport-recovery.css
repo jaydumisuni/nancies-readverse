@@ -53,8 +53,8 @@
     left: var(--notverse-vv-left, 0px) !important;
     width: var(--notverse-vv-width, 100vw) !important;
     height: calc(
-      var(--notverse-vv-height, 100dvh)
-      - var(--notverse-replies-nav-clearance, calc(72px + env(safe-area-inset-bottom)))
+      var(--notverse-vv-height, 100dvh) -
+      var(--notverse-replies-nav-clearance, calc(72px + env(safe-area-inset-bottom)))
     ) !important;
     max-height: none !important;
     z-index: 4000 !important;
