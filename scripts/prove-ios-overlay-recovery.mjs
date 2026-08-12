@@ -38,6 +38,26 @@ async function rect(page, selector) {
   });
 }
 
+async function visibleBounds(page) {
+  return page.evaluate(() => {
+    const viewport = window.visualViewport;
+    const top = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
+    const left = Math.max(0, Math.round(viewport?.offsetLeft ?? 0));
+    const width = Math.max(1, Math.round(viewport?.width ?? window.innerWidth));
+    const layoutHeight = Math.max(1, window.innerHeight - top);
+    const height = Math.max(1, Math.min(layoutHeight, Math.round(viewport?.height ?? window.innerHeight)));
+    return {
+      top,
+      left,
+      width,
+      height,
+      bottom: top + height,
+      innerHeight: window.innerHeight,
+      visualHeight: viewport?.height ?? null,
+    };
+  });
+}
+
 async function injectVisualViewport(page, { offsetTop, offsetLeft = 0, width, height }) {
   return page.evaluate(({ offsetTop, offsetLeft, width, height }) => {
     const viewport = window.visualViewport;
@@ -77,9 +97,15 @@ async function proveChat(browserType, browserName, width, height, keyboardHeight
     await editor.fill("This is a real mobile draft that must remain visible while the software keyboard changes the Safari visual viewport.");
     await editor.focus();
 
+    /* Playwright viewport resizing is only a layout approximation. WebKit can
+       legitimately retain a larger visualViewport for some emulated sizes, so
+       compare against the browser's observed visible bounds rather than an
+       invented keyboard coordinate. The deterministic offset test below then
+       covers the Safari visualViewport panning path explicitly. */
     await page.setViewportSize({ width, height: keyboardHeight });
     await page.waitForTimeout(950);
 
+    const visible = await visibleBounds(page);
     const panel = await rect(page, ".companion-panel.open");
     const composer = await rect(page, ".companion-panel.open .chat-input");
     const chatBody = await rect(page, ".companion-panel.open .chat-body");
@@ -92,61 +118,38 @@ async function proveChat(browserType, browserName, width, height, keyboardHeight
 
     assert(focused, `${browserName}: chat editor lost focus`);
     assert(Math.abs(scale - 1) < .01, `${browserName}: focus zoomed page to ${scale}`);
-    assert(panel.top >= -1 && panel.bottom <= keyboardHeight + 1, `${browserName}: chat panel exceeds keyboard viewport ${JSON.stringify(panel)}`);
-    assert(composer.bottom <= keyboardHeight + 1, `${browserName}: composer is behind keyboard ${JSON.stringify(composer)}`);
+    assert(panel.top >= visible.top - 1 && panel.bottom <= visible.bottom + 1, `${browserName}: chat panel exceeds observed visual viewport ${JSON.stringify({ panel, visible })}`);
+    assert(composer.bottom <= visible.bottom + 1, `${browserName}: composer is behind observed keyboard viewport ${JSON.stringify({ composer, visible })}`);
     assert(chatBody.bottom <= composer.top + 1, `${browserName}: chat body overlaps composer`);
     assert(nav.display === "none" || nav.visibility === "hidden" || Number(nav.opacity) === 0, `${browserName}: mobile nav remains visible behind chat ${JSON.stringify(nav)}`);
 
     await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-chat-keyboard.png`, fullPage: false });
+    report.cases.push({ kind: "chat-keyboard", browserName, width, requestedHeight: keyboardHeight, visible, panel, composer, chatBody, nav });
 
-    report.cases.push({ kind: "chat-keyboard", browserName, width, height: keyboardHeight, panel, composer, chatBody, nav });
-  } finally {
-    await context.close();
-    await browser.close();
-  }
-}
-
-async function proveOffsetRecovery(browserType, browserName) {
-  const width = 390;
-  const height = 844;
-  const offsetTop = 96;
-  const visibleHeight = 524;
-  const browser = await browserType.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width, height },
-    isMobile: true,
-    hasTouch: true,
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
-
-  try {
-    await prepare(page);
-    await page.getByRole("button", { name: "Chat now", exact: true }).click();
-    const editor = page.locator(".companion-panel.open textarea.chat-composer-editor");
-    await editor.waitFor();
-    await editor.fill("Offset viewport recovery proof");
-    await editor.focus();
-
+    /* The supplied real iPhone captures exposed the non-zero offset path that
+       resize-only emulation missed. Force that exact browser-state shape at
+       every supported phone width and prove the production code follows it. */
+    const offsetTop = 48;
+    const injectedHeight = Math.max(220, keyboardHeight - offsetTop);
     const injected = await injectVisualViewport(page, {
       offsetTop,
       width,
-      height: visibleHeight,
+      height: injectedHeight,
     });
-    assert(injected, `${browserName}: could not inject non-zero visualViewport offset coverage`);
+    assert(injected, `${browserName}: could not inject non-zero chat visualViewport coverage`);
     await page.waitForTimeout(950);
 
-    const panel = await rect(page, ".companion-panel.open");
-    const composer = await rect(page, ".companion-panel.open .chat-input");
+    const offsetPanel = await rect(page, ".companion-panel.open");
+    const offsetComposer = await rect(page, ".companion-panel.open .chat-input");
     const cssTop = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--notverse-vv-top").trim());
 
-    assert(Math.abs(panel.top - offsetTop) <= 1, `${browserName}: panel did not follow visualViewport.offsetTop ${JSON.stringify(panel)}`);
-    assert(panel.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset panel exceeds visible viewport ${JSON.stringify(panel)}`);
-    assert(composer.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset composer falls outside visible viewport ${JSON.stringify(composer)}`);
+    assert(Math.abs(offsetPanel.top - offsetTop) <= 1, `${browserName}: chat panel did not follow visualViewport.offsetTop ${JSON.stringify(offsetPanel)}`);
+    assert(offsetPanel.bottom <= offsetTop + injectedHeight + 1, `${browserName}: injected chat panel exceeds visible viewport ${JSON.stringify(offsetPanel)}`);
+    assert(offsetComposer.bottom <= offsetTop + injectedHeight + 1, `${browserName}: injected chat composer falls outside visible viewport ${JSON.stringify(offsetComposer)}`);
     assert(cssTop === `${offsetTop}px`, `${browserName}: visual viewport top variable is stale (${cssTop})`);
 
-    await page.screenshot({ path: `${out}/${browserName}-390x844-chat-offset-top.png`, fullPage: false });
-    report.cases.push({ kind: "chat-offset-top", browserName, offsetTop, visibleHeight, panel, composer, cssTop });
+    await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-chat-offset-top.png`, fullPage: false });
+    report.cases.push({ kind: "chat-offset-top", browserName, width, offsetTop, visibleHeight: injectedHeight, panel: offsetPanel, composer: offsetComposer, cssTop });
   } finally {
     await context.close();
     await browser.close();
@@ -230,6 +233,7 @@ async function proveReplies(browserType, browserName, width, height) {
     await page.setViewportSize({ width, height: keyboardHeight });
     await page.waitForTimeout(950);
 
+    const keyboardVisible = await visibleBounds(page);
     const keyboardDrawer = await rect(page, ".replies-drawer");
     const keyboardForm = await rect(page, ".replies-drawer form");
     const keyboardNav = await page.locator(".mobile-nav.notverse-mobile-nav").evaluate((node) => {
@@ -237,15 +241,15 @@ async function proveReplies(browserType, browserName, width, height) {
       return { display: style.display, visibility: style.visibility, opacity: style.opacity };
     });
 
-    assert(keyboardDrawer.top >= -0.5, `${browserName}: keyboard replies drawer clips above the visible viewport`);
-    assert(keyboardDrawer.bottom <= keyboardHeight + 1, `${browserName}: replies drawer exceeds keyboard viewport`);
-    assert(keyboardForm.bottom <= keyboardHeight + 1, `${browserName}: reply field hides behind keyboard`);
+    assert(keyboardDrawer.top >= keyboardVisible.top - 0.5, `${browserName}: keyboard replies drawer clips above the observed visual viewport`);
+    assert(keyboardDrawer.bottom <= keyboardVisible.bottom + 1, `${browserName}: replies drawer exceeds observed keyboard viewport ${JSON.stringify({ keyboardDrawer, keyboardVisible })}`);
+    assert(keyboardForm.bottom <= keyboardVisible.bottom + 1, `${browserName}: reply field hides behind observed keyboard viewport ${JSON.stringify({ keyboardForm, keyboardVisible })}`);
     assert(keyboardNav.display === "none" || keyboardNav.visibility === "hidden" || Number(keyboardNav.opacity) === 0, `${browserName}: navigation remains visible while reply keyboard is open`);
 
     await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-replies-keyboard.png`, fullPage: false });
 
-    const offsetTop = Math.min(48, Math.max(0, keyboardHeight - 200));
-    const visibleHeight = keyboardHeight - offsetTop;
+    const offsetTop = 48;
+    const visibleHeight = Math.max(220, keyboardHeight - offsetTop);
     const offsetInjected = await injectVisualViewport(page, {
       offsetTop,
       width,
@@ -266,6 +270,7 @@ async function proveReplies(browserType, browserName, width, height) {
     await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-replies-offset-top.png`, fullPage: false });
 
     report.cases.push({ kind: "replies", browserName, width, height, drawer, form, nav });
+    report.cases.push({ kind: "replies-keyboard", browserName, width, requestedHeight: keyboardHeight, visible: keyboardVisible, drawer: keyboardDrawer, form: keyboardForm, nav: keyboardNav });
     report.cases.push({ kind: "replies-offset-top", browserName, width, keyboardHeight, offsetTop, visibleHeight, offsetBackdrop, offsetDrawer, offsetForm });
   } finally {
     await context.close();
@@ -289,11 +294,10 @@ for (const [browserName, browserType] of [["chromium", chromium], ["webkit", web
   }
 
   try {
-    await proveOffsetRecovery(browserType, browserName);
     await proveBreakpointRecovery(browserType, browserName);
   } catch (error) {
     report.ok = false;
-    report.errors.push(`${browserName}/recovery: ${error instanceof Error ? error.message : String(error)}`);
+    report.errors.push(`${browserName}/breakpoint-recovery: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
