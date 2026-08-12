@@ -91,8 +91,33 @@ function syncReplies(bounds: VisualBounds): void {
   backdrop.style.setProperty("width", `${bounds.width}px`, "important");
 }
 
+function clearRecoveryOverrides(): void {
+  const panel = document.querySelector<HTMLElement>(".companion-panel.open");
+  for (const property of [
+    "position",
+    "z-index",
+    "top",
+    "left",
+    "right",
+    "bottom",
+    "width",
+    "max-width",
+    "height",
+    "max-height",
+    "transform",
+  ]) {
+    panel?.style.removeProperty(property);
+  }
+
+  const backdrop = document.querySelector<HTMLElement>(".replies-backdrop");
+  for (const property of ["top", "left", "width"]) {
+    backdrop?.style.removeProperty(property);
+  }
+}
+
 function syncVisibleViewport(): void {
   if (!mobileViewport.matches) {
+    clearRecoveryOverrides();
     document.body.classList.remove("notverse-replies-open", "notverse-replies-keyboard");
     document.querySelector<HTMLElement>(".mobile-nav.notverse-mobile-nav")?.style.removeProperty("display");
     return;
