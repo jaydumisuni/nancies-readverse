@@ -244,7 +244,29 @@ async function proveReplies(browserType, browserName, width, height) {
 
     await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-replies-keyboard.png`, fullPage: false });
 
+    const offsetTop = Math.min(48, Math.max(0, keyboardHeight - 200));
+    const visibleHeight = keyboardHeight - offsetTop;
+    const offsetInjected = await injectVisualViewport(page, {
+      offsetTop,
+      width,
+      height: visibleHeight,
+    });
+    assert(offsetInjected, `${browserName}: could not inject Replies visualViewport offset coverage`);
+    await page.waitForTimeout(950);
+
+    const offsetBackdrop = await rect(page, ".replies-backdrop");
+    const offsetDrawer = await rect(page, ".replies-drawer");
+    const offsetForm = await rect(page, ".replies-drawer form");
+
+    assert(Math.abs(offsetBackdrop.top - offsetTop) <= 1, `${browserName}: Replies backdrop did not follow visualViewport.offsetTop ${JSON.stringify(offsetBackdrop)}`);
+    assert(offsetDrawer.top >= offsetTop - 1, `${browserName}: offset Replies drawer clips above the visual viewport ${JSON.stringify(offsetDrawer)}`);
+    assert(offsetDrawer.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset Replies drawer exceeds visual viewport ${JSON.stringify(offsetDrawer)}`);
+    assert(offsetForm.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset reply composer falls behind keyboard ${JSON.stringify(offsetForm)}`);
+
+    await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-replies-offset-top.png`, fullPage: false });
+
     report.cases.push({ kind: "replies", browserName, width, height, drawer, form, nav });
+    report.cases.push({ kind: "replies-offset-top", browserName, width, keyboardHeight, offsetTop, visibleHeight, offsetBackdrop, offsetDrawer, offsetForm });
   } finally {
     await context.close();
     await browser.close();
