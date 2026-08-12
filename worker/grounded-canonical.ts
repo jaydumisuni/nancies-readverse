@@ -1,3 +1,5 @@
+import { HEADERS, OPENERS, jsonResponse as json, normalize, parseYear } from "./grounded-shared";
+
 type CanonicalEnv = { AI: Ai; AI_MODEL: string };
 type CanonicalBody = { question?: unknown; companion?: unknown };
 
@@ -19,18 +21,6 @@ type TopicPack = {
   intro: string;
   reasons: string[];
   tail: string;
-};
-
-const HEADERS = {
-  accept: "application/json",
-  "user-agent": "NoTVerse/2.0 (+https://notverse.1ink.online)",
-};
-
-const OPENERS: Record<string, string> = {
-  Gojo: "Absolutely.", Itachi: "Yes.", Naruto: "Definitely.", Kakashi: "I have a likely direction.",
-  Megumi: "Yes. Let us narrow it properly.", Sasuke: "Yes. Start with the strongest fit.", Maki: "Yes. No random list.",
-  Nobara: "Obviously. We are choosing good ones.", Hinata: "Yes, I would be happy to help.", Sakura: "Yes. Let us make it useful.",
-  Temari: "Yes. We can rank this efficiently.", "Mei Mei": "Certainly. It should justify your time.",
 };
 
 const TOPICS: TopicPack[] = [
@@ -138,10 +128,14 @@ export async function handleCanonicalTopicTurn(
 
   const opener = OPENERS[companion] ?? OPENERS.Gojo;
   const lines = [`${opener} ${topic.intro}`];
+  const reasonBySeed = new Map(
+    topic.seeds.map((seed, index) => [normalize(seed.title), topic.reasons[index]] as const),
+  );
   unique.slice(0, 3).forEach((book, index) => {
     const author = book.authors.join(", ") || "author not listed in the catalogue result";
     const year = book.year ? ` (${book.year})` : "";
-    const reason = topic.reasons[index] || topic.reasons.at(-1) || "Fit: the public catalogue verified this title and author for the topic you asked about.";
+    const reason = reasonBySeed.get(normalize(book.title))
+      || "Fit: the public catalogue verified this title and author for the topic you asked about.";
     lines.push(`${index + 1}. **${book.title}** — ${author}${year}\n${reason}`);
   });
   lines.push(topic.tail);
@@ -201,7 +195,7 @@ async function verifyOpenLibrary(seed: Seed): Promise<VerifiedBook | null> {
 
 async function verifyGoogle(seed: Seed): Promise<VerifiedBook | null> {
   const url = new URL("https://www.googleapis.com/books/v1/volumes");
-  url.searchParams.set("q", `intitle:${JSON.stringify(seed.title)}+inauthor:${JSON.stringify(seed.author)}`);
+  url.searchParams.set("q", `intitle:${JSON.stringify(seed.title)} inauthor:${JSON.stringify(seed.author)}`);
   url.searchParams.set("maxResults", "8");
   url.searchParams.set("printType", "books");
   const r = await fetch(url.toString(), { headers: HEADERS, signal: AbortSignal.timeout(10_000) });
@@ -241,19 +235,5 @@ function dedupe(items: VerifiedBook[]): VerifiedBook[] {
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
-}
-
-function normalize(value: string): string {
-  return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
-}
-function parseYear(value: unknown): number | undefined {
-  const m = typeof value === "string" ? value.match(/\b(?:1[5-9]\d{2}|20\d{2})\b/) : null;
-  return m ? Number(m[0]) : undefined;
-}
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
   });
 }

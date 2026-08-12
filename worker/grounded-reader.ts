@@ -1,3 +1,5 @@
+import { HEADERS, OPENERS, jsonResponse as response, normalize, parseYear } from "./grounded-shared";
+
 type ChatTurn = { role?: unknown; text?: unknown };
 type Body = { question?: unknown; companion?: unknown; history?: unknown };
 type Env = { AI: Ai; AI_MODEL: string };
@@ -17,26 +19,6 @@ type Book = {
 };
 
 type Hypothesis = { title: string; author?: string };
-
-const HEADERS = {
-  accept: "application/json",
-  "user-agent": "NoTVerse/2.0 (+https://notverse.1ink.online)",
-};
-
-const OPENERS: Record<string, string> = {
-  Gojo: "Absolutely.",
-  Itachi: "Yes.",
-  Naruto: "Definitely.",
-  Kakashi: "I have a likely direction.",
-  Megumi: "Yes. Let us narrow it properly.",
-  Sasuke: "Yes. Start with the strongest fit.",
-  Maki: "Yes. No random list.",
-  Nobara: "Obviously. We are choosing good ones.",
-  Hinata: "Yes, I would be happy to help.",
-  Sakura: "Yes. Let us make it useful.",
-  Temari: "Yes. We can rank this efficiently.",
-  "Mei Mei": "Certainly. It should justify your time.",
-};
 
 const STOP = new Set([
   "about", "again", "also", "another", "book", "books", "can", "could", "do", "for", "from", "give", "have",
@@ -68,7 +50,8 @@ export async function handleGroundedReaderTurn(
   const history = normalizeHistory(body.history);
 
   const previous = extractPreviousGrounded(history);
-  const follow = classifyFollowUp(question, previous);
+  const detected = detectIntent(question);
+  const follow = detected ? null : classifyFollowUp(question, previous);
   if (follow === "explain" && previous) {
     return response({
       ok: true,
@@ -80,7 +63,6 @@ export async function handleGroundedReaderTurn(
     });
   }
 
-  const detected = detectIntent(question);
   const inherited: Intent | null = follow === "more" && previous ? previous.intent : null;
   const intent = detected || inherited;
   if (!intent) return null;
@@ -106,13 +88,14 @@ export async function handleGroundedReaderTurn(
   }
 
   const desired = intent === "identify" ? Math.min(3, candidates.length) : Math.min(requestedCount(question), candidates.length, 5);
-  const ranked = await rankCandidates(searchQuestion, candidates, desired, intent, env, ctx);
-  let chosen = (ranked.length ? ranked : candidates.slice(0, desired).map((_book, index) => index))
-    .map((index) => candidates[index])
+  const ranking = await rankCandidates(searchQuestion, candidates, desired, intent, env, ctx);
+  const pool = ranking.pool;
+  let chosen = (ranking.indices.length ? ranking.indices : pool.slice(0, desired).map((_book, index) => index))
+    .map((index) => pool[index])
     .filter((book): book is Book => Boolean(book));
 
   if (intent === "identify") {
-    const exact = candidates.filter((book) => book.exactHypothesis);
+    const exact = pool.filter((book) => book.exactHypothesis);
     if (exact.length && !chosen.some((book) => book.exactHypothesis)) chosen = [exact[0], ...chosen];
   }
   chosen = dedupe(chosen).slice(0, desired);
@@ -217,9 +200,11 @@ function parseHypotheses(text: string): Hypothesis[] {
 }
 
 async function verifyHypotheses(hypotheses: Hypothesis[]): Promise<Book[]> {
-  const settled = await Promise.allSettled(hypotheses.slice(0, 10).map(async (hypothesis) => {
-    const open = await exactOpenLibrary(hypothesis).catch(() => null);
-    const google = await exactGoogleBooks(hypothesis).catch(() => null);
+  const settled = await Promise.allSettled(hypotheses.slice(0, 6).map(async (hypothesis) => {
+    const [open, google] = await Promise.all([
+      exactOpenLibrary(hypothesis).catch(() => null),
+      exactGoogleBooks(hypothesis).catch(() => null),
+    ]);
     const exact = open || google;
     if (!exact) return null;
     const merged = mergeBooks([...(open ? [open] : []), ...(google ? [google] : [])])[0];
@@ -246,7 +231,7 @@ async function exactGoogleBooks(h: Hypothesis): Promise<Book | null> {
   url.searchParams.set("q", [
     `intitle:${JSON.stringify(h.title)}`,
     h.author ? `inauthor:${JSON.stringify(h.author)}` : "",
-  ].filter(Boolean).join("+"));
+  ].filter(Boolean).join(" "));
   url.searchParams.set("maxResults", "8");
   url.searchParams.set("printType", "books");
   const r = await fetch(url.toString(), { headers: HEADERS, signal: AbortSignal.timeout(10_000) });
@@ -420,12 +405,19 @@ function mergeBooks(items: Book[]): Book[] {
   return [...map.values()];
 }
 
-async function rankCandidates(question: string, candidates: Book[], desired: number, intent: Intent, env: Env, ctx: ExecutionContext): Promise<number[]> {
-  const scored = candidates.map((book) => ({ ...book, score: scoreBook(book, question, intent) }))
-    .sort((a, b) => (b.score || 0) - (a.score || 0));
-  candidates.splice(0, candidates.length, ...scored.slice(0, 18));
+async function rankCandidates(
+  question: string,
+  input: Book[],
+  desired: number,
+  intent: Intent,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<{ pool: Book[]; indices: number[] }> {
+  const pool = input.map((book) => ({ ...book, score: scoreBook(book, question, intent) }))
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 18);
 
-  const shortlist = candidates.slice(0, 14).map((book, index) => ({
+  const shortlist = pool.slice(0, 14).map((book, index) => ({
     index,
     title: book.title,
     authors: book.authors,
@@ -458,12 +450,12 @@ async function rankCandidates(question: string, candidates: Book[], desired: num
       const parsed = JSON.parse(match[0]) as { indices?: unknown[] };
       if (!Array.isArray(parsed.indices)) continue;
       const indices = [...new Set(parsed.indices.map(Number).filter((value) => Number.isInteger(value) && value >= 0 && value < shortlist.length))].slice(0, desired);
-      if (indices.length) return indices;
+      if (indices.length) return { pool, indices };
     } catch (error) {
       ctx.waitUntil(Promise.resolve(console.warn("NoTVerse catalogue ranking fallback", model, error)));
     }
   }
-  return [];
+  return { pool, indices: [] };
 }
 
 function scoreBook(book: Book, question: string, intent: Intent): number {
@@ -605,15 +597,10 @@ function stripInternal(book: Book): Omit<Book, "score" | "exactHypothesis"> {
 function cleanQuery(value: string): string {
   return value.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").replace(/^['"`]+|['"`]+$/g, "").trim().slice(0, 200);
 }
-function normalize(value: string): string { return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim(); }
 function clean(value: unknown, max: number): string { return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : ""; }
 function cleanDescription(value: unknown): string | undefined {
   const text = clean(value, 1400).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.slice(0, 900) : undefined;
-}
-function parseYear(value: unknown): number | undefined {
-  const match = typeof value === "string" ? value.match(/\b(?:1[5-9]\d{2}|20\d{2})\b/) : null;
-  return match ? Number(match[0]) : undefined;
 }
 function longer(a?: string, b?: string): string | undefined { if (!a) return b; if (!b) return a; return a.length >= b.length ? a : b; }
 function lowerFirst(value: string): string {
@@ -636,10 +623,4 @@ function extractText(result: unknown): string {
     }
   }
   return "";
-}
-function response(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
-  });
 }

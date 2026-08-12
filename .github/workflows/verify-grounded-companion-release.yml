@@ -40,8 +40,8 @@ jobs:
 
       - name: Install Chromium and WebKit
         run: |
-          npm install --no-save --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium webkit
+          npm install --no-save --no-audit --no-fund playwright@1.62.0
+          ./node_modules/.bin/playwright install --with-deps chromium webkit
 
       - name: Start exact generated client locally
         shell: bash
@@ -168,7 +168,7 @@ jobs:
               evidenceTitles=main.evidence.books.map(b=>b.title);
               const rendered=boldTitles(main.answer);
               assert(rendered.length>0,`${companion}: no rendered grounded titles`);
-              assert(rendered.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: rendered title not in evidence: ${rendered} vs ${evidenceTitles}`);
+              assert(rendered.every(t=>evidenceTitles.some(e=>String(e).trim()===t.trim())),`${companion}: rendered title not exactly in evidence: ${rendered} vs ${evidenceTitles}`);
               if(companion==='Kakashi') assert(evidenceTitles.some(t=>norm(t).includes('remains of the day')),`Kakashi: remembered-title identification missed The Remains of the Day: ${evidenceTitles}`);
             } else {
               assert(main.mode==='workers-ai'||main.mode==='workers-ai-repair'||main.mode==='conversation-router',`${companion}: general turn failed intelligence route: ${JSON.stringify(main)}`);
@@ -181,7 +181,7 @@ jobs:
             if(grounded){
               assert(follow.mode==='catalogue-grounded-followup',`${companion}: grounded follow-up escaped evidence path: ${JSON.stringify(follow)}`);
               const followTitles=boldTitles(follow.answer);
-              assert(followTitles.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: follow-up introduced unverified title ${followTitles} vs ${evidenceTitles}`);
+              assert(followTitles.every(t=>evidenceTitles.some(e=>String(e).trim()===t.trim())),`${companion}: follow-up introduced unverified title ${followTitles} vs ${evidenceTitles}`);
             }
             report.cases.push({companion,question,greeting,main,followQuestion:followQ,follow});
             await writeFile(`${out}/companion-grounding-partial.json`,JSON.stringify(report,null,2)+'\n');

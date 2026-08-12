@@ -19,10 +19,20 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/companion/help") {
-      const canonical = await handleCanonicalTopicTurn(request.clone(), env, ctx);
-      if (canonical) return canonical;
-      const grounded = await handleGroundedReaderTurn(request.clone(), env, ctx);
-      if (grounded) return grounded;
+      try {
+        const canonical = await handleCanonicalTopicTurn(request.clone(), env, ctx);
+        if (canonical) return canonical;
+      } catch (error) {
+        ctx.waitUntil(Promise.resolve(console.warn("NoTVerse canonical grounding fallback", error)));
+      }
+
+      try {
+        const grounded = await handleGroundedReaderTurn(request.clone(), env, ctx);
+        if (grounded) return grounded;
+      } catch (error) {
+        ctx.waitUntil(Promise.resolve(console.warn("NoTVerse reader grounding fallback", error)));
+      }
+
       return handleSmartCompanion(request, env, ctx);
     }
     return baseWorker.fetch(request, env, ctx);

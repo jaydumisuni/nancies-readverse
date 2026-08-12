@@ -26,7 +26,13 @@ jobs:
           for attempt in $(seq 1 120); do
             gambling="$(curl -fsS --max-time 30 -H 'content-type: application/json' -d '{"companion":"Gojo","question":"Do you have recommendations for books I can read on gambling?","history":[]}' "$BRANCH_PREVIEW/api/companion/help" || true)"
             grief="$(curl -fsS --max-time 30 -H 'content-type: application/json' -d '{"companion":"Hinata","question":"Suggest a gentle novel for someone processing grief, but avoid anything relentlessly bleak.","history":[]}' "$BRANCH_PREVIEW/api/companion/help" || true)"
-            if printf '%s' "$gambling" | grep -Fq 'Addiction by Design' && printf '%s' "$grief" | grep -Fq '"mode":"catalogue-grounded"'; then
+            if GAMBLING_JSON="$gambling" node -e '
+              const b=JSON.parse(process.env.GAMBLING_JSON||"{}");
+              const books=Array.isArray(b.evidence?.books)?b.evidence.books:[];
+              const titleOk=books.some(book=>String(book.title||"").trim()==="Addiction by Design");
+              const providerOk=books.some(book=>Array.isArray(book.providers)&&book.providers.some(p=>p==="Google Books"||p==="Open Library"));
+              process.exit(b.mode==="catalogue-grounded"&&b.evidence?.type==="public-catalogue"&&titleOk&&providerOk?0:1);
+            ' && printf '%s' "$grief" | grep -Fq '"mode":"catalogue-grounded"'; then
               exit 0
             fi
             sleep 5
@@ -81,7 +87,7 @@ jobs:
               evidenceTitles=main.evidence.books.map(b=>b.title);
               const rendered=titles(main.answer);
               assert(rendered.length,`${companion}: no rendered grounded titles`);
-              assert(rendered.every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: rendered title outside evidence`);
+              assert(rendered.every(t=>evidenceTitles.some(e=>String(e).trim()===t.trim())),`${companion}: rendered title outside exact evidence`);
               if(companion==='Kakashi') assert(evidenceTitles.some(t=>norm(t).includes('remains of the day')),'Kakashi missed The Remains of the Day');
             } else {
               assert(['workers-ai','workers-ai-repair','conversation-router'].includes(main.mode),`${companion}: wrong general route ${main.mode}`);
@@ -93,12 +99,20 @@ jobs:
             assert(follow.answer!==main.answer,`${companion}: repeated answer`);
             if(grounded){
               assert(follow.mode==='catalogue-grounded-followup',`${companion}: follow-up escaped grounding: ${follow.mode}`);
-              assert(titles(follow.answer).every(t=>evidenceTitles.some(e=>norm(e)===norm(t))),`${companion}: follow-up introduced a new title`);
+              assert(titles(follow.answer).every(t=>evidenceTitles.some(e=>String(e).trim()===t.trim())),`${companion}: follow-up introduced a new title`);
             }
             report.push({companion,greeting:greeting.answer,question,main,follow:follow.answer});
           }
           assert(greetings.size>=8,`only ${greetings.size}/12 distinct greetings`);
-          console.log(JSON.stringify({ok:true,companions:report.length,uniqueGreetings:greetings.size,report},null,2));
+
+          const prior=report.find(item=>item.companion==='Gojo');
+          const explicit=await ask('Gojo','Why should I read books about architecture?',[
+            {role:'user',text:prior.question},
+            {role:'assistant',text:prior.main.answer},
+          ]);
+          assert(explicit.mode!=='catalogue-grounded-followup',`explicit new book intent was misclassified as a follow-up: ${JSON.stringify(explicit)}`);
+
+          console.log(JSON.stringify({ok:true,companions:report.length,uniqueGreetings:greetings.size,explicitIntentMode:explicit.mode,report},null,2));
           JS
           node /tmp/prove.mjs | tee /tmp/notverse-companion-intelligence.json
       - name: Prove live public ratings and no approval placeholder
@@ -108,8 +122,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/notverse-rating-proof
+          html="$(curl -fsS "$NOTVERSE_URL/")"
+          if printf '%s' "$html" | grep -Eiq 'provider connections pending|ratings are shown only when approved sources agree|approval pending'; then
+            echo 'Obsolete rating approval/pending copy is still rendered.' >&2
+            exit 1
+          fi
           PROOF_DIR=/tmp/notverse-rating-proof node scripts/verify-live-public-ratings.mjs
-          ! grep -RniE 'provider connections pending|ratings?.{0,40}(approval|pending)|approval.{0,40}ratings?' src dist/client 2>/dev/null
       - name: Upload intelligence proof
         if: always()
         uses: actions/upload-artifact@v4
