@@ -24,7 +24,7 @@ permissions:
 jobs:
   exact-browser-and-runtime-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +59,23 @@ jobs:
       - name: Prove mobile chat drafts, Inbox clearance and Search visually
         run: node scripts/prove-mobile-polish-visual.mjs
 
-      - name: Prove iOS keyboard chat and Replies navigation clearance
+      - name: Prove iOS keyboard chat and Replies navigation clearance locally
+        run: node scripts/prove-ios-overlay-recovery.mjs
+
+      - name: Wait for exact Cloudflare branch preview
+        env:
+          PREVIEW_URL: https://fix-ios-chat-replies-20260813-notverse.pharrtechnolgiescoltd.workers.dev
+        run: |
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent "$PREVIEW_URL/" >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Prove iOS keyboard chat and Replies clearance on deployed branch
+        env:
+          PROOF_URL: https://fix-ios-chat-replies-20260813-notverse.pharrtechnolgiescoltd.workers.dev
+          PROOF_DIR: engineering-evidence/ios-overlay-recovery-deployed
         run: node scripts/prove-ios-overlay-recovery.mjs
 
       - name: Start exact generated Worker entry
@@ -91,5 +107,6 @@ jobs:
           path: |
             engineering-evidence/mobile-notes-chat
             engineering-evidence/ios-overlay-recovery
+            engineering-evidence/ios-overlay-recovery-deployed
           if-no-files-found: error
           retention-days: 14
