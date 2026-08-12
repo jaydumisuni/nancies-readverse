@@ -12,6 +12,7 @@ on:
       - "worker/**"
       - "scripts/prove-mobile-notes-chat.mjs"
       - "scripts/prove-mobile-polish-visual.mjs"
+      - "scripts/prove-ios-overlay-recovery.mjs"
       - "scripts/prove-companion-runtime.mjs"
       - "package.json"
       - "wrangler.jsonc"
@@ -23,7 +24,7 @@ permissions:
 jobs:
   exact-browser-and-runtime-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +59,9 @@ jobs:
       - name: Prove mobile chat drafts, Inbox clearance and Search visually
         run: node scripts/prove-mobile-polish-visual.mjs
 
+      - name: Prove iOS keyboard chat and Replies navigation clearance
+        run: node scripts/prove-ios-overlay-recovery.mjs
+
       - name: Start exact generated Worker entry
         run: |
           npx wrangler dev --local --port 8790 --config dist/notverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
@@ -84,6 +88,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mobile-notes-chat-exact-proof
-          path: engineering-evidence/mobile-notes-chat
+          path: |
+            engineering-evidence/mobile-notes-chat
+            engineering-evidence/ios-overlay-recovery
           if-no-files-found: error
           retention-days: 14
