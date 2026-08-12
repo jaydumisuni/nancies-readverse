@@ -65,8 +65,8 @@
   body.notverse-replies-open .replies-drawer {
     box-sizing: border-box;
     width: min(720px, 100%) !important;
-    height: min(650px, 100%) !important;
-    max-height: 100% !important;
+    height: min(650px, calc(100% - 8px)) !important;
+    max-height: calc(100% - 8px) !important;
     min-height: 0 !important;
     overflow-y: auto !important;
     overscroll-behavior-y: contain;
