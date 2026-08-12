@@ -156,15 +156,23 @@ function enhanceChatComposer(): void {
   resizeChatEditor(editor);
 }
 
+function pinConversationEnd(element: HTMLElement): void {
+  const pin = () => {
+    element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+  };
+  window.requestAnimationFrame(pin);
+  for (const delay of [70, 180, 420]) {
+    window.setTimeout(pin, delay);
+  }
+}
+
 function keepConversationEndsVisible(): void {
   const chatBody = document.querySelector<HTMLElement>(".companion-panel.open .chat-body");
   if (chatBody) {
     const count = chatBody.querySelectorAll(".message-row").length;
     if (count !== lastChatMessageCount) {
       lastChatMessageCount = count;
-      window.requestAnimationFrame(() => {
-        chatBody.scrollTop = chatBody.scrollHeight;
-      });
+      pinConversationEnd(chatBody);
     }
   } else {
     lastChatMessageCount = 0;
@@ -175,9 +183,7 @@ function keepConversationEndsVisible(): void {
     const count = inboxThread.children.length;
     if (count !== lastInboxMessageCount) {
       lastInboxMessageCount = count;
-      window.requestAnimationFrame(() => {
-        inboxThread.scrollTop = inboxThread.scrollHeight;
-      });
+      pinConversationEnd(inboxThread);
     }
   } else {
     lastInboxMessageCount = 0;
