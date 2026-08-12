@@ -41,6 +41,9 @@ try {
     await page.locator("body").waitFor({ state: "visible", timeout: 30000 });
 
     const text = (await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
+    const title = await page.title();
+    const identityMarks = await page.locator('[aria-label="NoTVerse"]').count();
+    const applicationName = await page.locator('meta[name="application-name"]').getAttribute("content");
     const setupVisible = await page.locator(".notverse-setup").isVisible().catch(() => false);
     const homeVisible = await page.locator(".notverse-home").isVisible().catch(() => false);
     const metrics = await page.evaluate(() => ({
@@ -48,7 +51,12 @@ try {
       scrollWidth: document.documentElement.scrollWidth,
     }));
 
-    assert(text.includes("NoTVerse"), `${viewport.name}: NoTVerse identity is missing`);
+    // The visual wordmark is CSS-rendered from an accessible image mark, so it is
+    // intentionally absent from body.innerText. Prove identity through the document
+    // title, application metadata and the actual rendered NoTVerse-labelled mark.
+    assert(title === "NoTVerse", `${viewport.name}: NoTVerse document title is missing`);
+    assert(applicationName === "NoTVerse", `${viewport.name}: NoTVerse application metadata is missing`);
+    assert(identityMarks > 0, `${viewport.name}: NoTVerse brand mark is missing`);
     assert(text.includes("Created for Nancy. Shared with the world."), `${viewport.name}: exact origin line is missing`);
     assert(!text.includes("Nancy's ReadVerse"), `${viewport.name}: old visible product name remains`);
     assert(setupVisible || homeVisible, `${viewport.name}: neither setup nor Home is visible`);
@@ -60,7 +68,9 @@ try {
     report.viewports.push({
       ...viewport,
       status: response.status(),
-      title: await page.title(),
+      title,
+      applicationName,
+      identityMarks,
       finalUrl: page.url(),
       setupVisible,
       homeVisible,
