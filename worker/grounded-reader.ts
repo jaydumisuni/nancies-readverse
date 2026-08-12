@@ -50,9 +50,11 @@ export async function handleGroundedReaderTurn(
   const history = normalizeHistory(body.history);
 
   const previous = extractPreviousGrounded(history);
+  const follow = classifyFollowUp(question, previous);
   const detected = detectIntent(question);
-  const follow = detected ? null : classifyFollowUp(question, previous);
-  if (follow === "explain" && previous) {
+  const clearlyReferentialExplain = follow === "explain"
+    && /\b(?:strongest fit|best fit|first (?:one|choice|recommendation|conclusion)|why that|why this)\b/i.test(question);
+  if (follow === "explain" && previous && (!detected || clearlyReferentialExplain)) {
     return response({
       ok: true,
       answer: explainPrevious(previous, companion),
@@ -63,7 +65,7 @@ export async function handleGroundedReaderTurn(
     });
   }
 
-  const inherited: Intent | null = follow === "more" && previous ? previous.intent : null;
+  const inherited: Intent | null = !detected && follow === "more" && previous ? previous.intent : null;
   const intent = detected || inherited;
   if (!intent) return null;
 
@@ -132,7 +134,7 @@ export async function handleGroundedReaderTurn(
 function detectIntent(question: string): Intent | null {
   if (/\b(?:half remember|trying to remember|cannot remember|can't remember|what (?:book|novel|title) (?:is|was|might)|what might it be|which book was it|remember a .*book|remember a .*novel)\b/i.test(question)) return "identify";
   if (/\b(?:recommend(?:ation|ations|ed)?|suggest(?:ion|ions|ed)?|what should i read|reading list|good books?|books?\s+(?:about|on|for)|novels?\s+(?:about|on|for))\b/i.test(question)) return "recommend";
-  if (/\b(?:which|what)\b[^?]{0,140}\bbooks?\b[^?]{0,140}\b(?:best|useful|start|choose|read|strongest|practical)\b/i.test(question)) return "recommend";
+  if (/\b(?:which|what)\b[^?]{0,140}\bbooks?\b[^?]{0,140}\b(?:best|useful|start|choose|read|strongest|practical|explain|cover|teach)\b/i.test(question)) return "recommend";
   if (/\bbooks?\b[^?]{0,140}\b(?:most useful|best for|good for|practical for|fastest practical return)\b/i.test(question)) return "recommend";
   return null;
 }
