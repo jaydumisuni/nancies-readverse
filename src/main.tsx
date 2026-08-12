@@ -9,6 +9,7 @@ import "./notverse/adaptive-interaction-fix.css";
 import "./notverse/final-viewport-stability.css";
 import "./notverse/production-polish.css";
 import "./notverse/runtime-interaction-fix";
+import "./notverse/conversation-scroll";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");
