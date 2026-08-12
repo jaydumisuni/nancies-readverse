@@ -1,0 +1,118 @@
+/* Real-iOS visual viewport recovery.
+   No redesign: this only keeps overlays inside the visible browser area and
+   prevents the existing mobile navigation from covering modal content. */
+
+@media (max-width: 760px) {
+  /* Companion chat is a true mobile modal. Keep it above every app surface and
+     bind it to the visual viewport rather than the larger layout viewport. */
+  body.notverse-chat-open .companion-panel.open {
+    position: fixed !important;
+    z-index: 7000 !important;
+    top: var(--notverse-vv-top, 0px) !important;
+    left: var(--notverse-vv-left, 0px) !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: var(--notverse-vv-width, 100vw) !important;
+    max-width: var(--notverse-vv-width, 100vw) !important;
+    height: var(--notverse-vv-height, 100dvh) !important;
+    max-height: var(--notverse-vv-height, 100dvh) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  /* Do not leave the six-tab bar visibly sitting behind a modal chat. */
+  body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
+  body.notverse-chat-open .floating-companion {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body.notverse-chat-open .companion-panel.open .chat-body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-bottom: 32px !important;
+    scroll-padding-bottom: 32px !important;
+  }
+
+  body.notverse-chat-open .companion-panel.open .chat-input {
+    flex: none !important;
+    min-height: 58px;
+    background: rgba(8, 7, 10, .995) !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Replies stay inside the Notes workspace and end before the six-tab bar.
+     The underlying Note is still visible through the approved dark backdrop. */
+  body.notverse-replies-open .replies-backdrop {
+    position: fixed !important;
+    inset: auto !important;
+    top: var(--notverse-vv-top, 0px) !important;
+    left: var(--notverse-vv-left, 0px) !important;
+    width: var(--notverse-vv-width, 100vw) !important;
+    height: calc(
+      var(--notverse-vv-height, 100dvh)
+      - var(--notverse-replies-nav-clearance, calc(72px + env(safe-area-inset-bottom)))
+    ) !important;
+    max-height: none !important;
+    z-index: 4000 !important;
+    place-items: end center !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-replies-open .replies-drawer {
+    box-sizing: border-box;
+    width: min(720px, 100%) !important;
+    height: min(650px, 100%) !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    display: flex !important;
+    flex-direction: column;
+    padding-bottom: 12px !important;
+    scroll-padding-bottom: 72px;
+  }
+
+  body.notverse-replies-open .replies-drawer > header {
+    flex: 0 0 auto;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin: -2px -2px 0;
+    padding: 2px 2px 12px;
+    background: linear-gradient(180deg, #121012 78%, rgba(18,16,18,0));
+  }
+
+  body.notverse-replies-open .replies-drawer > article {
+    flex: 0 0 auto;
+  }
+
+  body.notverse-replies-open .replies-drawer > form {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin-top: auto;
+    padding-top: 12px;
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    background: linear-gradient(0deg, #121012 80%, rgba(18,16,18,0));
+  }
+
+  body.notverse-replies-open .replies-drawer > form input {
+    min-width: 0;
+    font-size: 16px !important;
+  }
+
+  /* If the reply field itself opens the software keyboard, the app nav is no
+     longer useful. Give the drawer the full visual viewport until focus leaves. */
+  body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {
+    display: none !important;
+  }
+
+  body.notverse-replies-keyboard .replies-backdrop {
+    height: var(--notverse-vv-height, 100dvh) !important;
+  }
+}
