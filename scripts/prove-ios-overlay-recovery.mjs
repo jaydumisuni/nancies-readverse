@@ -38,6 +38,27 @@ async function rect(page, selector) {
   });
 }
 
+async function injectVisualViewport(page, { offsetTop, offsetLeft = 0, width, height }) {
+  return page.evaluate(({ offsetTop, offsetLeft, width, height }) => {
+    const viewport = window.visualViewport;
+    if (!viewport) return false;
+
+    try {
+      Object.defineProperties(viewport, {
+        offsetTop: { configurable: true, value: offsetTop },
+        offsetLeft: { configurable: true, value: offsetLeft },
+        width: { configurable: true, value: width },
+        height: { configurable: true, value: height },
+      });
+      viewport.dispatchEvent(new Event("scroll"));
+      viewport.dispatchEvent(new Event("resize"));
+      return true;
+    } catch {
+      return false;
+    }
+  }, { offsetTop, offsetLeft, width, height });
+}
+
 async function proveChat(browserType, browserName, width, height, keyboardHeight) {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({
@@ -79,6 +100,94 @@ async function proveChat(browserType, browserName, width, height, keyboardHeight
     await page.screenshot({ path: `${out}/${browserName}-${width}x${keyboardHeight}-chat-keyboard.png`, fullPage: false });
 
     report.cases.push({ kind: "chat-keyboard", browserName, width, height: keyboardHeight, panel, composer, chatBody, nav });
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function proveOffsetRecovery(browserType, browserName) {
+  const width = 390;
+  const height = 844;
+  const offsetTop = 96;
+  const visibleHeight = 524;
+  const browser = await browserType.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await prepare(page);
+    await page.getByRole("button", { name: "Chat now", exact: true }).click();
+    const editor = page.locator(".companion-panel.open textarea.chat-composer-editor");
+    await editor.waitFor();
+    await editor.fill("Offset viewport recovery proof");
+    await editor.focus();
+
+    const injected = await injectVisualViewport(page, {
+      offsetTop,
+      width,
+      height: visibleHeight,
+    });
+    assert(injected, `${browserName}: could not inject non-zero visualViewport offset coverage`);
+    await page.waitForTimeout(950);
+
+    const panel = await rect(page, ".companion-panel.open");
+    const composer = await rect(page, ".companion-panel.open .chat-input");
+    const cssTop = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--notverse-vv-top").trim());
+
+    assert(Math.abs(panel.top - offsetTop) <= 1, `${browserName}: panel did not follow visualViewport.offsetTop ${JSON.stringify(panel)}`);
+    assert(panel.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset panel exceeds visible viewport ${JSON.stringify(panel)}`);
+    assert(composer.bottom <= offsetTop + visibleHeight + 1, `${browserName}: offset composer falls outside visible viewport ${JSON.stringify(composer)}`);
+    assert(cssTop === `${offsetTop}px`, `${browserName}: visual viewport top variable is stale (${cssTop})`);
+
+    await page.screenshot({ path: `${out}/${browserName}-390x844-chat-offset-top.png`, fullPage: false });
+    report.cases.push({ kind: "chat-offset-top", browserName, offsetTop, visibleHeight, panel, composer, cssTop });
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function proveBreakpointRecovery(browserType, browserName) {
+  const browser = await browserType.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await prepare(page);
+    await page.getByRole("button", { name: "Chat now", exact: true }).click();
+    await page.locator(".companion-panel.open").waitFor();
+    await page.waitForTimeout(200);
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.waitForTimeout(950);
+
+    const inline = await page.locator(".companion-panel.open").evaluate((node) => ({
+      top: node.style.getPropertyValue("top"),
+      left: node.style.getPropertyValue("left"),
+      width: node.style.getPropertyValue("width"),
+      height: node.style.getPropertyValue("height"),
+      position: node.style.getPropertyValue("position"),
+    }));
+    const nav = await page.locator(".mobile-nav.notverse-mobile-nav").evaluate((node) => ({
+      inlineDisplay: node.style.getPropertyValue("display"),
+      computedDisplay: getComputedStyle(node).display,
+    }));
+
+    assert(Object.values(inline).every((value) => value === ""), `${browserName}: mobile inline chat geometry survived desktop transition ${JSON.stringify(inline)}`);
+    assert(nav.inlineDisplay === "", `${browserName}: mobile nav kept an inline display override after desktop transition`);
+
+    report.cases.push({ kind: "breakpoint-recovery", browserName, inline, nav });
   } finally {
     await context.close();
     await browser.close();
@@ -155,6 +264,14 @@ for (const [browserName, browserType] of [["chromium", chromium], ["webkit", web
       report.ok = false;
       report.errors.push(`${browserName}/${width}x${height}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  try {
+    await proveOffsetRecovery(browserType, browserName);
+    await proveBreakpointRecovery(browserType, browserName);
+  } catch (error) {
+    report.ok = false;
+    report.errors.push(`${browserName}/recovery: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
