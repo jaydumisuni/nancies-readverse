@@ -107,6 +107,7 @@ async function proveReplies(browserType, browserName, width, height) {
     const nav = await rect(page, ".mobile-nav.notverse-mobile-nav");
     const backdrop = await rect(page, ".replies-backdrop");
 
+    assert(drawer.top >= -0.5, `${browserName}: replies drawer clips above the visible viewport ${JSON.stringify(drawer)}`);
     assert(drawer.bottom <= nav.top + 1, `${browserName}: replies drawer extends under navigation ${JSON.stringify({ drawer, nav })}`);
     assert(form.bottom <= nav.top + 1, `${browserName}: reply composer hides behind navigation ${JSON.stringify({ form, nav })}`);
     assert(backdrop.bottom <= nav.top + 2, `${browserName}: replies backdrop consumes navigation strip ${JSON.stringify({ backdrop, nav })}`);
@@ -127,6 +128,7 @@ async function proveReplies(browserType, browserName, width, height) {
       return { display: style.display, visibility: style.visibility, opacity: style.opacity };
     });
 
+    assert(keyboardDrawer.top >= -0.5, `${browserName}: keyboard replies drawer clips above the visible viewport`);
     assert(keyboardDrawer.bottom <= keyboardHeight + 1, `${browserName}: replies drawer exceeds keyboard viewport`);
     assert(keyboardForm.bottom <= keyboardHeight + 1, `${browserName}: reply field hides behind keyboard`);
     assert(keyboardNav.display === "none" || keyboardNav.visibility === "hidden" || Number(keyboardNav.opacity) === 0, `${browserName}: navigation remains visible while reply keyboard is open`);
