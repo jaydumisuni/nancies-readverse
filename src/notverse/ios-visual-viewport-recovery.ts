@@ -1,3 +1,5 @@
+export {};
+
 /* iOS Safari visualViewport recovery for modal conversation surfaces.
    The app already owns the approved layouts; this module only supplies the
    visible viewport bounds that Safari changes while browser chrome/keyboard
