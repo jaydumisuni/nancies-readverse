@@ -1,6 +1,7 @@
 /* Runtime viewport and conversation recovery for NoTVerse.
    This module preserves the approved React structure while adding reliable
-   viewport state classes and a catalogue-backed recommendation fallback. */
+   viewport state classes, mobile composer polish and a catalogue-backed
+   recommendation fallback. */
 
 type CompanionRequestBody = {
   question?: unknown;
@@ -23,6 +24,8 @@ const nativeFetch = window.fetch.bind(window);
 const rootElement = document.documentElement;
 let lockedScrollY = 0;
 let viewportLocked = false;
+let lastChatMessageCount = 0;
+let lastInboxMessageCount = 0;
 
 function viewportHeight(): number {
   return Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight));
@@ -77,9 +80,115 @@ function applyMobileChatGeometry(): void {
   panel.style.setProperty("max-height", `${availableHeight}px`, "important");
 }
 
+function setReactInputValue(input: HTMLInputElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function resizeChatEditor(editor: HTMLTextAreaElement): void {
+  editor.style.height = "auto";
+  const next = Math.max(44, Math.min(editor.scrollHeight, 124));
+  editor.style.height = `${next}px`;
+  editor.style.overflowY = editor.scrollHeight > 124 ? "auto" : "hidden";
+}
+
+function enhanceChatComposer(): void {
+  const form = document.querySelector<HTMLFormElement>(".companion-panel.open .chat-input");
+  const input = form?.querySelector<HTMLInputElement>("input:not(.chat-composer-editor)");
+  if (!form || !input) return;
+
+  input.classList.add("chat-input-state-bridge");
+  let editor = form.querySelector<HTMLTextAreaElement>("textarea.chat-composer-editor");
+
+  if (!editor) {
+    editor = document.createElement("textarea");
+    editor.className = "chat-composer-editor";
+    editor.rows = 1;
+    editor.maxLength = Number(input.maxLength || 1000);
+    editor.placeholder = input.placeholder;
+    editor.setAttribute("aria-label", input.placeholder || "Message companion");
+    editor.setAttribute("enterkeyhint", "send");
+    editor.autocapitalize = "sentences";
+    editor.spellcheck = true;
+    editor.value = input.value;
+    form.insertBefore(editor, input);
+
+    const syncEditorFromBridge = () => {
+      if (document.activeElement === editor) return;
+      if (editor!.value !== input.value) {
+        editor!.value = input.value;
+        resizeChatEditor(editor!);
+      }
+    };
+
+    editor.addEventListener("input", () => {
+      setReactInputValue(input, editor!.value);
+      resizeChatEditor(editor!);
+    });
+
+    editor.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      setReactInputValue(input, editor!.value);
+      window.requestAnimationFrame(() => {
+        const send = form.querySelector<HTMLButtonElement>("button[type=submit]");
+        if (!send?.disabled && editor!.value.trim()) {
+          form.requestSubmit();
+          editor!.value = "";
+          resizeChatEditor(editor!);
+        }
+      });
+    });
+
+    input.addEventListener("input", syncEditorFromBridge);
+    form.addEventListener("submit", () => {
+      window.setTimeout(() => {
+        editor!.value = input.value;
+        resizeChatEditor(editor!);
+      }, 0);
+    });
+  }
+
+  if (document.activeElement !== editor && editor.value !== input.value) {
+    editor.value = input.value;
+  }
+  resizeChatEditor(editor);
+}
+
+function keepConversationEndsVisible(): void {
+  const chatBody = document.querySelector<HTMLElement>(".companion-panel.open .chat-body");
+  if (chatBody) {
+    const count = chatBody.querySelectorAll(".message-row").length;
+    if (count !== lastChatMessageCount) {
+      lastChatMessageCount = count;
+      window.requestAnimationFrame(() => {
+        chatBody.scrollTop = chatBody.scrollHeight;
+      });
+    }
+  } else {
+    lastChatMessageCount = 0;
+  }
+
+  const inboxThread = document.querySelector<HTMLElement>(".inbox-layout .message-thread");
+  if (inboxThread) {
+    const count = inboxThread.children.length;
+    if (count !== lastInboxMessageCount) {
+      lastInboxMessageCount = count;
+      window.requestAnimationFrame(() => {
+        inboxThread.scrollTop = inboxThread.scrollHeight;
+      });
+    }
+  } else {
+    lastInboxMessageCount = 0;
+  }
+}
+
 function syncInteractionState(): void {
   applyViewportMetrics();
   applyMobileChatGeometry();
+  enhanceChatComposer();
+  keepConversationEndsVisible();
   const chatOpen = Boolean(document.querySelector(".companion-panel.open"));
   const notesOpen = Boolean(document.querySelector(".notes-experience"));
 
