@@ -21,6 +21,30 @@ async function prepare(page) {
   await page.reload({ waitUntil: "networkidle" });
 }
 
+async function verifyMessageClearance(page, threadSelector, composerSelector, label) {
+  const geometry = await page.evaluate(({ threadSelector, composerSelector }) => {
+    const thread = document.querySelector(threadSelector);
+    const composer = document.querySelector(composerSelector)?.getBoundingClientRect();
+    const last = thread?.lastElementChild?.getBoundingClientRect();
+    const threadBox = thread?.getBoundingClientRect();
+    return {
+      composer: composer && { top: composer.top, bottom: composer.bottom },
+      last: last && { top: last.top, bottom: last.bottom },
+      thread: threadBox && { top: threadBox.top, bottom: threadBox.bottom },
+      scrollTop: thread instanceof HTMLElement ? thread.scrollTop : 0,
+      scrollHeight: thread instanceof HTMLElement ? thread.scrollHeight : 0,
+      clientHeight: thread instanceof HTMLElement ? thread.clientHeight : 0,
+    };
+  }, { threadSelector, composerSelector });
+  if (!geometry.thread || !geometry.composer || !geometry.last) throw new Error(`${label}: missing thread/composer geometry ${JSON.stringify(geometry)}`);
+  if (geometry.thread.bottom > geometry.composer.top + 1) throw new Error(`${label}: scrolling thread extends under composer ${JSON.stringify(geometry)}`);
+  if (geometry.last.bottom > geometry.thread.bottom + 1) throw new Error(`${label}: newest message is clipped below the thread ${JSON.stringify(geometry)}`);
+  if (geometry.scrollHeight > geometry.clientHeight && geometry.scrollTop + geometry.clientHeight < geometry.scrollHeight - 2) {
+    throw new Error(`${label}: newest message is not scrolled into view ${JSON.stringify(geometry)}`);
+  }
+  return geometry;
+}
+
 async function verifyPhone(width, height, name) {
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const page = await context.newPage();
@@ -64,7 +88,7 @@ async function verifyPhone(width, height, name) {
 
   await page.getByRole("button", { name: "Home" }).last().click();
   await page.getByRole("button", { name: "Chat now" }).click();
-  await page.waitForSelector(".companion-panel.open .chat-input input");
+  await page.waitForSelector(".companion-panel.open .chat-input textarea.chat-composer-editor");
   await page.waitForTimeout(420);
 
   const chatGeometry = await page.evaluate(() => {
@@ -91,10 +115,29 @@ async function verifyPhone(width, height, name) {
     };
   });
 
-  const input = page.locator(".chat-input input");
-  await input.fill("Do you have recommendations for books I can read on gambling?");
-  await page.screenshot({ path: `${out}/${name}-chat.png`, fullPage: false });
-  report.viewports.push({ name, width, height, notesGeometry, chatGeometry, before, after });
+  const editor = page.locator(".chat-input textarea.chat-composer-editor");
+  const bridge = page.locator(".chat-input input.chat-input-state-bridge");
+  const draft = "Do you have recommendations for books I can read on gambling? I want something that explains the psychology and the odds clearly enough that I can spot mistakes before I send this.";
+  await editor.fill(draft);
+  await page.waitForTimeout(80);
+  const editorBox = await editor.boundingBox();
+  if (!editorBox || editorBox.height <= 44) throw new Error(`${name}: long chat draft did not expand vertically`);
+  if ((await editor.inputValue()) !== draft) throw new Error(`${name}: visible composer does not retain the full draft`);
+  if ((await bridge.inputValue()) !== draft) throw new Error(`${name}: visible composer did not synchronise with React state bridge`);
+  await page.screenshot({ path: `${out}/${name}-chat-draft.png`, fullPage: false });
+
+  await editor.press("Shift+Enter");
+  await editor.type("Second line so I can inspect and correct wording before sending.");
+  if (!(await editor.inputValue()).includes("\n")) throw new Error(`${name}: Shift+Enter does not preserve an editable new line`);
+  await page.screenshot({ path: `${out}/${name}-chat-editing.png`, fullPage: false });
+
+  const userMessagesBefore = await page.locator(".message-row.user").count();
+  await editor.press("Enter");
+  await page.waitForFunction((before) => document.querySelectorAll(".message-row.user").length > before, userMessagesBefore, { timeout: 3000 });
+  await page.waitForTimeout(250);
+  if ((await editor.inputValue()) !== "") throw new Error(`${name}: visible composer did not clear after sending`);
+  const chatClearance = await verifyMessageClearance(page, ".companion-panel.open .chat-body", ".companion-panel.open .chat-input", `${name}/chat`);
+  await page.screenshot({ path: `${out}/${name}-chat-sent.png`, fullPage: false });
 
   if (!chatGeometry.panel || chatGeometry.panel.top < -1 || chatGeometry.panel.bottom > height + 1) throw new Error(`${name}: chat panel exceeds viewport: ${JSON.stringify(chatGeometry.panel)}`);
   if (!chatGeometry.input || chatGeometry.input.bottom > height + 1) throw new Error(`${name}: chat composer is unreachable`);
@@ -102,8 +145,68 @@ async function verifyPhone(width, height, name) {
   if (chatGeometry.chatBody?.scrollbarWidth !== "none") throw new Error(`${name}: chat scrollbar remains visible`);
   if (chatGeometry.nav?.opacity !== "0" || chatGeometry.nav?.pointerEvents !== "none") throw new Error(`${name}: mobile navigation remains active behind chat`);
   if (chatGeometry.documentHeight > height + 1) throw new Error(`${name}: chat opens with document scrolling`);
-  if ((await input.inputValue()).length < 20) throw new Error(`${name}: chat input is not editable`);
 
+  await editor.fill("Keyboard visibility check with enough text to wrap onto another line before the viewport becomes shorter.");
+  await editor.focus();
+  const keyboardHeight = Math.min(height, 524);
+  await page.setViewportSize({ width, height: keyboardHeight });
+  await page.waitForTimeout(300);
+  const keyboardGeometry = await page.evaluate(() => {
+    const panel = document.querySelector(".companion-panel.open")?.getBoundingClientRect();
+    const composer = document.querySelector(".companion-panel.open .chat-input")?.getBoundingClientRect();
+    const editor = document.querySelector(".companion-panel.open .chat-composer-editor")?.getBoundingClientRect();
+    return {
+      height: innerHeight,
+      panelBottom: panel?.bottom,
+      composerBottom: composer?.bottom,
+      editorBottom: editor?.bottom,
+      scale: visualViewport?.scale || 1,
+    };
+  });
+  if ((keyboardGeometry.panelBottom || 0) > keyboardGeometry.height + 1) throw new Error(`${name}: keyboard-sized chat panel exceeds viewport`);
+  if ((keyboardGeometry.composerBottom || 0) > keyboardGeometry.height + 1) throw new Error(`${name}: composer hides behind keyboard-sized viewport`);
+  if ((keyboardGeometry.editorBottom || 0) > keyboardGeometry.height + 1) throw new Error(`${name}: visible draft editor hides behind keyboard-sized viewport`);
+  if (Math.abs(keyboardGeometry.scale - 1) > .01) throw new Error(`${name}: focused editor triggered mobile zoom ${keyboardGeometry.scale}`);
+  await page.screenshot({ path: `${out}/${name}-chat-keyboard.png`, fullPage: false });
+
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(160);
+  await page.getByRole("button", { name: "Close chat" }).click();
+  await page.getByRole("button", { name: "Inbox" }).last().click();
+  await page.waitForSelector(".inbox-layout .message-thread");
+  const inboxInput = page.locator(".inbox-layout main > form input");
+  const inboxText = "This is a longer mobile message used to prove the last bubble remains fully visible above the composer.";
+  await inboxInput.fill(inboxText);
+  await inboxInput.press("Enter");
+  await page.getByText(inboxText, { exact: true }).waitFor();
+  await page.waitForTimeout(180);
+  const inboxClearance = await verifyMessageClearance(page, ".inbox-layout .message-thread", ".inbox-layout main > form", `${name}/inbox`);
+  await page.screenshot({ path: `${out}/${name}-inbox-sent.png`, fullPage: false });
+
+  await page.getByRole("button", { name: "Search" }).last().click();
+  await page.waitForSelector(".search-action-grid");
+  if (height <= 700) {
+    const searchGeometry = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll(".search-action-grid > button")];
+      const descriptions = cards.map((card) => {
+        const small = card.querySelector("small");
+        if (!(small instanceof HTMLElement)) return null;
+        const style = getComputedStyle(small);
+        const box = small.getBoundingClientRect();
+        return { text: small.textContent, width: box.width, height: box.height, whiteSpace: style.whiteSpace, lines: Math.round(box.height / Number.parseFloat(style.lineHeight || "10")) };
+      }).filter(Boolean);
+      const first = cards[0]?.getBoundingClientRect();
+      const second = cards[1]?.getBoundingClientRect();
+      const third = cards[2]?.getBoundingClientRect();
+      return { descriptions, first, second, third };
+    });
+    if (searchGeometry.first && searchGeometry.second && Math.abs(searchGeometry.first.top - searchGeometry.second.top) > 2) throw new Error(`${name}: first two Search actions are not sharing a readable row`);
+    if (searchGeometry.third && searchGeometry.first && searchGeometry.third.top <= searchGeometry.first.top + 2) throw new Error(`${name}: short-phone Search is still squeezing three actions into one row`);
+    if (searchGeometry.descriptions.some((item) => item.whiteSpace === "nowrap")) throw new Error(`${name}: Search descriptions are still single-line clipped`);
+  }
+  await page.screenshot({ path: `${out}/${name}-search.png`, fullPage: false });
+
+  report.viewports.push({ name, width, height, notesGeometry, chatGeometry, chatClearance, keyboardGeometry, inboxClearance, before, after });
   await context.close();
 }
 
@@ -111,6 +214,7 @@ for (const [width, height, name] of [
   [360, 640, "short-phone"],
   [384, 848, "phone"],
   [390, 844, "tall-phone"],
+  [430, 932, "large-phone"],
 ]) {
   try {
     await verifyPhone(width, height, name);

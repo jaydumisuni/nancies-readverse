@@ -22,16 +22,28 @@ const response = await fetch(`${baseUrl}/api/companion/help`, {
 const body = await response.json();
 const answer = typeof body.answer === "string" ? body.answer.trim() : "";
 const sourceMisroute = /paste (?:the |a )?link|attach (?:the |a )?file|inspect public redirects/i.test(answer);
-const concreteTitles = [
-  "Addiction by Design",
-  "The Biggest Bluff",
-  "Thinking in Bets",
-  "The Theory of Gambling and Statistical Logic",
-].filter((title) => answer.includes(title));
-const genericOnly = /i (?:can|will) give you|tell me whether you prefer/i.test(answer) && concreteTitles.length === 0;
+const groundedMode = /catalogue-grounded|verified/i.test(String(body.mode || ""))
+  || /verified-public-catalogue/i.test(String(body.model || ""));
+
+// The grounded recommender may legitimately return different catalogue titles
+// as public records change. Prove the response contains three concrete numbered
+// title entries instead of pinning the regression test to one historical list.
+const concreteTitles = [...answer.matchAll(/^\s*\d+\.\s+\*\*([^*\n]+)\*\*/gm)]
+  .map((match) => match[1].trim())
+  .filter(Boolean);
+const uniqueTitles = [...new Set(concreteTitles)];
+const genericOnly = /i (?:can|will) give you|tell me whether you prefer/i.test(answer)
+  && uniqueTitles.length === 0;
+const hasGroundingLanguage = /checked the titles|verified records|public book catalogues|Open Library|Google Books/i.test(answer);
 
 const report = {
-  ok: response.ok && Boolean(answer) && !sourceMisroute && !genericOnly && concreteTitles.length >= 3,
+  ok: response.ok
+    && Boolean(answer)
+    && !sourceMisroute
+    && !genericOnly
+    && groundedMode
+    && hasGroundingLanguage
+    && uniqueTitles.length >= 3,
   status: response.status,
   mode: body.mode,
   model: body.model,
@@ -39,7 +51,9 @@ const report = {
   answer,
   sourceMisroute,
   genericOnly,
-  concreteTitles,
+  groundedMode,
+  hasGroundingLanguage,
+  concreteTitles: uniqueTitles,
 };
 
 await writeFile(`${out}/companion-runtime-report.json`, `${JSON.stringify(report, null, 2)}\n`);
@@ -47,4 +61,4 @@ if (!report.ok) {
   console.error(JSON.stringify(report, null, 2));
   process.exit(1);
 }
-console.log(`Companion runtime proof passed with ${concreteTitles.length} concrete titles.`);
+console.log(`Companion runtime proof passed with ${uniqueTitles.length} grounded concrete titles.`);

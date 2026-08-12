@@ -11,6 +11,7 @@ on:
       - "src/**"
       - "worker/**"
       - "scripts/prove-mobile-notes-chat.mjs"
+      - "scripts/prove-mobile-polish-visual.mjs"
       - "scripts/prove-companion-runtime.mjs"
       - "package.json"
       - "wrangler.jsonc"
@@ -22,7 +23,7 @@ permissions:
 jobs:
   exact-browser-and-runtime-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -36,10 +37,10 @@ jobs:
       - name: Strict build
         run: npm run build
 
-      - name: Install Playwright proof browser
+      - name: Install Playwright proof browsers
         run: |
           npm install --no-save --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       - name: Start exact generated production client
         run: |
@@ -53,6 +54,9 @@ jobs:
 
       - name: Prove short-phone and tall-phone Notes/chat geometry
         run: node scripts/prove-mobile-notes-chat.mjs
+
+      - name: Prove mobile chat drafts, Inbox clearance and Search visually
+        run: node scripts/prove-mobile-polish-visual.mjs
 
       - name: Start exact generated Worker entry
         run: |
