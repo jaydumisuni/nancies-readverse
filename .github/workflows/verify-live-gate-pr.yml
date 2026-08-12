@@ -1,0 +1,44 @@
+name: Verify corrected live NoTVerse gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/verify-notverse-live.mjs"
+      - "scripts/prove-ios-overlay-recovery.mjs"
+      - ".github/workflows/deploy-live.yml"
+      - ".github/workflows/verify-live-gate-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-current-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - name: Install production proof browsers
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium webkit
+      - name: Verify approved live branding and shell
+        env:
+          NOTVERSE_URL: https://notverse.1ink.online/
+        run: node scripts/verify-notverse-live.mjs
+      - name: Verify current production iOS chat and Replies overlays
+        env:
+          PROOF_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/notverse-live/ios-overlay-recovery
+        run: node scripts/prove-ios-overlay-recovery.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrected-live-gate-proof
+          path: engineering-evidence/notverse-live
+          if-no-files-found: error
+          retention-days: 7
