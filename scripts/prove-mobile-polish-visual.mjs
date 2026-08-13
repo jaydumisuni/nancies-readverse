@@ -158,18 +158,38 @@ async function testInbox(page, browserName, viewport) {
   const message = `Mobile clearance ${browserName} ${viewport.name}: the whole outgoing bubble must stay above the composer and navigation.`;
   await input.fill(message);
   await input.press("Enter");
-  await page.getByText(message, { exact: true }).waitFor();
+  await page.waitForFunction((expected) => {
+    const last = document.querySelector(".inbox-layout .message-thread")?.lastElementChild;
+    return last?.firstChild?.textContent?.trim() === expected;
+  }, message);
   await page.waitForTimeout(250);
 
   const viewportState = await getViewport(page);
   const thread = await getRect(page, ".inbox-layout .message-thread");
   const composer = await getRect(page, ".inbox-layout main > form");
-  const nav = await getRect(page, ".notverse-mobile-nav");
+  const focusedState = await page.evaluate(() => {
+    const nav = document.querySelector(".notverse-mobile-nav");
+    const style = nav ? getComputedStyle(nav) : null;
+    return {
+      focusedMode: document.body.classList.contains("notverse-inbox-keyboard"),
+      navDisplay: style?.display || "",
+      navVisibility: style?.visibility || "",
+      navOpacity: style?.opacity || "",
+      navPointerEvents: style?.pointerEvents || "",
+    };
+  });
+  assert(focusedState.focusedMode, `${prefix}: Inbox did not enter focused keyboard mode`);
+  assert(
+    focusedState.navDisplay === "none" || focusedState.navVisibility === "hidden" || focusedState.navOpacity === "0" || focusedState.navPointerEvents === "none",
+    `${prefix}: mobile navigation remains active during focused Inbox composition ${JSON.stringify(focusedState)}`,
+  );
   assert(thread.bottom <= composer.top + 1, `${prefix}: Inbox thread extends underneath composer`);
   assert(composer.top >= -1 && composer.bottom <= viewportState.height + 1, `${prefix}: Inbox composer leaves viewport`);
-  assert(composer.bottom <= nav.top + 1, `${prefix}: Inbox composer hides behind mobile navigation`);
   await assertNewestVisible(page, ".inbox-layout .message-thread", null, `${prefix}/inbox`);
   await page.screenshot({ path: `${out}/${prefix}-inbox-sent.png`, fullPage: false });
+
+  await input.blur();
+  await page.waitForFunction(() => !document.body.classList.contains("notverse-inbox-keyboard"));
 }
 
 async function testSearch(page, browserName, viewport) {
