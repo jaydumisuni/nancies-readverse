@@ -178,7 +178,10 @@ async function verifyPhone(width, height, name) {
   const inboxText = "This is a longer mobile message used to prove the last bubble remains fully visible above the composer.";
   await inboxInput.fill(inboxText);
   await inboxInput.press("Enter");
-  await page.locator(".inbox-layout .message-thread").getByText(inboxText, { exact: true }).waitFor();
+  await page.waitForFunction((expected) => {
+    const last = document.querySelector(".inbox-layout .message-thread")?.lastElementChild;
+    return last?.firstChild?.textContent?.trim() === expected;
+  }, inboxText);
   await page.waitForTimeout(180);
   const inboxClearance = await verifyMessageClearance(page, ".inbox-layout .message-thread", ".inbox-layout main > form", `${name}/inbox`);
   await page.screenshot({ path: `${out}/${name}-inbox-sent.png`, fullPage: false });
