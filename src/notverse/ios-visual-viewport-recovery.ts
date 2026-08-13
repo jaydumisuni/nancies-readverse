@@ -1,9 +1,9 @@
 export {};
 
-/* iOS Safari visualViewport recovery for modal conversation surfaces.
-   The app already owns the approved layouts; this module only supplies the
-   visible viewport bounds that Safari changes while browser chrome/keyboard
-   animate and keeps modal surfaces synchronized through those transitions. */
+/* iOS Safari visual viewport recovery for modal conversation surfaces.
+   Fixed overlays stay anchored to the layout viewport origin while their
+   height follows the visual viewport. Safari is allowed to pan its visual
+   viewport for focused controls without the app applying that offset twice. */
 
 const mobileViewport = window.matchMedia("(max-width: 760px)");
 const rootElement = document.documentElement;
@@ -17,35 +17,55 @@ type VisualBounds = {
 
 function readVisualBounds(): VisualBounds {
   const viewport = window.visualViewport;
-  const top = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
-  const left = Math.max(0, Math.round(viewport?.offsetLeft ?? 0));
-  const width = Math.max(1, Math.round(viewport?.width ?? window.innerWidth));
-  const availableLayoutHeight = Math.max(1, window.innerHeight - top);
+  const width = Math.max(
+    1,
+    Math.min(window.innerWidth, Math.round(viewport?.width ?? window.innerWidth)),
+  );
   const height = Math.max(
     1,
-    Math.min(availableLayoutHeight, Math.round(viewport?.height ?? window.innerHeight)),
+    Math.min(window.innerHeight, Math.round(viewport?.height ?? window.innerHeight)),
   );
-  return { top, left, width, height };
+
+  /* A fixed overlay is already positioned in layout-viewport coordinates.
+     Adding visualViewport.offsetTop/offsetLeft here double-applies Safari's
+     native focus pan and was the real-iPhone failure mode. */
+  return { top: 0, left: 0, width, height };
 }
 
 function setViewportVariables(bounds: VisualBounds): void {
-  rootElement.style.setProperty("--notverse-vv-top", `${bounds.top}px`);
-  rootElement.style.setProperty("--notverse-vv-left", `${bounds.left}px`);
+  rootElement.style.setProperty("--notverse-vv-top", "0px");
+  rootElement.style.setProperty("--notverse-vv-left", "0px");
   rootElement.style.setProperty("--notverse-vv-width", `${bounds.width}px`);
   rootElement.style.setProperty("--notverse-vv-height", `${bounds.height}px`);
 
   /* Keep the older variables accurate because existing polish layers consume
      them too. */
-  rootElement.style.setProperty("--notverse-viewport-top", `${bounds.top}px`);
+  rootElement.style.setProperty("--notverse-viewport-top", "0px");
   rootElement.style.setProperty("--notverse-viewport-height", `${bounds.height}px`);
 }
 
-function pinNewestChatMessage(): void {
-  const thread = document.querySelector<HTMLElement>(".companion-panel.open .chat-body");
-  if (!thread) return;
-  requestAnimationFrame(() => {
-    thread.scrollTop = Math.max(0, thread.scrollHeight - thread.clientHeight);
-  });
+function resizeVisibleChatEditor(bounds: VisualBounds): void {
+  const editor = document.querySelector<HTMLTextAreaElement>(
+    ".companion-panel.open textarea.chat-composer-editor",
+  );
+  if (!editor) return;
+
+  /* production-polish.css historically promoted every non-empty draft to
+     42dvh with !important. Neutralise that rule before measuring content, then
+     cap the editor by both content and the currently visible viewport. */
+  editor.style.setProperty("height", "auto", "important");
+  editor.style.setProperty("max-height", "none", "important");
+  const contentHeight = editor.scrollHeight;
+  const cap = Math.min(124, Math.max(72, Math.floor(bounds.height * 0.22)));
+  const next = Math.max(44, Math.min(contentHeight, cap));
+
+  editor.style.setProperty("height", `${next}px`, "important");
+  editor.style.setProperty("max-height", `${cap}px`, "important");
+  editor.style.setProperty(
+    "overflow-y",
+    contentHeight > cap ? "auto" : "hidden",
+    "important",
+  );
 }
 
 function syncChatPanel(bounds: VisualBounds): void {
@@ -59,8 +79,8 @@ function syncChatPanel(bounds: VisualBounds): void {
 
   panel.style.setProperty("position", "fixed", "important");
   panel.style.setProperty("z-index", "7000", "important");
-  panel.style.setProperty("top", `${bounds.top}px`, "important");
-  panel.style.setProperty("left", `${bounds.left}px`, "important");
+  panel.style.setProperty("top", "0px", "important");
+  panel.style.setProperty("left", "0px", "important");
   panel.style.setProperty("right", "auto", "important");
   panel.style.setProperty("bottom", "auto", "important");
   panel.style.setProperty("width", `${bounds.width}px`, "important");
@@ -69,10 +89,10 @@ function syncChatPanel(bounds: VisualBounds): void {
   panel.style.setProperty("max-height", `${bounds.height}px`, "important");
   panel.style.setProperty("transform", "none", "important");
 
-  /* This inline fallback is intentional: the supplied iPhone captures proved
-     a class-only hide can lose the race while Safari is moving the viewport. */
+  /* Inline fallback remains intentional because Safari can repaint app chrome
+     while the keyboard animates. */
   nav?.style.setProperty("display", "none", "important");
-  pinNewestChatMessage();
+  resizeVisibleChatEditor(bounds);
 }
 
 function syncReplies(bounds: VisualBounds): void {
@@ -86,8 +106,8 @@ function syncReplies(bounds: VisualBounds): void {
 
   if (!backdrop) return;
 
-  backdrop.style.setProperty("top", `${bounds.top}px`, "important");
-  backdrop.style.setProperty("left", `${bounds.left}px`, "important");
+  backdrop.style.setProperty("top", "0px", "important");
+  backdrop.style.setProperty("left", "0px", "important");
   backdrop.style.setProperty("width", `${bounds.width}px`, "important");
 }
 
@@ -148,7 +168,10 @@ observer.observe(host, {
 window.addEventListener("resize", settleVisibleViewport, { passive: true });
 window.addEventListener("orientationchange", settleVisibleViewport, { passive: true });
 window.visualViewport?.addEventListener("resize", settleVisibleViewport, { passive: true });
-window.visualViewport?.addEventListener("scroll", settleVisibleViewport, { passive: true });
+
+/* Do not follow visualViewport.scroll. On iOS that event is the browser's
+   native focus pan; repositioning a fixed overlay from that offset creates the
+   double-pan seen in the supplied real-device recording. */
 
 document.addEventListener("focusin", (event) => {
   const target = event.target;
@@ -165,5 +188,15 @@ document.addEventListener("focusout", (event) => {
     settleVisibleViewport();
   }
 }, true);
+
+/* The legacy composer enhancer runs on the textarea itself. This bubbling
+   listener executes afterwards and restores the content-driven !important
+   height, so the old 42dvh CSS rule can never win after an edit. */
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement)) return;
+  if (!target.matches(".companion-panel.open textarea.chat-composer-editor")) return;
+  resizeVisibleChatEditor(readVisualBounds());
+});
 
 syncVisibleViewport();
