@@ -1,0 +1,38 @@
+name: Patch Inbox focus-exit proof
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean2-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[inbox-focus-exit-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify focused Inbox mode exits before navigation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-mobile-notes-chat.mjs')
+          text = path.read_text()
+          old = '''  await page.screenshot({ path: `${out}/${name}-inbox-sent.png`, fullPage: false });\n\n  await page.getByRole("button", { name: "Search" }).last().click();'''
+          new = '''  await page.screenshot({ path: `${out}/${name}-inbox-sent.png`, fullPage: false });\n\n  await inboxInput.blur();\n  await page.waitForFunction(() => !document.body.classList.contains("notverse-inbox-keyboard"));\n  await page.getByRole("button", { name: "Search" }).last().click();'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one Inbox-to-Search transition, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-mobile-notes-chat.mjs
+          git diff --cached --check
+          git commit -m "test: verify Inbox focus exit before navigation [inbox-focus-exit-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean2-20260813
