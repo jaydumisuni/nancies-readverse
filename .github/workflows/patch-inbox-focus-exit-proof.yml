@@ -36,3 +36,5 @@ jobs:
           git diff --cached --check
           git commit -m "test: verify Inbox focus exit before navigation [inbox-focus-exit-fixed]"
           git push origin HEAD:fix-mobile-keyboard-composers-clean2-20260813
+
+# second push intentionally activates this branch-only workflow
