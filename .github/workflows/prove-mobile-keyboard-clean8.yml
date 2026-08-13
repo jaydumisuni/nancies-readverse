@@ -1,4 +1,4 @@
-name: Prove mobile keyboard clean8
+name: Diagnose mobile Inbox clean8
 
 on:
   push:
@@ -9,38 +9,34 @@ permissions:
   contents: read
 
 jobs:
-  exact-mobile-proof:
+  inbox-height-diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Freeze candidate content
+      - name: Freeze candidate content before diagnostics
         run: |
-          test "$(git rev-parse HEAD^^)" = "21d00ca0006349752c3de1bbf16f5a9c252cc430"
+          test "$(git rev-parse HEAD^^^)" = "21d00ca0006349752c3de1bbf16f5a9c252cc430"
           test "$(git hash-object src/notverse/ios-visual-viewport-recovery.ts)" = "13d2f0c0899aa6b92fbe6cf588ef3d121dfb420c"
           test "$(git hash-object src/notverse/ios-visual-viewport-recovery.css)" = "06314c8c99ef0777e562cc25d0673b0202ffa450"
           test "$(git hash-object scripts/prove-ios-overlay-recovery.mjs)" = "2d30de25d25c781c6bb0718d347ad438abf37036"
-          test "$(git hash-object scripts/prove-mobile-notes-chat.mjs)" = "dac10813de8b3840f046aeb3da5e15e2c6fec350"
-          test "$(git hash-object scripts/prove-mobile-polish-visual.mjs)" = "5ac171ce044a3b47a4d5592ab6870dce264bf288"
-          node --check scripts/prove-ios-overlay-recovery.mjs
 
-      - name: Install project dependencies
-        run: npm install --no-audit --no-fund
+      - name: Build exact candidate
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
 
-      - name: Strict build
-        run: npm run build
-
-      - name: Install Playwright proof browsers
+      - name: Install Chromium
         run: |
           npm install --no-save --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium webkit
+          npx playwright install --with-deps chromium
 
       - name: Start exact generated production client
         run: |
@@ -52,45 +48,151 @@ jobs:
           cat /tmp/notverse-preview.log
           exit 1
 
-      - name: Prove short-phone and tall-phone Notes/chat geometry
-        run: node scripts/prove-mobile-notes-chat.mjs
-
-      - name: Prove mobile chat drafts Inbox clearance and Search visually
-        run: node scripts/prove-mobile-polish-visual.mjs
-
-      - name: Prove strict Chat Replies Inbox keyboard edge
-        run: node scripts/prove-ios-overlay-recovery.mjs
-
-      - name: Start exact generated Worker entry
+      - name: Recover focused Inbox computed geometry
         run: |
-          npx wrangler dev --local --port 8790 --config dist/notverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:8790/api/health >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat /tmp/notverse-worker.log
-          exit 1
+          cat > /tmp/diagnose-inbox.mjs <<'NODE'
+          import { chromium } from "playwright";
+          import { mkdir, writeFile } from "node:fs/promises";
 
-      - name: Prove recommendation request is not misrouted
-        run: node scripts/prove-companion-runtime.mjs
+          const out = "engineering-evidence/inbox-height-diagnostic";
+          await mkdir(out, { recursive: true });
+          const cases = [];
 
-      - name: Preserve proof metadata
-        if: always()
-        run: |
-          mkdir -p engineering-evidence/mobile-keyboard-clean8
-          printf '%s\n' '21d00ca0006349752c3de1bbf16f5a9c252cc430' > engineering-evidence/mobile-keyboard-clean8/candidate-commit.txt
-          git rev-parse HEAD > engineering-evidence/mobile-keyboard-clean8/runner-commit.txt
-          cp /tmp/notverse-preview.log engineering-evidence/mobile-keyboard-clean8/preview.log 2>/dev/null || true
-          cp /tmp/notverse-worker.log engineering-evidence/mobile-keyboard-clean8/worker.log 2>/dev/null || true
+          async function prepare(page) {
+            await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+            await page.evaluate(() => {
+              localStorage.setItem("notverse.preferences", JSON.stringify({
+                setupComplete: true,
+                noteFont: "handwritten",
+                readingInterests: ["Manga", "Novels", "PDFs"],
+                discoveryMethods: ["title", "memory", "link"],
+              }));
+            });
+            await page.reload({ waitUntil: "networkidle" });
+          }
 
-      - name: Upload exact evidence
+          async function inject(page, width, height) {
+            return page.evaluate(({ width, height }) => {
+              const viewport = visualViewport;
+              if (!viewport) return false;
+              Object.defineProperties(viewport, {
+                offsetTop: { configurable: true, value: 0 },
+                offsetLeft: { configurable: true, value: 0 },
+                width: { configurable: true, value: width },
+                height: { configurable: true, value: height },
+              });
+              viewport.dispatchEvent(new Event("scroll"));
+              viewport.dispatchEvent(new Event("resize"));
+              return true;
+            }, { width, height });
+          }
+
+          function inspectNode(node) {
+            if (!(node instanceof HTMLElement)) return null;
+            const r = node.getBoundingClientRect();
+            const s = getComputedStyle(node);
+            return {
+              tag: node.tagName,
+              className: node.className,
+              rect: { top:r.top, bottom:r.bottom, left:r.left, right:r.right, width:r.width, height:r.height },
+              clientHeight: node.clientHeight,
+              offsetHeight: node.offsetHeight,
+              scrollHeight: node.scrollHeight,
+              style: {
+                display:s.display, position:s.position, boxSizing:s.boxSizing,
+                height:s.height, minHeight:s.minHeight, maxHeight:s.maxHeight,
+                gridTemplateRows:s.gridTemplateRows, gridAutoRows:s.gridAutoRows,
+                alignItems:s.alignItems, alignSelf:s.alignSelf,
+                overflow:s.overflow, overflowY:s.overflowY,
+                paddingTop:s.paddingTop, paddingBottom:s.paddingBottom,
+                marginTop:s.marginTop, marginBottom:s.marginBottom,
+              },
+            };
+          }
+
+          for (const [width, viewportHeight, keyboardBottom] of [[360,640,420],[390,844,524]]) {
+            const browser = await chromium.launch({ headless:true });
+            const context = await browser.newContext({ viewport:{ width, height:viewportHeight }, isMobile:true, hasTouch:true, deviceScaleFactor:1 });
+            const page = await context.newPage();
+            await prepare(page);
+            await page.locator(".notverse-mobile-nav button").filter({ hasText:"Inbox" }).click();
+            const input = page.getByRole("textbox", { name:"Private message" });
+            await input.waitFor();
+            await input.fill("diagnostic draft");
+            await input.focus();
+            await inject(page, width, keyboardBottom);
+            await page.waitForTimeout(950);
+
+            const state = await page.evaluate(() => {
+              const q = (selector) => inspectNode(document.querySelector(selector));
+              const form = document.querySelector(".inbox-layout main > form");
+              const parents = [];
+              let current = form;
+              while (current instanceof HTMLElement && parents.length < 8) {
+                parents.push(inspectNode(current));
+                current = current.parentElement;
+              }
+              const rootStyle = getComputedStyle(document.documentElement);
+              return {
+                innerHeight,
+                visualViewport: visualViewport ? { offsetTop:visualViewport.offsetTop, height:visualViewport.height, width:visualViewport.width } : null,
+                bodyClass: document.body.className,
+                vars: {
+                  vvHeight: rootStyle.getPropertyValue("--notverse-vv-height").trim(),
+                  vvBottom: rootStyle.getPropertyValue("--notverse-vv-bottom").trim(),
+                  keyboardInset: rootStyle.getPropertyValue("--notverse-keyboard-inset").trim(),
+                },
+                shell:q(".main-shell.notverse-shell"),
+                inbox:q(".inbox-view"),
+                layout:q(".inbox-layout"),
+                main:q(".inbox-layout > main"),
+                header:q(".inbox-layout > main > header"),
+                thread:q(".inbox-layout .message-thread"),
+                form:q(".inbox-layout main > form"),
+                field:q(".inbox-layout main > form input"),
+                send:q(".inbox-layout main > form button"),
+                parents,
+              };
+
+              function inspectNode(node) {
+                if (!(node instanceof HTMLElement)) return null;
+                const r = node.getBoundingClientRect();
+                const s = getComputedStyle(node);
+                return {
+                  tag: node.tagName,
+                  className: node.className,
+                  rect: { top:r.top, bottom:r.bottom, left:r.left, right:r.right, width:r.width, height:r.height },
+                  clientHeight: node.clientHeight,
+                  offsetHeight: node.offsetHeight,
+                  scrollHeight: node.scrollHeight,
+                  style: {
+                    display:s.display, position:s.position, boxSizing:s.boxSizing,
+                    height:s.height, minHeight:s.minHeight, maxHeight:s.maxHeight,
+                    gridTemplateRows:s.gridTemplateRows, gridAutoRows:s.gridAutoRows,
+                    alignItems:s.alignItems, alignSelf:s.alignSelf,
+                    overflow:s.overflow, overflowY:s.overflowY,
+                    paddingTop:s.paddingTop, paddingBottom:s.paddingBottom,
+                    marginTop:s.marginTop, marginBottom:s.marginBottom,
+                  },
+                };
+              }
+            });
+            cases.push({ width, viewportHeight, keyboardBottom, state });
+            console.log(JSON.stringify({ width, viewportHeight, keyboardBottom, state }, null, 2));
+            await page.screenshot({ path:`${out}/chromium-${width}x${viewportHeight}-inbox-diagnostic.png`, fullPage:false });
+            await context.close();
+            await browser.close();
+          }
+
+          await writeFile(`${out}/geometry.json`, JSON.stringify(cases, null, 2));
+          NODE
+          node /tmp/diagnose-inbox.mjs
+
+      - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-keyboard-clean8-proof
-          path: |
-            engineering-evidence/mobile-keyboard-clean8
-            engineering-evidence/mobile-notes-chat
-            engineering-evidence/ios-overlay-recovery
+          name: inbox-height-diagnostic-clean8
+          path: engineering-evidence/inbox-height-diagnostic
           if-no-files-found: error
           retention-days: 14
