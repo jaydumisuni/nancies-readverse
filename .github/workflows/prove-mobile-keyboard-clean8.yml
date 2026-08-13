@@ -1,44 +1,34 @@
-name: Diagnose mobile Inbox clean8
-
+name: Diagnose Inbox height ownership
 on:
   push:
     branches:
       - proof/mobile-keyboard-clean8-20260814
-
 permissions:
   contents: read
-
 jobs:
-  inbox-height-diagnostic:
+  diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 4
-
+          fetch-depth: 5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Freeze candidate content before diagnostics
+      - name: Freeze clean8 product candidate
         run: |
-          test "$(git rev-parse HEAD^^^)" = "21d00ca0006349752c3de1bbf16f5a9c252cc430"
-          test "$(git hash-object src/notverse/ios-visual-viewport-recovery.ts)" = "13d2f0c0899aa6b92fbe6cf588ef3d121dfb420c"
+          git diff --quiet 21d00ca0006349752c3de1bbf16f5a9c252cc430 -- src/notverse/ios-visual-viewport-recovery.ts src/notverse/ios-visual-viewport-recovery.css scripts/prove-ios-overlay-recovery.mjs scripts/prove-mobile-notes-chat.mjs scripts/prove-mobile-polish-visual.mjs
           test "$(git hash-object src/notverse/ios-visual-viewport-recovery.css)" = "06314c8c99ef0777e562cc25d0673b0202ffa450"
-          test "$(git hash-object scripts/prove-ios-overlay-recovery.mjs)" = "2d30de25d25c781c6bb0718d347ad438abf37036"
-
       - name: Build exact candidate
         run: |
           npm install --no-audit --no-fund
           npm run build
-
       - name: Install Chromium
         run: |
           npm install --no-save --no-audit --no-fund playwright
           npx playwright install --with-deps chromium
-
-      - name: Start exact generated production client
+      - name: Start generated production client
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/notverse-preview.log 2>&1 &
           for attempt in $(seq 1 60); do
@@ -47,152 +37,5 @@ jobs:
           done
           cat /tmp/notverse-preview.log
           exit 1
-
-      - name: Recover focused Inbox computed geometry
-        run: |
-          cat > /tmp/diagnose-inbox.mjs <<'NODE'
-          import { chromium } from "playwright";
-          import { mkdir, writeFile } from "node:fs/promises";
-
-          const out = "engineering-evidence/inbox-height-diagnostic";
-          await mkdir(out, { recursive: true });
-          const cases = [];
-
-          async function prepare(page) {
-            await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
-            await page.evaluate(() => {
-              localStorage.setItem("notverse.preferences", JSON.stringify({
-                setupComplete: true,
-                noteFont: "handwritten",
-                readingInterests: ["Manga", "Novels", "PDFs"],
-                discoveryMethods: ["title", "memory", "link"],
-              }));
-            });
-            await page.reload({ waitUntil: "networkidle" });
-          }
-
-          async function inject(page, width, height) {
-            return page.evaluate(({ width, height }) => {
-              const viewport = visualViewport;
-              if (!viewport) return false;
-              Object.defineProperties(viewport, {
-                offsetTop: { configurable: true, value: 0 },
-                offsetLeft: { configurable: true, value: 0 },
-                width: { configurable: true, value: width },
-                height: { configurable: true, value: height },
-              });
-              viewport.dispatchEvent(new Event("scroll"));
-              viewport.dispatchEvent(new Event("resize"));
-              return true;
-            }, { width, height });
-          }
-
-          function inspectNode(node) {
-            if (!(node instanceof HTMLElement)) return null;
-            const r = node.getBoundingClientRect();
-            const s = getComputedStyle(node);
-            return {
-              tag: node.tagName,
-              className: node.className,
-              rect: { top:r.top, bottom:r.bottom, left:r.left, right:r.right, width:r.width, height:r.height },
-              clientHeight: node.clientHeight,
-              offsetHeight: node.offsetHeight,
-              scrollHeight: node.scrollHeight,
-              style: {
-                display:s.display, position:s.position, boxSizing:s.boxSizing,
-                height:s.height, minHeight:s.minHeight, maxHeight:s.maxHeight,
-                gridTemplateRows:s.gridTemplateRows, gridAutoRows:s.gridAutoRows,
-                alignItems:s.alignItems, alignSelf:s.alignSelf,
-                overflow:s.overflow, overflowY:s.overflowY,
-                paddingTop:s.paddingTop, paddingBottom:s.paddingBottom,
-                marginTop:s.marginTop, marginBottom:s.marginBottom,
-              },
-            };
-          }
-
-          for (const [width, viewportHeight, keyboardBottom] of [[360,640,420],[390,844,524]]) {
-            const browser = await chromium.launch({ headless:true });
-            const context = await browser.newContext({ viewport:{ width, height:viewportHeight }, isMobile:true, hasTouch:true, deviceScaleFactor:1 });
-            const page = await context.newPage();
-            await prepare(page);
-            await page.locator(".notverse-mobile-nav button").filter({ hasText:"Inbox" }).click();
-            const input = page.getByRole("textbox", { name:"Private message" });
-            await input.waitFor();
-            await input.fill("diagnostic draft");
-            await input.focus();
-            await inject(page, width, keyboardBottom);
-            await page.waitForTimeout(950);
-
-            const state = await page.evaluate(() => {
-              const q = (selector) => inspectNode(document.querySelector(selector));
-              const form = document.querySelector(".inbox-layout main > form");
-              const parents = [];
-              let current = form;
-              while (current instanceof HTMLElement && parents.length < 8) {
-                parents.push(inspectNode(current));
-                current = current.parentElement;
-              }
-              const rootStyle = getComputedStyle(document.documentElement);
-              return {
-                innerHeight,
-                visualViewport: visualViewport ? { offsetTop:visualViewport.offsetTop, height:visualViewport.height, width:visualViewport.width } : null,
-                bodyClass: document.body.className,
-                vars: {
-                  vvHeight: rootStyle.getPropertyValue("--notverse-vv-height").trim(),
-                  vvBottom: rootStyle.getPropertyValue("--notverse-vv-bottom").trim(),
-                  keyboardInset: rootStyle.getPropertyValue("--notverse-keyboard-inset").trim(),
-                },
-                shell:q(".main-shell.notverse-shell"),
-                inbox:q(".inbox-view"),
-                layout:q(".inbox-layout"),
-                main:q(".inbox-layout > main"),
-                header:q(".inbox-layout > main > header"),
-                thread:q(".inbox-layout .message-thread"),
-                form:q(".inbox-layout main > form"),
-                field:q(".inbox-layout main > form input"),
-                send:q(".inbox-layout main > form button"),
-                parents,
-              };
-
-              function inspectNode(node) {
-                if (!(node instanceof HTMLElement)) return null;
-                const r = node.getBoundingClientRect();
-                const s = getComputedStyle(node);
-                return {
-                  tag: node.tagName,
-                  className: node.className,
-                  rect: { top:r.top, bottom:r.bottom, left:r.left, right:r.right, width:r.width, height:r.height },
-                  clientHeight: node.clientHeight,
-                  offsetHeight: node.offsetHeight,
-                  scrollHeight: node.scrollHeight,
-                  style: {
-                    display:s.display, position:s.position, boxSizing:s.boxSizing,
-                    height:s.height, minHeight:s.minHeight, maxHeight:s.maxHeight,
-                    gridTemplateRows:s.gridTemplateRows, gridAutoRows:s.gridAutoRows,
-                    alignItems:s.alignItems, alignSelf:s.alignSelf,
-                    overflow:s.overflow, overflowY:s.overflowY,
-                    paddingTop:s.paddingTop, paddingBottom:s.paddingBottom,
-                    marginTop:s.marginTop, marginBottom:s.marginBottom,
-                  },
-                };
-              }
-            });
-            cases.push({ width, viewportHeight, keyboardBottom, state });
-            console.log(JSON.stringify({ width, viewportHeight, keyboardBottom, state }, null, 2));
-            await page.screenshot({ path:`${out}/chromium-${width}x${viewportHeight}-inbox-diagnostic.png`, fullPage:false });
-            await context.close();
-            await browser.close();
-          }
-
-          await writeFile(`${out}/geometry.json`, JSON.stringify(cases, null, 2));
-          NODE
-          node /tmp/diagnose-inbox.mjs
-
-      - name: Upload diagnostic evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: inbox-height-diagnostic-clean8
-          path: engineering-evidence/inbox-height-diagnostic
-          if-no-files-found: error
-          retention-days: 14
+      - name: Print focused Inbox geometry
+        run: node scripts/diagnose-inbox-height.mjs
