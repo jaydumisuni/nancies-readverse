@@ -1,0 +1,44 @@
+name: Deduplicate Replies keyboard gap
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean6-20260814
+
+permissions:
+  contents: write
+
+jobs:
+  dedupe:
+    if: ${{ !contains(github.event.head_commit.message, '[replies-deduped]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Collapse repeated focused Replies override
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/notverse/ios-visual-viewport-recovery.css')
+          text = path.read_text()
+          block = '''  body.notverse-replies-keyboard .replies-drawer {\n    margin-bottom: 0 !important;\n    padding-bottom: 0 !important;\n  }\n'''
+          before = text.count(block)
+          if before < 2:
+              raise SystemExit(f'expected duplicate focused Replies blocks, found {before}')
+          pair = block + '\n' + block
+          while pair in text:
+              text = text.replace(pair, block, 1)
+          if text.count(block) != 1:
+              raise SystemExit(f'expected one focused Replies block after dedupe, found {text.count(block)}')
+          path.write_text(text)
+          PY
+          git diff --check
+      - name: Commit clean CSS blob
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add src/notverse/ios-visual-viewport-recovery.css
+          git diff --cached --check
+          git commit -m "fix: deduplicate Replies keyboard override [replies-deduped] [replies-gap-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean6-20260814
