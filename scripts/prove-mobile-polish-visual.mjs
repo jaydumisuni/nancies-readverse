@@ -134,7 +134,12 @@ async function testChat(page, browserName, viewport) {
   await editor.focus();
   const keyboardHeight = viewport.height <= 700 ? 420 : 524;
   await page.setViewportSize({ width: viewport.width, height: keyboardHeight });
-  await page.waitForTimeout(350);
+  await page.waitForFunction(() => {
+    const panel = document.querySelector(".companion-panel.open");
+    if (!(panel instanceof HTMLElement)) return false;
+    return panel.getBoundingClientRect().bottom <= innerHeight + 1;
+  }, null, { timeout: 2500 });
+  await page.waitForTimeout(80);
   const keyboardViewport = await getViewport(page);
   const keyboardPanel = await getRect(page, ".companion-panel.open");
   const keyboardComposer = await getRect(page, ".companion-panel.open .chat-input");
