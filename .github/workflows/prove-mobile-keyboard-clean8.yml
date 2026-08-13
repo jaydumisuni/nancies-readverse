@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 3
 
       - uses: actions/setup-node@v4
         with:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Freeze candidate content
         run: |
-          test "$(git rev-parse HEAD^)" = "21d00ca0006349752c3de1bbf16f5a9c252cc430"
+          test "$(git rev-parse HEAD^^)" = "21d00ca0006349752c3de1bbf16f5a9c252cc430"
           test "$(git hash-object src/notverse/ios-visual-viewport-recovery.ts)" = "13d2f0c0899aa6b92fbe6cf588ef3d121dfb420c"
           test "$(git hash-object src/notverse/ios-visual-viewport-recovery.css)" = "06314c8c99ef0777e562cc25d0673b0202ffa450"
           test "$(git hash-object scripts/prove-ios-overlay-recovery.mjs)" = "2d30de25d25c781c6bb0718d347ad438abf37036"
