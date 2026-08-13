@@ -1,0 +1,42 @@
+name: Patch iOS proof screenshot typo
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean5-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[ios-proof-screenshot-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Correct strict proof syntax only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-ios-overlay-recovery.mjs')
+          text = path.read_text()
+          old = 'await page.screenshot(s path:'
+          new = 'await page.screenshot({ path:'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one screenshot typo, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          old_tail = '-inbox-keyboard-panned.png`, fullPage: false });'
+          new_tail = '-inbox-keyboard-panned.png`, fullPage: false });'
+          path.write_text(text)
+          PY
+          node --check scripts/prove-ios-overlay-recovery.mjs
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-ios-overlay-recovery.mjs
+          git diff --cached --check
+          git commit -m "test: fix strict iOS proof screenshot syntax [ios-proof-screenshot-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean5-20260813
