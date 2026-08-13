@@ -1,0 +1,38 @@
+name: Patch mobile polish Inbox proof
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean3-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[mobile-polish-inbox-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Align visual Inbox proof with focused conversation behavior
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-mobile-polish-visual.mjs')
+          text = path.read_text()
+          old = '''  await input.fill(message);\n  await input.press("Enter");\n  await page.getByText(message, { exact: true }).waitFor();\n  await page.waitForTimeout(250);\n\n  const viewportState = await getViewport(page);\n  const thread = await getRect(page, ".inbox-layout .message-thread");\n  const composer = await getRect(page, ".inbox-layout main > form");\n  const nav = await getRect(page, ".notverse-mobile-nav");\n  assert(thread.bottom <= composer.top + 1, `${prefix}: Inbox thread extends underneath composer`);\n  assert(composer.top >= -1 && composer.bottom <= viewportState.height + 1, `${prefix}: Inbox composer leaves viewport`);\n  assert(composer.bottom <= nav.top + 1, `${prefix}: Inbox composer hides behind mobile navigation`);\n  await assertNewestVisible(page, ".inbox-layout .message-thread", null, `${prefix}/inbox`);\n  await page.screenshot({ path: `${out}/${prefix}-inbox-sent.png`, fullPage: false });'''
+          new = '''  await input.fill(message);\n  await input.press("Enter");\n  await page.waitForFunction((expected) => {\n    const last = document.querySelector(".inbox-layout .message-thread")?.lastElementChild;\n    return last?.firstChild?.textContent?.trim() === expected;\n  }, message);\n  await page.waitForTimeout(250);\n\n  const viewportState = await getViewport(page);\n  const thread = await getRect(page, ".inbox-layout .message-thread");\n  const composer = await getRect(page, ".inbox-layout main > form");\n  const focusedState = await page.evaluate(() => {\n    const nav = document.querySelector(".notverse-mobile-nav");\n    const style = nav ? getComputedStyle(nav) : null;\n    return {\n      focusedMode: document.body.classList.contains("notverse-inbox-keyboard"),\n      navDisplay: style?.display || "",\n      navVisibility: style?.visibility || "",\n      navOpacity: style?.opacity || "",\n      navPointerEvents: style?.pointerEvents || "",\n    };\n  });\n  assert(focusedState.focusedMode, `${prefix}: Inbox did not enter focused keyboard mode`);\n  assert(\n    focusedState.navDisplay === "none" || focusedState.navVisibility === "hidden" || focusedState.navOpacity === "0" || focusedState.navPointerEvents === "none",\n    `${prefix}: mobile navigation remains active during focused Inbox composition ${JSON.stringify(focusedState)}`,\n  );\n  assert(thread.bottom <= composer.top + 1, `${prefix}: Inbox thread extends underneath composer`);\n  assert(composer.top >= -1 && composer.bottom <= viewportState.height + 1, `${prefix}: Inbox composer leaves viewport`);\n  await assertNewestVisible(page, ".inbox-layout .message-thread", null, `${prefix}/inbox`);\n  await page.screenshot({ path: `${out}/${prefix}-inbox-sent.png`, fullPage: false });\n\n  await input.blur();\n  await page.waitForFunction(() => !document.body.classList.contains("notverse-inbox-keyboard"));'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale mobile polish Inbox block, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-mobile-polish-visual.mjs
+          git diff --cached --check
+          git commit -m "test: align mobile polish Inbox proof [mobile-polish-inbox-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean3-20260813
