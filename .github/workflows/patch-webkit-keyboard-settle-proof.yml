@@ -36,3 +36,5 @@ jobs:
           git diff --cached --check
           git commit -m "test: wait for WebKit keyboard settlement [webkit-keyboard-settle-fixed]"
           git push origin HEAD:fix-mobile-keyboard-composers-clean4-20260813
+
+# trigger branch-only proof correction
