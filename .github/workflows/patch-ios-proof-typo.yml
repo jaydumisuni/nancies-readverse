@@ -1,0 +1,38 @@
+name: Patch iOS proof typo
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[ios-proof-typo-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Correct exact proof helper typo
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-ios-overlay-recovery.mjs')
+          text = path.read_text()
+          old = 'flushToBotom(form, bottom, `${browserName}: panned Replies composer`, 6);'
+          new = 'flushToBottom(form, bottom, `${browserName}: panned Replies composer`, 6);'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one typo, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-ios-overlay-recovery.mjs
+          git diff --cached --check
+          git commit -m "test: correct panned Replies proof helper [ios-proof-typo-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-20260813
