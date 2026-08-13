@@ -1,0 +1,38 @@
+name: Patch WebKit keyboard settle proof
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean4-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[webkit-keyboard-settle-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wait for actual WebKit viewport settlement
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-mobile-polish-visual.mjs')
+          text = path.read_text()
+          old = '''  await page.setViewportSize({ width: viewport.width, height: keyboardHeight });\n  await page.waitForTimeout(350);\n  const keyboardViewport = await getViewport(page);'''
+          new = '''  await page.setViewportSize({ width: viewport.width, height: keyboardHeight });\n  await page.waitForFunction(() => {\n    const panel = document.querySelector(".companion-panel.open");\n    if (!(panel instanceof HTMLElement)) return false;\n    return panel.getBoundingClientRect().bottom <= innerHeight + 1;\n  }, null, { timeout: 2500 });\n  await page.waitForTimeout(80);\n  const keyboardViewport = await getViewport(page);'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one keyboard settle block, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-mobile-polish-visual.mjs
+          git diff --cached --check
+          git commit -m "test: wait for WebKit keyboard settlement [webkit-keyboard-settle-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean4-20260813
