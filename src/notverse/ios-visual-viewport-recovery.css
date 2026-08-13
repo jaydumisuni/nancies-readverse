@@ -1,6 +1,7 @@
 /* Real-iOS visual viewport recovery.
-   No redesign: fixed modal surfaces stay at the layout-viewport origin while
-   their height follows Safari's visible viewport. */
+   Conversation composers must sit directly on the visible keyboard edge.
+   The visual viewport may pan; fixed surfaces stay at top:0 while their
+   bottom tracks visualViewport.offsetTop + visualViewport.height. */
 
 @media (max-width: 760px) {
   body.notverse-chat-open .companion-panel.open {
@@ -30,20 +31,21 @@
   body.notverse-chat-open .companion-panel.open .chat-body {
     min-height: 0 !important;
     overflow-y: auto !important;
-    padding-bottom: 32px !important;
-    scroll-padding-bottom: 32px !important;
+    padding-bottom: 18px !important;
+    scroll-padding-bottom: 18px !important;
   }
 
   body.notverse-chat-open .companion-panel.open .chat-input {
     flex: none !important;
-    min-height: 58px;
+    min-height: 54px !important;
     background: rgba(8, 7, 10, .995) !important;
-    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    padding: 5px 8px max(3px, env(safe-area-inset-bottom)) !important;
   }
 
-  /* Notes previously fixed the body itself. That is unsafe for fixed modal
-     descendants on mobile Safari; keep the Notes shell fixed instead and let
-     Replies own the visual viewport directly. */
+  body.notverse-chat-open.notverse-keyboard-open .companion-panel.open .chat-input {
+    padding-bottom: 2px !important;
+  }
+
   body.notverse-replies-open {
     position: static !important;
     inset: auto !important;
@@ -58,10 +60,7 @@
     top: 0 !important;
     left: 0 !important;
     width: var(--notverse-vv-width, 100vw) !important;
-    height: calc(
-      var(--notverse-vv-height, 100dvh) -
-      var(--notverse-replies-nav-clearance, calc(72px + env(safe-area-inset-bottom)))
-    ) !important;
+    height: var(--notverse-vv-height, 100dvh) !important;
     max-height: none !important;
     z-index: 4000 !important;
     place-items: end center !important;
@@ -71,15 +70,15 @@
   body.notverse-replies-open .replies-drawer {
     box-sizing: border-box;
     width: min(720px, 100%) !important;
-    height: min(650px, calc(100% - 8px)) !important;
-    max-height: calc(100% - 8px) !important;
+    height: min(650px, calc(100% - 2px)) !important;
+    max-height: calc(100% - 2px) !important;
     min-height: 0 !important;
     overflow-y: auto !important;
     overscroll-behavior-y: contain;
     display: flex !important;
     flex-direction: column;
-    padding-bottom: 12px !important;
-    scroll-padding-bottom: 72px;
+    padding-bottom: 4px !important;
+    scroll-padding-bottom: 58px;
   }
 
   body.notverse-replies-open .replies-drawer > header {
@@ -88,7 +87,7 @@
     top: 0;
     z-index: 3;
     margin: -2px -2px 0;
-    padding: 2px 2px 12px;
+    padding: 2px 2px 10px;
     background: linear-gradient(180deg, #121012 78%, rgba(18,16,18,0));
   }
 
@@ -102,9 +101,9 @@
     bottom: 0;
     z-index: 3;
     margin-top: auto;
-    padding-top: 12px;
-    padding-bottom: max(2px, env(safe-area-inset-bottom));
-    background: linear-gradient(0deg, #121012 80%, rgba(18,16,18,0));
+    padding-top: 8px;
+    padding-bottom: 2px;
+    background: linear-gradient(0deg, #121012 82%, rgba(18,16,18,0));
   }
 
   body.notverse-replies-open .replies-drawer > form input {
@@ -112,11 +111,118 @@
     font-size: 16px !important;
   }
 
+  body.notverse-replies-keyboard .replies-drawer {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.notverse-replies-keyboard .replies-drawer {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {
     display: none !important;
   }
 
-  body.notverse-replies-keyboard .replies-backdrop {
+  /* Inbox enters a focused conversation surface only while its message field
+     owns focus. This is the Messenger/Facebook behavior from the supplied
+     recordings: header + messages + composer consume the visible viewport,
+     with the composer directly on the keyboard edge. */
+  body.notverse-inbox-keyboard .utility-bar,
+  body.notverse-inbox-keyboard .mobile-nav.notverse-mobile-nav {
+    display: none !important;
+  }
+
+  body.notverse-inbox-keyboard .main-shell.notverse-shell {
+    box-sizing: border-box;
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    width: var(--notverse-vv-width, 100vw) !important;
     height: var(--notverse-vv-height, 100dvh) !important;
+    min-height: 0 !important;
+    max-height: var(--notverse-vv-height, 100dvh) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-view {
+    box-sizing: border-box;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: var(--notverse-vv-width, 100vw) !important;
+    height: var(--notverse-vv-height, 100dvh) !important;
+    min-height: 0 !important;
+    max-height: var(--notverse-vv-height, 100dvh) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-view > header {
+    display: none !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout {
+    box-sizing: border-box;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout > aside {
+    display: none !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout > main {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout > main > header {
+    min-height: 52px;
+    padding: max(6px, env(safe-area-inset-top)) 10px 6px !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout .message-thread {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    padding: 10px 10px 14px !important;
+    scroll-padding-bottom: 14px !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout main > form {
+    position: relative;
+    z-index: 5;
+    min-height: 52px;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: end;
+    gap: 6px !important;
+    padding: 5px 7px 2px !important;
+    background: rgba(10,7,10,.998) !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout main > form input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    font-size: 16px !important;
+    line-height: 20px;
+    padding: 10px 11px !important;
+  }
+
+  body.notverse-inbox-keyboard .inbox-layout main > form button {
+    min-width: 58px;
+    height: 42px;
+    padding: 0 13px !important;
   }
 }
