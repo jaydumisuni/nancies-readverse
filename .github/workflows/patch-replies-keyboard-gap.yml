@@ -37,3 +37,5 @@ jobs:
           git diff --cached --check
           git commit -m "fix: remove Replies keyboard bottom reserve [replies-gap-fixed]"
           git push origin HEAD:fix-mobile-keyboard-composers-clean6-20260814
+
+# activate branch-only exact patch
