@@ -217,7 +217,7 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
     assert(Math.abs(backdrop.top) <= 1, `${browserName}: Replies double-followed offset ${backdrop.top}`);
     assert(topVar === "0px", `${browserName}: Replies exported non-zero top ${topVar}`);
     flushToBottom(backdrop, bottom, `${browserName}: panned Replies backdrop`, 6);
-    flushToBotom(form, bottom, `${browserName}: panned Replies composer`, 6);
+    flushToBottom(form, bottom, `${browserName}: panned Replies composer`, 6);
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-replies-keyboard-panned.png`, fullPage: false });
 
     report.cases.push({ kind: "replies", browserName, width, height, keyboardBottom });
