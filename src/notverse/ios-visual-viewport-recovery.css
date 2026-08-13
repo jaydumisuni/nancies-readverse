@@ -1,15 +1,13 @@
 /* Real-iOS visual viewport recovery.
-   No redesign: this only keeps overlays inside the visible browser area and
-   prevents the existing mobile navigation from covering modal content. */
+   No redesign: fixed modal surfaces stay at the layout-viewport origin while
+   their height follows Safari's visible viewport. */
 
 @media (max-width: 760px) {
-  /* Companion chat is a true mobile modal. Keep it above every app surface and
-     bind it to the visual viewport rather than the larger layout viewport. */
   body.notverse-chat-open .companion-panel.open {
     position: fixed !important;
     z-index: 7000 !important;
-    top: var(--notverse-vv-top, 0px) !important;
-    left: var(--notverse-vv-left, 0px) !important;
+    top: 0 !important;
+    left: 0 !important;
     right: auto !important;
     bottom: auto !important;
     width: var(--notverse-vv-width, 100vw) !important;
@@ -21,7 +19,6 @@
     transform: none !important;
   }
 
-  /* Do not leave the six-tab bar visibly sitting behind a modal chat. */
   body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
   body.notverse-chat-open .floating-companion {
     display: none !important;
@@ -44,13 +41,22 @@
     padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
   }
 
-  /* Replies stay inside the Notes workspace and end before the six-tab bar.
-     The underlying Note is still visible through the approved dark backdrop. */
+  /* Notes previously fixed the body itself. That is unsafe for fixed modal
+     descendants on mobile Safari; keep the Notes shell fixed instead and let
+     Replies own the visual viewport directly. */
+  body.notverse-replies-open {
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
   body.notverse-replies-open .replies-backdrop {
     position: fixed !important;
     inset: auto !important;
-    top: var(--notverse-vv-top, 0px) !important;
-    left: var(--notverse-vv-left, 0px) !important;
+    top: 0 !important;
+    left: 0 !important;
     width: var(--notverse-vv-width, 100vw) !important;
     height: calc(
       var(--notverse-vv-height, 100dvh) -
@@ -106,8 +112,6 @@
     font-size: 16px !important;
   }
 
-  /* If the reply field itself opens the software keyboard, the app nav is no
-     longer useful. Give the drawer the full visual viewport until focus leaves. */
   body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {
     display: none !important;
   }
