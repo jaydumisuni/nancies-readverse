@@ -43,27 +43,37 @@ try {
     const text = (await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
     const setupVisible = await page.locator(".notverse-setup").isVisible().catch(() => false);
     const homeVisible = await page.locator(".notverse-home").isVisible().catch(() => false);
+    const brandAccessible = await page.locator('[aria-label="NoTVerse"], [aria-label="NoTVerse Home"]').first().isVisible().catch(() => false);
+    const title = await page.title();
     const metrics = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
     }));
 
-    assert(text.includes("NoTVerse"), `${viewport.name}: NoTVerse identity is missing`);
+    /* Preserve the rendered frame before assertions so a failed live gate always
+       leaves visual evidence instead of only a textual error. */
+    const screenshot = `${viewport.name}.png`;
+    await page.screenshot({ path: `${output}/${screenshot}`, fullPage: true });
+
+    /* The approved brand deliberately removed a second visible NoTVerse wordmark:
+       the canonical artwork owns the visual name while the DOM exposes NoTVerse
+       through accessibility and page identity. Do not reintroduce duplicate text
+       merely to satisfy a verifier. */
+    assert(brandAccessible || title.includes("NoTVerse"), `${viewport.name}: accessible NoTVerse identity is missing`);
     assert(text.includes("Created for Nancy. Shared with the world."), `${viewport.name}: exact origin line is missing`);
     assert(!text.includes("Nancy's ReadVerse"), `${viewport.name}: old visible product name remains`);
     assert(setupVisible || homeVisible, `${viewport.name}: neither setup nor Home is visible`);
     assert(metrics.scrollWidth <= metrics.clientWidth + 2, `${viewport.name}: horizontal overflow`);
     assert(errors.length === 0, `${viewport.name}: browser errors: ${errors.join(" | ")}`);
 
-    const screenshot = `${viewport.name}.png`;
-    await page.screenshot({ path: `${output}/${screenshot}`, fullPage: true });
     report.viewports.push({
       ...viewport,
       status: response.status(),
-      title: await page.title(),
+      title,
       finalUrl: page.url(),
       setupVisible,
       homeVisible,
+      brandAccessible,
       screenshot,
     });
     await context.close();
