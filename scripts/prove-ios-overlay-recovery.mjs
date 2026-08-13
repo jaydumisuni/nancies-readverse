@@ -270,7 +270,7 @@ async function proveInbox(browserType, browserName, width, height, keyboardBotto
     form = await rect(page, ".inbox-layout main > form");
     flushToBottom(inbox, bottom, `${browserName}: panned Inbox surface`, 6);
     flushToBottom(form, bottom, `${browserName}: panned Inbox composer`, 6);
-    await page.screenshot(s path: `${out}/${browserName}-${width}x${height}-inbox-keyboard-panned.png`, fullPage: false });
+    await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-inbox-keyboard-panned.png`, fullPage: false });
 
     report.cases.push({ kind: "inbox", browserName, width, height, keyboardBottom });
   } finally {
