@@ -26,10 +26,7 @@ jobs:
           new = 'await page.screenshot({ path:'
           if text.count(old) != 1:
               raise SystemExit(f'expected one screenshot typo, found {text.count(old)}')
-          text = text.replace(old, new, 1)
-          old_tail = '-inbox-keyboard-panned.png`, fullPage: false });'
-          new_tail = '-inbox-keyboard-panned.png`, fullPage: false });'
-          path.write_text(text)
+          path.write_text(text.replace(old, new, 1))
           PY
           node --check scripts/prove-ios-overlay-recovery.mjs
       - name: Commit exact proof correction
@@ -40,3 +37,5 @@ jobs:
           git diff --cached --check
           git commit -m "test: fix strict iOS proof screenshot syntax [ios-proof-screenshot-fixed]"
           git push origin HEAD:fix-mobile-keyboard-composers-clean5-20260813
+
+# activate this disposable branch-only patch workflow
