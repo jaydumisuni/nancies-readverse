@@ -116,6 +116,11 @@
     padding-bottom: 0 !important;
   }
 
+  body.notverse-replies-keyboard .replies-drawer {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {
     display: none !important;
   }
