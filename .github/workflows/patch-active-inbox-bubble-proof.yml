@@ -1,0 +1,38 @@
+name: Patch active Inbox bubble proof
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean-20260813
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[active-inbox-bubble-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify actual last Inbox bubble text
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/prove-mobile-notes-chat.mjs')
+          text = path.read_text()
+          old = 'await page.locator(".inbox-layout .message-thread").getByText(inboxText, { exact: true }).waitFor();'
+          new = '''await page.waitForFunction((expected) => {\n    const last = document.querySelector(".inbox-layout .message-thread")?.lastElementChild;\n    return last?.firstChild?.textContent?.trim() === expected;\n  }, inboxText);'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale exact Inbox bubble selector, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit exact proof correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add scripts/prove-mobile-notes-chat.mjs
+          git diff --cached --check
+          git commit -m "test: verify actual last Inbox bubble [active-inbox-bubble-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean-20260813
