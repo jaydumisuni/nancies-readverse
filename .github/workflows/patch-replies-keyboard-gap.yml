@@ -1,0 +1,39 @@
+name: Patch Replies keyboard gap
+
+on:
+  push:
+    branches:
+      - fix-mobile-keyboard-composers-clean6-20260814
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[replies-gap-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove inherited Replies keyboard bottom reserve
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/notverse/ios-visual-viewport-recovery.css')
+          text = path.read_text()
+          marker = '''  body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {\n    display: none !important;\n  }'''
+          replacement = '''  body.notverse-replies-keyboard .replies-drawer {\n    margin-bottom: 0 !important;\n    padding-bottom: 0 !important;\n  }\n\n  body.notverse-replies-keyboard .mobile-nav.notverse-mobile-nav {\n    display: none !important;\n  }'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'expected one Replies keyboard marker, found {text.count(marker)}')
+          path.write_text(text.replace(marker, replacement, 1))
+          PY
+          git diff --check
+      - name: Commit exact product correction
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add src/notverse/ios-visual-viewport-recovery.css
+          git diff --cached --check
+          git commit -m "fix: remove Replies keyboard bottom reserve [replies-gap-fixed]"
+          git push origin HEAD:fix-mobile-keyboard-composers-clean6-20260814
