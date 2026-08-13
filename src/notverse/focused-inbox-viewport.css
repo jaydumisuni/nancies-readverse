@@ -1,0 +1,9 @@
+/* Focused mobile Inbox owns the full visual viewport while the keyboard is open.
+   This outranks the normal mobile workspace grid/padding from production-polish.css. */
+@media (max-width: 760px) {
+  body.notverse-inbox-keyboard .main-shell.notverse-shell > .inbox-view {
+    display: block !important;
+    grid-template-rows: none !important;
+    padding: 0 !important;
+  }
+}
