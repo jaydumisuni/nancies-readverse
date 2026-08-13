@@ -186,6 +186,8 @@ async function verifyPhone(width, height, name) {
   const inboxClearance = await verifyMessageClearance(page, ".inbox-layout .message-thread", ".inbox-layout main > form", `${name}/inbox`);
   await page.screenshot({ path: `${out}/${name}-inbox-sent.png`, fullPage: false });
 
+  await inboxInput.blur();
+  await page.waitForFunction(() => !document.body.classList.contains("notverse-inbox-keyboard"));
   await page.getByRole("button", { name: "Search" }).last().click();
   await page.waitForSelector(".search-action-grid");
   if (height <= 700) {
