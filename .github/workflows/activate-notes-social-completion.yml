@@ -1,0 +1,62 @@
+name: Activate Notes social completion
+
+on:
+  push:
+    branches:
+      - complete-notes-social-loop-20260814
+
+permissions:
+  contents: write
+
+jobs:
+  activate-and-prove:
+    if: ${{ !contains(github.event.head_commit.message, '[social-activated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply exact social completion activation
+        run: python scripts/activate-notes-social-completion.py
+      - name: Remove branch-only activation helpers
+        run: |
+          rm scripts/activate-notes-social-completion.py
+          rm .github/workflows/activate-notes-social-completion.yml
+      - name: Install dependencies and strict build
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Install proof browsers
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+      - name: Start exact generated client
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/notverse-social.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/notverse-social.log
+          exit 1
+      - name: Prove existing mobile geometry
+        run: node scripts/prove-mobile-notes-chat.mjs
+      - name: Prove existing mobile visual contract
+        run: node scripts/prove-mobile-polish-visual.mjs
+      - name: Prove iOS keyboard and horizontal stability
+        run: node scripts/prove-ios-overlay-recovery.mjs
+      - name: Prove Notes social completion
+        run: node scripts/prove-notes-social-loop.mjs
+      - name: Freeze only proven source changes
+        run: |
+          git config user.name "THE TECH GUY"
+          git config user.email "65334711+jaydumisuni@users.noreply.github.com"
+          git add src/App.tsx src/main.tsx src/notverse/NoTVerseViews.tsx src/notverse/ios-visual-viewport-recovery.ts .github/workflows/mobile-notes-chat-regression.yml
+          git add -u scripts/activate-notes-social-completion.py .github/workflows/activate-notes-social-completion.yml
+          git diff --cached --check
+          git commit -m "complete Notes social loop [social-activated]"
+          git push origin HEAD:complete-notes-social-loop-20260814
