@@ -49,7 +49,7 @@ jobs:
           const cases=[
             ['Gojo','Recommend three books about decision-making under uncertainty and explain why each is useful.',['decision','uncertainty'],true],
             ['Itachi','Compare 1984 and Brave New World without spoilers. What different danger does each examine?',['1984','brave new world','control'],false],
-            ['Naruto','I have lost my reading motivation. Give me a realistic way to restart without forcing a huge goal.',['reading','small'],false],
+            ['Naruto','I have lost my reading motivation. Give me a realistic way to restart without forcing a huge goal.',['read','page','habit','restart','small'],false],
             ['Kakashi','I half remember a literary novel about a butler looking back on his life and missed choices. What might it be?',['remains of the day','ishiguro','butler'],true],
             ['Megumi','Explain the difference between a manga chapter, volume and omnibus so a beginner can buy the right thing.',['chapter','volume','omnibus'],false],
             ['Sasuke','Recommend a concise book about discipline that is not empty motivational hype, and explain the trade-off.',['discipline'],true],

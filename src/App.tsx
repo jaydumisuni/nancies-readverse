@@ -1464,6 +1464,19 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    const routeSocialHash = () => {
+      const hash = window.location.hash;
+      if (hash === "#activity" || hash === "#my-notes" || hash.startsWith("#note=")) {
+        setChatOpen(false);
+        setActiveSection("notes");
+      }
+    };
+    routeSocialHash();
+    window.addEventListener("hashchange", routeSocialHash);
+    return () => window.removeEventListener("hashchange", routeSocialHash);
+  }, []);
+
   return (
     <div className="readverse-app notverse-app">
       <div className="cosmic-grid" />
@@ -1548,8 +1561,9 @@ export default function App() {
             />
             <kbd>⌘ K</kbd>
           </label>
+          <button type="button" className="mobile-notifications" aria-label="Notifications" onClick={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "activity"; }}>♡</button>
           <div className="utility-actions">
-            <button type="button" aria-label="Notifications">♡</button>
+            <button type="button" className="activity-button" aria-label="Notifications" onClick={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "activity"; }}>♡</button>
             <button
               type="button"
               aria-label="Settings"
@@ -1585,6 +1599,7 @@ export default function App() {
           onUpload={() => fileInputRef.current?.click()}
           onChat={() => setChatOpen(true)}
           onSettings={() => setSettingsOpen(true)}
+          onMyNotes={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "my-notes"; }}
           onOpenBook={openNoTVerseBook}
         />
 

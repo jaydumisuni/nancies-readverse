@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import NotesExperience from "./NotesExperience";
+import NotesSocialExperience from "./NotesSocialExperience";
 import { starterInbox, starterNotebooks, starterNotes, usePersistentState } from "./storage";
 import type { InboxThread, NoTVerseNav, NoTVersePreferences, NotebookRecord, PresenceReader } from "./types";
 
@@ -32,15 +32,16 @@ type Props = {
   onUpload: () => void;
   onChat: () => void;
   onSettings: () => void;
+  onMyNotes: () => void;
   onOpenBook: (book: BookLike) => void;
 };
 
 export default function NoTVerseViews(props: Props) {
-  if (props.active === "notes") return <NotesExperience displayName={props.displayName} avatar={props.avatar} libraryTitles={props.books.map((book) => book.title)} noteFont={props.preferences.noteFont} />;
+  if (props.active === "notes") return <NotesSocialExperience displayName={props.displayName} avatar={props.avatar} libraryTitles={props.books.map((book) => book.title)} noteFont={props.preferences.noteFont} />;
   if (props.active === "search") return <SearchView onDiscover={props.onDiscover} onSource={props.onSource} onUpload={props.onUpload} />;
   if (props.active === "library") return <LibraryView books={props.books} onOpen={props.onOpenBook} />;
   if (props.active === "inbox") return <InboxView displayName={props.displayName} />;
-  if (props.active === "me") return <ProfileNotebook displayName={props.displayName} avatar={props.avatar} status={props.status} books={props.books} onSettings={props.onSettings} />;
+  if (props.active === "me") return <ProfileNotebook displayName={props.displayName} avatar={props.avatar} status={props.status} books={props.books} onSettings={props.onSettings} onMyNotes={props.onMyNotes} />;
   return <HomeView {...props} />;
 }
 
@@ -224,7 +225,10 @@ function InboxView({ displayName }: { displayName: string }) {
   );
 }
 
-function ProfileNotebook({ displayName, avatar, status, books, onSettings }: { displayName: string; avatar?: string; status?: string; books: BookLike[]; onSettings: () => void }) {
+function ProfileNotebook({ displayName, avatar, status, books, onSettings, onMyNotes }: { displayName: string; avatar?: string; status?: string; books: BookLike[]; onSettings: () => void; onMyNotes: () => void }) {
   const [notebooks] = usePersistentState<NotebookRecord[]>("notverse.notebooks", starterNotebooks);
-  return <section className="notverse-view profile-notebook"><header className="profile-cover"><div className="profile-main-avatar">{avatar ? <img src={avatar} alt="" /> : displayName.slice(0, 1)}</div><div><span className="notverse-eyebrow">My Notebook</span><h1>{displayName}</h1><p>{status || "Reading, remembering and leaving Notes in the margins."}</p></div><button type="button" onClick={onSettings}>Edit profile</button></header><div className="profile-stat-row"><span><strong>{books.length}</strong> Library</span><span><strong>{notebooks.length}</strong> Notebooks</span><span><strong>3</strong> Public Notes</span><span><strong>27</strong> Following</span></div><section className="profile-paper"><span className="note-tape" /><h2>Created for Nancy. Shared with the world.</h2><p>Public sections show only what the reader allows. Private Notes, drafts, hidden books, history and saved files stay private.</p><div className="profile-genres"><b>Manga</b><b>Novels</b><b>Research</b><b>Comics</b></div></section><section className="notverse-section"><header><div><span>Joined Notebooks</span><h2>Your reading circles.</h2></div></header><div className="notebook-row">{notebooks.map((notebook) => <article key={notebook.id} style={{ "--notebook-accent": notebook.coverAccent } as React.CSSProperties}><span>▤</span><div><strong>{notebook.name}</strong><small>{notebook.type}</small><p>{notebook.description}</p></div></article>)}</div></section></section>;
+  const [notes] = usePersistentState("notverse.notes", starterNotes);
+  const mine = notes.filter((note) => note.mine || note.author === displayName);
+  const publicMine = mine.filter((note) => note.visibility === "public");
+  return <section className="notverse-view profile-notebook"><header className="profile-cover"><div className="profile-main-avatar">{avatar ? <img src={avatar} alt="" /> : displayName.slice(0, 1)}</div><div><span className="notverse-eyebrow">My Notebook</span><h1>{displayName}</h1><p>{status || "Reading, remembering and leaving Notes in the margins."}</p></div><button type="button" onClick={onSettings}>Edit profile</button></header><div className="profile-stat-row"><span><strong>{books.length}</strong> Library</span><span><strong>{notebooks.length}</strong> Notebooks</span><span><strong>{publicMine.length}</strong> Public Notes</span><span><strong>{mine.length}</strong> My Notes</span></div><section className="profile-note-summary"><div><strong>My Notes</strong><small>{mine.length} Note{mine.length === 1 ? "" : "s"} written · {publicMine.length} public</small></div><button type="button" onClick={onMyNotes} aria-label="Open My Notes">Open My Notes</button></section><section className="profile-paper"><span className="note-tape" /><h2>Created for Nancy. Shared with the world.</h2><p>Public sections show only what the reader allows. Private Notes, drafts, hidden books, history and saved files stay private.</p><div className="profile-genres"><b>Manga</b><b>Novels</b><b>Research</b><b>Comics</b></div></section><section className="notverse-section"><header><div><span>Joined Notebooks</span><h2>Your reading circles.</h2></div></header><div className="notebook-row">{notebooks.map((notebook) => <article key={notebook.id} style={{ "--notebook-accent": notebook.coverAccent } as React.CSSProperties}><span>▤</span><div><strong>{notebook.name}</strong><small>{notebook.type}</small><p>{notebook.description}</p></div></article>)}</div></section></section>;
 }
