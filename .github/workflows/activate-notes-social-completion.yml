@@ -21,10 +21,13 @@ jobs:
         with:
           node-version: 22
       - name: Apply exact social completion activation
-        run: python scripts/activate-notes-social-completion.py
+        run: |
+          python scripts/activate-notes-social-completion.py
+          python scripts/patch-replies-autofollow.py
       - name: Remove branch-only activation helpers
         run: |
           rm scripts/activate-notes-social-completion.py
+          rm scripts/patch-replies-autofollow.py
           rm .github/workflows/activate-notes-social-completion.yml
       - name: Install dependencies and strict build
         run: |
@@ -55,8 +58,8 @@ jobs:
         run: |
           git config user.name "THE TECH GUY"
           git config user.email "65334711+jaydumisuni@users.noreply.github.com"
-          git add src/App.tsx src/main.tsx src/notverse/NoTVerseViews.tsx src/notverse/ios-visual-viewport-recovery.ts .github/workflows/mobile-notes-chat-regression.yml
-          git add -u scripts/activate-notes-social-completion.py .github/workflows/activate-notes-social-completion.yml
+          git add src/App.tsx src/main.tsx src/notverse/NoTVerseViews.tsx src/notverse/NotesSocialExperience.tsx src/notverse/notes-social-completion.css src/notverse/ios-visual-viewport-recovery.ts scripts/prove-notes-social-loop.mjs .github/workflows/mobile-notes-chat-regression.yml
+          git add -u scripts/activate-notes-social-completion.py scripts/patch-replies-autofollow.py .github/workflows/activate-notes-social-completion.yml
           git diff --cached --check
           git commit -m "complete Notes social loop [social-activated]"
           git push origin HEAD:complete-notes-social-loop-20260814
