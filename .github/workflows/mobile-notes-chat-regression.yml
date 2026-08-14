@@ -13,6 +13,7 @@ on:
       - "scripts/prove-mobile-notes-chat.mjs"
       - "scripts/prove-mobile-polish-visual.mjs"
       - "scripts/prove-ios-overlay-recovery.mjs"
+      - "scripts/prove-notes-social-loop.mjs"
       - "scripts/prove-companion-runtime.mjs"
       - "package.json"
       - "wrangler.jsonc"
@@ -62,6 +63,9 @@ jobs:
       - name: Prove iOS keyboard chat and Replies navigation clearance
         run: node scripts/prove-ios-overlay-recovery.mjs
 
+      - name: Prove Notes social loop, activity, share and real replies
+        run: node scripts/prove-notes-social-loop.mjs
+
       - name: Start exact generated Worker entry
         run: |
           npx wrangler dev --local --port 8790 --config dist/notverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
@@ -91,5 +95,6 @@ jobs:
           path: |
             engineering-evidence/mobile-notes-chat
             engineering-evidence/ios-overlay-recovery
+            engineering-evidence/notes-social-completion
           if-no-files-found: error
           retention-days: 14

@@ -205,11 +205,21 @@ function syncVisibleViewport(): void {
   syncInbox(bounds);
 }
 
-function settleVisibleViewport(): void {
+let settleFrame = 0;
+let settleUntil = 0;
+
+function settleFrameLoop(): void {
+  settleFrame = 0;
   syncVisibleViewport();
-  for (const delay of [40, 100, 180, 320, 520, 800]) {
-    window.setTimeout(syncVisibleViewport, delay);
+  if (performance.now() < settleUntil) {
+    settleFrame = window.requestAnimationFrame(settleFrameLoop);
   }
+}
+
+function settleVisibleViewport(duration = 420): void {
+  syncVisibleViewport();
+  settleUntil = Math.max(settleUntil, performance.now() + duration);
+  if (!settleFrame) settleFrame = window.requestAnimationFrame(settleFrameLoop);
 }
 
 const host = document.getElementById("root") || document.body;
@@ -221,13 +231,13 @@ observer.observe(host, {
   subtree: true,
 });
 
-window.addEventListener("resize", settleVisibleViewport, { passive: true });
-window.addEventListener("orientationchange", settleVisibleViewport, { passive: true });
-window.visualViewport?.addEventListener("resize", settleVisibleViewport, { passive: true });
+window.addEventListener("resize", () => settleVisibleViewport(520), { passive: true });
+window.addEventListener("orientationchange", () => settleVisibleViewport(700), { passive: true });
+window.visualViewport?.addEventListener("resize", () => settleVisibleViewport(520), { passive: true });
 
 /* visualViewport.scroll is Safari's native focus pan. Do not move the surface
    top to offsetTop. We only use offsetTop when deriving the visible bottom. */
-window.visualViewport?.addEventListener("scroll", settleVisibleViewport, { passive: true });
+window.visualViewport?.addEventListener("scroll", () => settleVisibleViewport(520), { passive: true });
 
 document.addEventListener("focusin", (event) => {
   const target = event.target;
@@ -235,7 +245,7 @@ document.addEventListener("focusin", (event) => {
   if (target.closest(
     ".companion-panel.open .chat-input, .replies-drawer, .inbox-layout main > form",
   )) {
-    settleVisibleViewport();
+    settleVisibleViewport(900);
   }
 }, true);
 
@@ -245,7 +255,7 @@ document.addEventListener("focusout", (event) => {
   if (target.closest(
     ".companion-panel.open .chat-input, .replies-drawer, .inbox-layout main > form",
   )) {
-    settleVisibleViewport();
+    settleVisibleViewport(700);
   }
 }, true);
 
