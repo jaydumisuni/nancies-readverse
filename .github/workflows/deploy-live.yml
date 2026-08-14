@@ -77,6 +77,12 @@ jobs:
           PROOF_DIR: engineering-evidence/notverse-live/ios-overlay-recovery
         run: node scripts/prove-ios-overlay-recovery.mjs
 
+      - name: Verify live Notes social loop, My Notes, replies, share and Activity
+        env:
+          PROOF_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/notverse-live/notes-social-completion
+        run: node scripts/prove-notes-social-loop.mjs
+
       - name: Verify live reader, Notes and Library handoff
         env:
           NOTVERSE_TEST_URL: https://notverse.1ink.online
