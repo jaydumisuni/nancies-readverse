@@ -87,6 +87,8 @@ async function testChat(page, browserName, viewport) {
   const bridge = panel.locator("input.chat-input-state-bridge");
   await editor.waitFor();
 
+  const initialEditorBox = await getRect(page, ".companion-panel.open .chat-composer-editor");
+  const initialComposerBox = await getRect(page, ".companion-panel.open .chat-input");
   const draft = "I want a book about gambling psychology and probability, but I also want to edit this sentence before I send it so I can catch wording mistakes without the beginning disappearing off the side.";
   await editor.fill(draft);
   await page.waitForTimeout(150);
@@ -96,6 +98,14 @@ async function testChat(page, browserName, viewport) {
   const historyBox = await getRect(page, ".companion-panel.open .chat-body");
   const composerBox = await getRect(page, ".companion-panel.open .chat-input");
   const editorBox = await getRect(page, ".companion-panel.open .chat-composer-editor");
+  const draftScrollState = await editor.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight,
+      overflowY: style.overflowY,
+    };
+  });
   const fontSize = Number.parseFloat(await editor.evaluate((node) => getComputedStyle(node).fontSize));
   const navState = await page.locator(".notverse-mobile-nav").evaluate((node) => {
     const style = getComputedStyle(node);
@@ -104,7 +114,10 @@ async function testChat(page, browserName, viewport) {
 
   assert(fontSize >= 16, `${prefix}: ${fontSize}px composer can trigger iOS zoom`);
   assert(Math.abs(viewportState.scale - 1) < 0.01, `${prefix}: composer focus zoomed to ${viewportState.scale}`);
-  assert(editorBox.height > 44, `${prefix}: long draft did not expand vertically`);
+  assert(Math.abs(editorBox.height - initialEditorBox.height) <= 1, `${prefix}: long draft moved editor height ${initialEditorBox.height} -> ${editorBox.height}`);
+  assert(Math.abs(composerBox.height - initialComposerBox.height) <= 1, `${prefix}: long draft moved composer height ${initialComposerBox.height} -> ${composerBox.height}`);
+  assert(draftScrollState.scrollHeight > draftScrollState.clientHeight, `${prefix}: long draft is not internally scrollable ${JSON.stringify(draftScrollState)}`);
+  assert(draftScrollState.overflowY === "auto" || draftScrollState.overflowY === "scroll", `${prefix}: long draft does not keep scrolling inside the fixed editor ${JSON.stringify(draftScrollState)}`);
   assert(editorBox.left >= -1 && editorBox.right <= viewportState.width + 1, `${prefix}: editor leaves viewport horizontally`);
   assert(panelBox.top >= -1 && panelBox.bottom <= viewportState.height + 1, `${prefix}: panel leaves viewport`);
   assert(historyBox.bottom <= composerBox.top + 1, `${prefix}: chat history sits underneath composer`);

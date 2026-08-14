@@ -117,11 +117,25 @@ async function verifyPhone(width, height, name) {
 
   const editor = page.locator(".chat-input textarea.chat-composer-editor");
   const bridge = page.locator(".chat-input input.chat-input-state-bridge");
+  const composer = page.locator(".companion-panel.open .chat-input");
+  const initialEditorBox = await editor.boundingBox();
+  const initialComposerBox = await composer.boundingBox();
+  if (!initialEditorBox || !initialComposerBox) throw new Error(`${name}: cannot recover initial fixed composer geometry`);
   const draft = "Do you have recommendations for books I can read on gambling? I want something that explains the psychology and the odds clearly enough that I can spot mistakes before I send this.";
   await editor.fill(draft);
   await page.waitForTimeout(80);
   const editorBox = await editor.boundingBox();
-  if (!editorBox || editorBox.height <= 44) throw new Error(`${name}: long chat draft did not expand vertically`);
+  const composerBox = await composer.boundingBox();
+  const editorScrollState = await editor.evaluate((node) => ({
+    clientHeight: node.clientHeight,
+    scrollHeight: node.scrollHeight,
+    overflowY: getComputedStyle(node).overflowY,
+  }));
+  if (!editorBox || !composerBox) throw new Error(`${name}: cannot recover long-draft composer geometry`);
+  if (Math.abs(editorBox.height - initialEditorBox.height) > 1) throw new Error(`${name}: long draft moved editor height ${initialEditorBox.height} -> ${editorBox.height}`);
+  if (Math.abs(composerBox.height - initialComposerBox.height) > 1) throw new Error(`${name}: long draft moved composer height ${initialComposerBox.height} -> ${composerBox.height}`);
+  if (editorScrollState.scrollHeight <= editorScrollState.clientHeight) throw new Error(`${name}: long draft is not internally scrollable ${JSON.stringify(editorScrollState)}`);
+  if (editorScrollState.overflowY !== "auto" && editorScrollState.overflowY !== "scroll") throw new Error(`${name}: fixed editor is not internally scrollable ${JSON.stringify(editorScrollState)}`);
   if ((await editor.inputValue()) !== draft) throw new Error(`${name}: visible composer does not retain the full draft`);
   if ((await bridge.inputValue()) !== draft) throw new Error(`${name}: visible composer did not synchronise with React state bridge`);
   await page.screenshot({ path: `${out}/${name}-chat-draft.png`, fullPage: false });

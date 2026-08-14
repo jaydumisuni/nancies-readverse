@@ -49,37 +49,6 @@ function setViewportLock(locked: boolean): void {
   }
 }
 
-function applyMobileChatGeometry(): void {
-  const panel = document.querySelector<HTMLElement>(".companion-panel");
-  if (!panel) return;
-
-  const shouldBound = panel.classList.contains("open") && window.matchMedia("(max-width: 760px)").matches;
-  if (!shouldBound) {
-    for (const property of ["top", "bottom", "height", "max-height"]) {
-      panel.style.removeProperty(property);
-    }
-    return;
-  }
-
-  const visualViewport = window.visualViewport;
-  const viewportTop = Math.max(
-    0,
-    Math.min(window.innerHeight - 1, Math.round(visualViewport?.offsetTop || 0)),
-  );
-  const availableHeight = Math.max(
-    1,
-    Math.min(
-      window.innerHeight - viewportTop,
-      Math.round(visualViewport?.height || window.innerHeight),
-    ) - 2,
-  );
-
-  panel.style.setProperty("top", `${viewportTop}px`, "important");
-  panel.style.setProperty("bottom", "auto", "important");
-  panel.style.setProperty("height", `${availableHeight}px`, "important");
-  panel.style.setProperty("max-height", `${availableHeight}px`, "important");
-}
-
 function setReactInputValue(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
   descriptor?.set?.call(input, value);
@@ -87,10 +56,12 @@ function setReactInputValue(input: HTMLInputElement, value: string): void {
 }
 
 function resizeChatEditor(editor: HTMLTextAreaElement): void {
-  editor.style.height = "auto";
-  const next = Math.max(44, Math.min(editor.scrollHeight, 124));
-  editor.style.height = `${next}px`;
-  editor.style.overflowY = editor.scrollHeight > 124 ? "auto" : "hidden";
+  /* The composer is a fixed keyboard-edge control. Long drafts scroll inside
+     the editor; typing must never resize or push the conversation surface. */
+  editor.style.setProperty("height", "44px", "important");
+  editor.style.setProperty("min-height", "44px", "important");
+  editor.style.setProperty("max-height", "44px", "important");
+  editor.style.setProperty("overflow-y", "auto", "important");
 }
 
 function enhanceChatComposer(): void {
@@ -192,7 +163,6 @@ function keepConversationEndsVisible(): void {
 
 function syncInteractionState(): void {
   applyViewportMetrics();
-  applyMobileChatGeometry();
   enhanceChatComposer();
   keepConversationEndsVisible();
   const chatOpen = Boolean(document.querySelector(".companion-panel.open"));

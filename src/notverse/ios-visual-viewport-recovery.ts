@@ -21,7 +21,7 @@ type VisualBounds = {
 
 function readVisualBounds(): VisualBounds {
   const viewport = window.visualViewport;
-  const layoutWidth = Math.max(1, window.innerWidth);
+  const layoutWidth = Math.max(1, document.documentElement.clientWidth || window.innerWidth);
   const layoutHeight = Math.max(1, window.innerHeight);
   const top = Math.max(
     0,
@@ -48,7 +48,7 @@ function readVisualBounds(): VisualBounds {
   return {
     top: 0,
     left: 0,
-    width: right,
+    width: layoutWidth,
     height: bottom,
     visibleHeight,
     bottom,
@@ -71,28 +71,16 @@ function setViewportVariables(bounds: VisualBounds): void {
   rootElement.style.setProperty("--notverse-viewport-height", `${bounds.height}px`);
 }
 
-function resizeVisibleChatEditor(bounds: VisualBounds): void {
+function resizeVisibleChatEditor(_bounds: VisualBounds): void {
   const editor = document.querySelector<HTMLTextAreaElement>(
     ".companion-panel.open textarea.chat-composer-editor",
   );
   if (!editor) return;
 
-  editor.style.setProperty("height", "auto", "important");
-  editor.style.setProperty("max-height", "none", "important");
-  const contentHeight = editor.scrollHeight;
-  const cap = Math.min(
-    124,
-    Math.max(72, Math.floor(bounds.visibleHeight * 0.22)),
-  );
-  const next = Math.max(44, Math.min(contentHeight, cap));
-
-  editor.style.setProperty("height", `${next}px`, "important");
-  editor.style.setProperty("max-height", `${cap}px`, "important");
-  editor.style.setProperty(
-    "overflow-y",
-    contentHeight > cap ? "auto" : "hidden",
-    "important",
-  );
+  editor.style.setProperty("height", "44px", "important");
+  editor.style.setProperty("min-height", "44px", "important");
+  editor.style.setProperty("max-height", "44px", "important");
+  editor.style.setProperty("overflow-y", "auto", "important");
 }
 
 function syncChatPanel(bounds: VisualBounds): void {
