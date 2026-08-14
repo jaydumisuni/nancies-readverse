@@ -8,3 +8,4 @@ if text.count(old) != 1:
     raise SystemExit(f"RepliesDrawer autoscroll marker mismatch: {text.count(old)}")
 path.write_text(text.replace(old, new, 1))
 print("Replies auto-follow patch applied.")
+# trigger v2
