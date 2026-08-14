@@ -12,6 +12,7 @@ import "./notverse/runtime-interaction-fix";
 import "./notverse/conversation-scroll";
 import "./notverse/ios-visual-viewport-recovery.css";
 import "./notverse/focused-inbox-viewport.css";
+import "./notverse/notes-social-completion.css";
 import "./notverse/ios-visual-viewport-recovery";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
