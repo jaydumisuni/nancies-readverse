@@ -38,15 +38,15 @@ async function prepare(page) {
   await page.reload({ waitUntil: "networkidle" });
 }
 
-async function injectVisualViewport(page, { offsetTop, width, height }) {
+async function injectVisualViewport(page, { offsetTop, offsetLeft = 0, width, height }) {
   return page.evaluate(
-    ({ offsetTop, width, height }) => {
+    ({ offsetTop, offsetLeft, width, height }) => {
       const viewport = visualViewport;
       if (!viewport) return false;
       try {
         Object.defineProperties(viewport, {
           offsetTop: { configurable: true, value: offsetTop },
-          offsetLeft: { configurable: true, value: 0 },
+          offsetLeft: { configurable: true, value: offsetLeft },
           width: { configurable: true, value: width },
           height: { configurable: true, value: height },
         });
@@ -57,7 +57,7 @@ async function injectVisualViewport(page, { offsetTop, width, height }) {
         return false;
       }
     },
-    { offsetTop, width, height },
+    { offsetTop, offsetLeft, width, height },
   );
 }
 
@@ -80,6 +80,18 @@ async function navHidden(page) {
 function flushToBottom(box, bottom, label, tolerance = 4) {
   const gap = Math.abs(bottom - box.bottom);
   assert(gap <= tolerance, `${label} leaves ${gap.toFixed(2)}px between composer and keyboard edge (bottom ${bottom}, rect ${box.bottom})`);
+}
+
+function lockHorizontal(box, width, label, tolerance = 1) {
+  assert(Math.abs(box.left) <= tolerance, `${label} moved left ${box.left.toFixed(2)}px`);
+  assert(Math.abs(box.width - width) <= tolerance, `${label} width changed to ${box.width.toFixed(2)}px (expected ${width})`);
+}
+
+async function bubbleRects(page, selector) {
+  return page.locator(selector).evaluateAll((nodes) => nodes.map((node) => {
+    const box = node.getBoundingClientRect();
+    return { left: box.left, width: box.width };
+  }));
 }
 
 async function openChat(page) {
@@ -125,8 +137,12 @@ async function proveChat(browserType, browserName, width, height, keyboardBottom
     let editorBox = await rect(page, ".companion-panel.open .chat-composer-editor");
     let send = await rect(page, ".companion-panel.open .chat-input button[type=submit]");
     let bubble = await rect(page, ".companion-panel.open .message-row .message-bubble");
+    const stableBubbles = await bubbleRects(page, ".companion-panel.open .message-row .message-bubble");
+    const stableComposerHeight = composer.height;
+    const stableEditorHeight = editorBox.height;
 
     assert(Math.abs(panel.top) <= 1, `${browserName}: chat double-followed viewport ${panel.top}`);
+    lockHorizontal(panel, width, `${browserName}: chat panel`);
     flushToBottom(panel, bottom, `${browserName}: chat panel`);
     flushToBottom(composer, bottom, `${browserName}: chat composer`);
     assert(header.height >= 44, `${browserName}: chat header collapsed`);
@@ -148,20 +164,26 @@ async function proveChat(browserType, browserName, width, height, keyboardBottom
     editorBox = await rect(page, ".companion-panel.open .chat-composer-editor");
     send = await rect(page, ".companion-panel.open .chat-input button[type=submit]");
     flushToBottom(composer, longBottom, `${browserName}: long chat composer`);
-    assert(editorBox.height <= Math.min(125, keyboardBottom * .30) + 1, `${browserName}: long editor unbounded ${editorBox.height}`);
+    assert(Math.abs(editorBox.height - stableEditorHeight) <= 1, `${browserName}: long draft resized editor ${stableEditorHeight} -> ${editorBox.height}`);
+    assert(Math.abs(composer.height - stableComposerHeight) <= 1, `${browserName}: long draft resized composer ${stableComposerHeight} -> ${composer.height}`);
     assert(body.height >= keyboardBottom * .24, `${browserName}: long draft erased history ${body.height}`);
     assert(body.bottom <= composer.top + 1 && send.bottom <= longBottom + 1, `${browserName}: long composer geometry failed`);
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-chat-keyboard-long.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, width, height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject chat panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject chat panned viewport`);
     await page.waitForTimeout(950);
     const pannedBottom = await visualBottom(page);
     panel = await rect(page, ".companion-panel.open");
     composer = await rect(page, ".companion-panel.open .chat-input");
+    const pannedBubbles = await bubbleRects(page, ".companion-panel.open .message-row .message-bubble");
     const topVar = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--notverse-vv-top").trim());
+    const widthVar = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--notverse-vv-width").trim());
     assert(Math.abs(panel.top) <= 1, `${browserName}: chat double-followed offset ${panel.top}`);
     assert(topVar === "0px", `${browserName}: exported non-zero chat top ${topVar}`);
+    assert(widthVar === `${width}px`, `${browserName}: exported moving chat width ${widthVar}`);
+    lockHorizontal(panel, width, `${browserName}: panned chat panel`);
+    assert(pannedBubbles.length === stableBubbles.length && pannedBubbles.every((box, index) => Math.abs(box.left - stableBubbles[index].left) <= 1 && Math.abs(box.width - stableBubbles[index].width) <= 1), `${browserName}: chat bubbles moved sideways during focus pan`);
     flushToBottom(panel, pannedBottom, `${browserName}: panned chat panel`);
     flushToBottom(composer, pannedBottom, `${browserName}: panned chat composer`);
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-chat-keyboard-panned.png`, fullPage: false });
@@ -180,6 +202,10 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
   try {
     await prepare(page);
     const input = await openReplies(page);
+    const openField = await rect(page, ".replies-drawer input");
+    const openForm = await rect(page, ".replies-drawer > form");
+    assert(openField.height >= 40 && openField.top >= 0 && openField.bottom <= height + 1, `${browserName}: reply field is not visible when Replies opens`);
+    assert(openForm.top >= 0 && openForm.bottom <= height + 1, `${browserName}: reply composer is outside the open drawer`);
     await input.fill("Keyboard-safe reply");
     await input.focus();
     assert(await injectVisualViewport(page, { offsetTop: 0, width, height: keyboardBottom }), `${browserName}: cannot inject Replies keyboard viewport`);
@@ -192,7 +218,7 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
     let form = await rect(page, ".replies-drawer > form");
     let field = await rect(page, ".replies-drawer input");
     let send = await rect(page, ".replies-drawer > form button");
-    const articles = await page.locator(".replies-drawer > article").evaluateAll((nodes) => nodes.map((node) => {
+    const articles = await page.locator(".replies-list > article").evaluateAll((nodes) => nodes.map((node) => {
       const box = node.getBoundingClientRect();
       return { top: box.top, bottom: box.bottom, height: box.height };
     }));
@@ -208,7 +234,7 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-replies-keyboard.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, width, height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Replies panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Replies panned viewport`);
     await page.waitForTimeout(950);
     bottom = await visualBottom(page);
     backdrop = await rect(page, ".replies-backdrop");
@@ -216,6 +242,7 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
     const topVar = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--notverse-vv-top").trim());
     assert(Math.abs(backdrop.top) <= 1, `${browserName}: Replies double-followed offset ${backdrop.top}`);
     assert(topVar === "0px", `${browserName}: Replies exported non-zero top ${topVar}`);
+    lockHorizontal(backdrop, width, `${browserName}: panned Replies backdrop`);
     flushToBottom(backdrop, bottom, `${browserName}: panned Replies backdrop`, 6);
     flushToBottom(form, bottom, `${browserName}: panned Replies composer`, 6);
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-replies-keyboard-panned.png`, fullPage: false });
@@ -247,11 +274,13 @@ async function proveInbox(browserType, browserName, width, height, keyboardBotto
     let form = await rect(page, ".inbox-layout main > form");
     let field = await rect(page, ".inbox-layout main > form input");
     let send = await rect(page, ".inbox-layout main > form button");
+    const stableInboxMessages = await bubbleRects(page, ".inbox-layout .message-thread > p:not(.inbox-empty)");
     const asideDisplay = await page.locator(".inbox-layout > aside").evaluate((node) => getComputedStyle(node).display);
     const value = await input.inputValue();
 
     assert(await page.locator("body.notverse-inbox-keyboard").count() === 1, `${browserName}: Inbox keyboard mode not entered`);
     flushToBottom(inbox, bottom, `${browserName}: Inbox surface`, 6);
+    lockHorizontal(inbox, width, `${browserName}: Inbox surface`);
     flushToBottom(form, bottom, `${browserName}: Inbox composer`, 6);
     assert(asideDisplay === "none", `${browserName}: Inbox thread picker still consumes keyboard viewport`);
     assert(header.height >= 44, `${browserName}: Inbox conversation header hidden`);
@@ -263,11 +292,14 @@ async function proveInbox(browserType, browserName, width, height, keyboardBotto
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-inbox-keyboard.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, width, height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Inbox panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Inbox panned viewport`);
     await page.waitForTimeout(950);
     bottom = await visualBottom(page);
     inbox = await rect(page, ".inbox-view");
     form = await rect(page, ".inbox-layout main > form");
+    const pannedInboxMessages = await bubbleRects(page, ".inbox-layout .message-thread > p:not(.inbox-empty)");
+    lockHorizontal(inbox, width, `${browserName}: panned Inbox surface`);
+    assert(pannedInboxMessages.length === stableInboxMessages.length && pannedInboxMessages.every((box, index) => Math.abs(box.left - stableInboxMessages[index].left) <= 1 && Math.abs(box.width - stableInboxMessages[index].width) <= 1), `${browserName}: Inbox messages moved sideways during focus pan`);
     flushToBottom(inbox, bottom, `${browserName}: panned Inbox surface`, 6);
     flushToBottom(form, bottom, `${browserName}: panned Inbox composer`, 6);
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-inbox-keyboard-panned.png`, fullPage: false });
