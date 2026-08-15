@@ -16,7 +16,8 @@ import "./notverse/notes-social-completion.css";
 import "./notverse/notes-header-touch-targets.css";
 import "./notverse/notes-notification-label";
 import "./notverse/replies-enter-submit";
-import "./notverse/ios-visual-viewport-recovery";
+import "./notverse/real-device-mobile-final.css";
+import "./notverse/real-device-mobile-controller";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");

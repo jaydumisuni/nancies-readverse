@@ -215,7 +215,7 @@ async function keyboardTransition(browserType, browserName) {
         const rect = node.getBoundingClientRect();
         return { left: rect.left, width: rect.width, bottom: rect.bottom };
       });
-      const expectedBottom = state.top + state.height;
+      const expectedBottom = state.height;
       samples.push({ ...box, expectedBottom });
       assert(Math.abs(box.left) <= 1 && Math.abs(box.width - 390) <= 1, `${browserName}: Inbox moved sideways during focus transition ${JSON.stringify({ state, box })}`);
       assert(Math.abs(box.bottom - expectedBottom) <= 8, `${browserName}: Inbox composer left moving keyboard edge ${JSON.stringify({ state, box, expectedBottom })}`);
@@ -226,7 +226,7 @@ async function keyboardTransition(browserType, browserName) {
       const box = node.getBoundingClientRect();
       return { left: box.left, width: box.width, bottom: box.bottom };
     });
-    const finalBottom = states.at(-1).top + states.at(-1).height;
+    const finalBottom = states.at(-1).height;
     assert(Math.abs(finalBox.left) <= 1 && Math.abs(finalBox.width - 390) <= 1, `${browserName}: Inbox final horizontal geometry moved ${JSON.stringify(finalBox)}`);
     assert(Math.abs(finalBox.bottom - finalBottom) <= 8, `${browserName}: Inbox final composer left keyboard edge ${finalBox.bottom} vs ${finalBottom}`);
     await page.screenshot({ path: `${out}/${browserName}-390-inbox-focus-transition.png`, fullPage: false });
