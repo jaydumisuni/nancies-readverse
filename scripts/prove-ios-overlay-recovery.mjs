@@ -64,9 +64,7 @@ async function injectVisualViewport(page, { offsetTop, offsetLeft = 0, width, he
 async function visualBottom(page) {
   return page.evaluate(() => {
     const viewport = visualViewport;
-    const top = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
-    const height = Math.max(1, Math.round(viewport?.height ?? innerHeight));
-    return Math.min(innerHeight, top + height);
+    return Math.max(1, Math.round(viewport?.height ?? innerHeight));
   });
 }
 
@@ -171,7 +169,7 @@ async function proveChat(browserType, browserName, width, height, keyboardBottom
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-chat-keyboard-long.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject chat panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: keyboardBottom }), `${browserName}: cannot inject chat panned viewport`);
     await page.waitForTimeout(950);
     const pannedBottom = await visualBottom(page);
     panel = await rect(page, ".companion-panel.open");
@@ -234,7 +232,7 @@ async function proveReplies(browserType, browserName, width, height, keyboardBot
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-replies-keyboard.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Replies panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: keyboardBottom }), `${browserName}: cannot inject Replies panned viewport`);
     await page.waitForTimeout(950);
     bottom = await visualBottom(page);
     backdrop = await rect(page, ".replies-backdrop");
@@ -292,7 +290,7 @@ async function proveInbox(browserType, browserName, width, height, keyboardBotto
     await page.screenshot({ path: `${out}/${browserName}-${width}x${height}-inbox-keyboard.png`, fullPage: false });
 
     const panOffset = 72;
-    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: Math.max(160, keyboardBottom - panOffset) }), `${browserName}: cannot inject Inbox panned viewport`);
+    assert(await injectVisualViewport(page, { offsetTop: panOffset, offsetLeft: 24, width: Math.max(240, width - 40), height: keyboardBottom }), `${browserName}: cannot inject Inbox panned viewport`);
     await page.waitForTimeout(950);
     bottom = await visualBottom(page);
     inbox = await rect(page, ".inbox-view");
