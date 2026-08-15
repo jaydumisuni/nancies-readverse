@@ -148,7 +148,7 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
     {composerOpen && <NoteComposer displayName={displayName} avatar={avatar} libraryTitles={libraryTitles} noteFont={noteFont} onClose={() => setComposerOpen(false)} onPublish={publish} />}
     {filtersOpen && <NoteFilters typeFilter={typeFilter} showSpoilers={showSpoilers} onType={setTypeFilter} onSpoilers={setShowSpoilers} onClose={() => setFiltersOpen(false)} />}
     {optionsOpen && note && <NoteOptions note={note} reported={reportedIds.includes(note.id)} onClose={() => setOptionsOpen(false)} onShare={() => void share(note)} onCopy={() => void copyLink(note)} onSave={toggleSaved} onNotebook={() => addToNotebook(note)} onHide={() => hideNote(note)} onReport={() => reportNote(note)} />}
-    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} onClose={() => setRepliesOpen(false)} onSend={submitReply} />, document.body)}
+    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={() => setRepliesOpen(false)} onSend={submitReply} />, document.body)}
     {activityOpen && createPortal(<ActivityPanel activities={activities} notes={notes} onClose={() => { setActivityOpen(false); window.history.replaceState(null, "", "#my-notes"); }} onOpenNote={openActivityNote} onMarkRead={() => setActivities((current) => current.map((item) => ({ ...item, unread: false })))} />, document.body)}
     {imageOpen && note?.image && <div className="note-image-viewer" onClick={() => setImageOpen(false)}><button type="button">×</button><img src={note.image.dataUrl} alt={note.image.name} /></div>}{toast && <div className="note-toast" role="status">{toast}</div>}
   </section>;
@@ -169,9 +169,61 @@ function NoteOptions({ note, reported, onClose, onShare, onCopy, onSave, onNoteb
   return <div className="note-modal-backdrop options-backdrop" onClick={onClose}><section className="note-options" onClick={(event) => event.stopPropagation()}><h3>Note Options</h3><button type="button" onClick={onShare}>↗ Share Note</button><button type="button" onClick={onSave}>{note.saved ? "▣ Remove saved Note" : "▢ Save Note"}</button><button type="button" onClick={onNotebook}>▤ Add to My Notebook</button><button type="button" onClick={onCopy}>⌁ Copy Note link</button>{!note.mine && <button type="button" onClick={onHide}>◉ Hide this Note</button>}{!note.mine && <button type="button" className="danger" onClick={onReport} disabled={reported}>{reported ? "⚑ Report recorded" : "⚑ Report Note"}</button>}<button type="button" onClick={onClose}>Cancel</button></section></div>;
 }
 
-function RepliesDrawer({ note, replies, onClose, onSend }: { note: NoTVerseNote; replies: NoteReply[]; onClose: () => void; onSend: (text: string) => void }) {
-  const [draft, setDraft] = useState(""); const listRef = useRef<HTMLDivElement>(null); const submitting = useRef(false); useEffect(() => { const list = listRef.current; if (!list) return; window.requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; }); }, [replies.length]); function sendDraft() { const clean = draft.trim(); if (!clean || submitting.current) return; submitting.current = true; onSend(clean); setDraft(""); window.setTimeout(() => { submitting.current = false; }, 450); } function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); sendDraft(); }
-  return <div className="note-modal-backdrop replies-backdrop"><section className="replies-drawer"><header><div><strong>Comments</strong><small>{replies.length} saved here{note.replies > replies.length ? ` · ${note.replies} total` : ""}</small></div><button type="button" onClick={onClose} aria-label="Close comments">×</button></header><div className="replies-list" ref={listRef}>{replies.length === 0 ? <div className="replies-empty"><strong>No comments yet.</strong><p>Start the conversation.</p></div> : replies.map((reply) => <article key={reply.id} data-reply-id={reply.id}><span className="reply-avatar">{reply.avatar ? <img src={reply.avatar} alt="" /> : reply.author.slice(0, 1)}</span><div><b>{reply.author}{reply.mine && <em>You</em>}</b><p>{reply.text}</p><small>{reply.createdAt}</small></div></article>)}</div><form onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a comment…" aria-label="Write a comment" /><button type="button" onPointerDown={(event) => { event.preventDefault(); sendDraft(); }} onClick={sendDraft} disabled={!draft.trim()}>Send</button></form></section></div>;
+function RepliesDrawer({ note, replies, displayName, avatar, onClose, onSend }: { note: NoTVerseNote; replies: NoteReply[]; displayName: string; avatar?: string; onClose: () => void; onSend: (text: string) => void }) {
+  const [draft, setDraft] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    window.requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+  }, [replies.length]);
+
+  function sendDraft() {
+    const clean = draft.trim();
+    if (!clean || submitting.current) return;
+    submitting.current = true;
+    onSend(clean);
+    setDraft("");
+    window.setTimeout(() => { submitting.current = false; }, 450);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    sendDraft();
+  }
+
+  function replyTo(author: string) {
+    setDraft(`@${author} `);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  return <div className="note-modal-backdrop replies-backdrop">
+    <section className="replies-drawer mobile-comments-screen">
+      <header>
+        <button type="button" className="mobile-comments-back" onClick={onClose} aria-label="Back to Notes">‹</button>
+        <div><strong>Comments</strong><small>{replies.length} saved here{note.replies > replies.length ? ` · ${note.replies} total` : ""}</small></div>
+        <button type="button" className="comments-close-desktop" onClick={onClose} aria-label="Close comments">×</button>
+      </header>
+      <div className="replies-list" ref={listRef}>
+        {replies.length === 0 ? <div className="replies-empty"><strong>No comments yet.</strong><p>Start the conversation.</p></div> : replies.map((reply) => <article key={reply.id} data-reply-id={reply.id}>
+          <span className="reply-avatar">{reply.avatar ? <img src={reply.avatar} alt="" /> : reply.author.slice(0, 1)}</span>
+          <div>
+            <b>{reply.author}{reply.mine && <em>You</em>}</b>
+            <p>{reply.text}</p>
+            <footer className="comment-meta"><small>{reply.createdAt}</small><button type="button" onClick={() => replyTo(reply.author)}>Reply</button></footer>
+          </div>
+        </article>)}
+      </div>
+      <form onSubmit={submit}>
+        <span className="comment-composer-avatar">{avatar ? <img src={avatar} alt="" /> : (displayName || "R").slice(0, 1)}</span>
+        <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a comment…" aria-label="Write a comment" />
+        <button type="button" onPointerDown={(event) => { event.preventDefault(); sendDraft(); }} onClick={sendDraft} disabled={!draft.trim()}>Send</button>
+      </form>
+    </section>
+  </div>;
 }
 
 function ActivityPanel({ activities, notes, onClose, onOpenNote, onMarkRead }: { activities: NoteActivity[]; notes: NoTVerseNote[]; onClose: () => void; onOpenNote: (noteId: string) => void; onMarkRead: () => void }) {

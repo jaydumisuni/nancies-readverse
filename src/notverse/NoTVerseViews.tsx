@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import NotesSocialExperience from "./NotesSocialExperience";
 import { starterInbox, starterNotebooks, starterNotes, usePersistentState } from "./storage";
 import type { InboxThread, NoTVerseNav, NoTVersePreferences, NotebookRecord, PresenceReader } from "./types";
@@ -134,6 +134,8 @@ function InboxView({ displayName }: { displayName: string }) {
   const [threads, setThreads] = usePersistentState<InboxThread[]>("notverse.inbox", starterInbox);
   const [selected, setSelected] = useState(threads[0]?.id || "");
   const [draft, setDraft] = useState("");
+  const [threadOpen, setThreadOpen] = useState(false);
+  const threadRef = useRef<HTMLDivElement>(null);
   const [messagesByThread, setMessagesByThread] = usePersistentState<Record<string, InboxMessageRecord[]>>(
     "notverse.inbox.messages",
     starterInbox[0]
@@ -149,8 +151,26 @@ function InboxView({ displayName }: { displayName: string }) {
   const active = threads.find((thread) => thread.id === selected);
   const activeMessages = active ? messagesByThread[active.id] || [] : [];
 
+  useEffect(() => {
+    document.body.classList.add("notverse-inbox-active");
+    return () => {
+      document.body.classList.remove("notverse-inbox-active", "notverse-inbox-thread-open");
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("notverse-inbox-thread-open", threadOpen);
+  }, [threadOpen]);
+
+  useEffect(() => {
+    const list = threadRef.current;
+    if (!list || !threadOpen) return;
+    window.requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+  }, [active?.id, activeMessages.length, threadOpen]);
+
   function selectThread(id: string) {
     setSelected(id);
+    setThreadOpen(true);
     setThreads((current) => current.map((item) => item.id === id ? { ...item, unread: 0 } : item));
   }
 
@@ -180,7 +200,7 @@ function InboxView({ displayName }: { displayName: string }) {
   }
 
   return (
-    <section className="notverse-view inbox-view">
+    <section className={`notverse-view inbox-view ${threadOpen ? "mobile-thread-open" : "mobile-thread-list"}`}>
       <header>
         <span className="notverse-eyebrow">Private conversations</span>
         <h1>Inbox</h1>
@@ -201,11 +221,12 @@ function InboxView({ displayName }: { displayName: string }) {
           {active ? (
             <>
               <header>
+                <button type="button" className="inbox-back" aria-label="Back to conversations" onClick={() => setThreadOpen(false)}>‹</button>
                 <span>{active.name.slice(0, 1)}</span>
                 <div><strong>{active.name}</strong><small>Private conversation with {displayName}</small></div>
                 <button type="button" aria-label="Conversation options">•••</button>
               </header>
-              <div className="message-thread" aria-live="polite">
+              <div className="message-thread" ref={threadRef} aria-live="polite">
                 {activeMessages.length ? activeMessages.map((message) => (
                   <p className={message.mine ? "sent" : "received"} key={message.id}>
                     {message.text}

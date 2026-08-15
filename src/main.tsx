@@ -16,6 +16,7 @@ import "./notverse/notes-header-touch-targets.css";
 import "./notverse/notes-notification-label";
 import "./notverse/replies-enter-submit";
 import "./notverse/real-device-mobile-final.css";
+import "./notverse/mobile-native-screens.css";
 import "./notverse/real-device-mobile-controller";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
