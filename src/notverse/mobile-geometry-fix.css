@@ -112,10 +112,6 @@ body:has(.companion-panel.open) .main-shell {
 
   .companion-panel,
   .companion-panel.open {
-    inset: 0 !important;
-    width: 100dvw !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
     border: 0 !important;
     border-radius: 0 !important;
     grid-template-rows: auto minmax(0, 1fr) auto;

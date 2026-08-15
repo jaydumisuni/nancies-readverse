@@ -32,14 +32,4 @@
     overflow: hidden !important;
   }
 
-  body.notverse-chat-open .companion-panel.open {
-    position: fixed !important;
-    inset: 0 !important;
-    top: 0 !important;
-    width: 100vw !important;
-    height: var(--notverse-viewport-height, 100dvh) !important;
-    max-height: var(--notverse-viewport-height, 100dvh) !important;
-    background: #08070a !important;
-    transform: none !important;
-  }
 }

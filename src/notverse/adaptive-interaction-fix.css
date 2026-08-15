@@ -109,21 +109,6 @@ body.notverse-chat-open .main-shell.notverse-shell {
     top: var(--notverse-scroll-lock, 0px);
   }
 
-  body.notverse-chat-open .companion-panel.open {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: var(--notverse-viewport-top, 0px) !important;
-    bottom: auto !important;
-    width: 100vw !important;
-    max-width: none !important;
-    height: var(--notverse-viewport-height, 100dvh) !important;
-    max-height: var(--notverse-viewport-height, 100dvh) !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    transform: none !important;
-  }
-
   body.notverse-chat-open .mobile-nav,
   body.notverse-chat-open .floating-companion {
     transform: translateY(calc(100% + 36px)) !important;

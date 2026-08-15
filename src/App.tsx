@@ -1561,9 +1561,8 @@ export default function App() {
             />
             <kbd>⌘ K</kbd>
           </label>
-          <button type="button" className="mobile-notifications" aria-label="Notifications" onClick={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "activity"; }}>♡</button>
           <div className="utility-actions">
-            <button type="button" className="activity-button" aria-label="Notifications" onClick={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "activity"; }}>♡</button>
+            <button type="button" className="activity-button" aria-label="Activity" onClick={() => { setChatOpen(false); setActiveSection("notes"); window.location.hash = "activity"; }}><span className="activity-glyph" aria-hidden="true">◉</span></button>
             <button
               type="button"
               aria-label="Settings"

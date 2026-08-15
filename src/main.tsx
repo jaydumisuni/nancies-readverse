@@ -10,7 +10,6 @@ import "./notverse/final-viewport-stability.css";
 import "./notverse/production-polish.css";
 import "./notverse/runtime-interaction-fix";
 import "./notverse/conversation-scroll";
-import "./notverse/ios-visual-viewport-recovery.css";
 import "./notverse/focused-inbox-viewport.css";
 import "./notverse/notes-social-completion.css";
 import "./notverse/notes-header-touch-targets.css";
