@@ -117,6 +117,16 @@ async function proveComments(browserType, browserName) {
     const overflow = await list.evaluate((n) => getComputedStyle(n).overflowY);
     assert(["auto", "scroll"].includes(overflow), `${browserName}: comments list is not the scroll owner: ${overflow}`);
     await page.screenshot({ path: `${out}/${browserName}-comments-keyboard.png`, fullPage: false });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Back to Notes" }).click();
+    await page.waitForTimeout(40);
+    assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}: Comments body state survived Back`);
+    assert.equal(await mobileNav.getAttribute("inert"), null, `${browserName}: mobile nav stayed inert after leaving Comments`);
+    assert.equal(await mobileNav.getAttribute("aria-hidden"), null, `${browserName}: mobile nav stayed aria-hidden after leaving Comments`);
+    assert.notEqual(await mobileNav.evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: mobile nav stayed visually hidden after leaving Comments`);
+    await mobileNav.getByRole("button", { name: "Home", exact: true }).click();
+    await page.waitForTimeout(30);
+    assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}: restored nav click reopened/stuck Comments`);
     report.cases.push({ browserName, kind: "comments", form });
   } finally {
     await context.close();
@@ -137,7 +147,12 @@ async function proveInbox(browserType, browserName) {
     assert.equal(await page.locator(".inbox-layout > main").evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: conversation is visible beside list`);
     await page.screenshot({ path: `${out}/${browserName}-inbox-list.png`, fullPage: false });
 
-    const firstThread = page.locator(".inbox-layout > aside button").first();
+    const inboxRows = page.locator(".inbox-layout > aside button");
+    const firstThread = inboxRows.first();
+    assert.equal(await firstThread.locator(".inbox-presence-dot.offline").count(), 1, `${browserName}: person thread missing truthful offline presence dot`);
+    assert.equal((await firstThread.locator(".inbox-presence-label").innerText()).trim(), "Last active unavailable", `${browserName}: person thread fabricated/missed last-active state`);
+    const groupThread = inboxRows.nth(1);
+    assert.equal(await groupThread.locator(".inbox-presence-dot").count(), 0, `${browserName}: group thread incorrectly received person presence`);
     await firstThread.click();
     await page.waitForTimeout(100);
     assert.equal(await page.locator("body.notverse-inbox-thread-open").count(), 1, `${browserName}: inbox thread state missing`);
@@ -169,7 +184,9 @@ async function proveInbox(browserType, browserName) {
   }
 }
 
+const enabledBrowsers = new Set((process.env.PROOF_BROWSERS || "chromium,webkit").split(",").map((value) => value.trim()).filter(Boolean));
 for (const [browserName, browserType] of [["chromium", chromium], ["webkit", webkit]]) {
+  if (!enabledBrowsers.has(browserName)) continue;
   for (const proof of [proveInbox, proveChat, proveComments]) {
     try {
       await proof(browserType, browserName);

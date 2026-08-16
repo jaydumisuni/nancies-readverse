@@ -1,4 +1,4 @@
-import { HEADERS, OPENERS, jsonResponse as json, normalize, parseYear } from "./grounded-shared";
+import { HEADERS, jsonResponse as json, normalize, parseYear } from "./grounded-shared";
 
 type CanonicalEnv = { AI: Ai; AI_MODEL: string };
 type CanonicalBody = { question?: unknown; companion?: unknown };
@@ -14,7 +14,7 @@ type VerifiedBook = {
 
 type Seed = { title: string; author: string };
 type TopicPack = {
-  id: "gambling" | "grief" | "sleep" | "pricing";
+  id: "surprise" | "gambling" | "grief" | "sleep" | "pricing";
   matches(question: string): boolean;
   seeds: Seed[];
   minVerified: number;
@@ -24,6 +24,25 @@ type TopicPack = {
 };
 
 const TOPICS: TopicPack[] = [
+  {
+    id: "surprise",
+    matches: (q) => /^(?:what books? (?:would|do) you recommend|recommend (?:me )?(?:some )?books?|any (?:good )?book recommendations?|what should i read)[?!.]*$/i.test(q.trim()),
+    seeds: [
+      { title: "The Shadow of the Wind", author: "Carlos Ruiz Zafón" },
+      { title: "Piranesi", author: "Susanna Clarke" },
+      { title: "Project Hail Mary", author: "Andy Weir" },
+      { title: "The Book Thief", author: "Markus Zusak" },
+    ],
+    minVerified: 2,
+    intro: "You gave me no genre constraint, so I picked a varied shortlist and verified each title first.",
+    reasons: [
+      "A literary mystery built around books, memory and a hidden author; atmospheric without needing a genre brief.",
+      "A strange, elegant puzzle with a compact cast and a world that rewards going in almost blind.",
+      "Fast science-fiction problem solving with humour, isolation and escalating stakes.",
+      "A historical novel with a distinctive narrator and a strong emotional centre.",
+    ],
+    tail: "If you want me to choose one for you, say “surprise me”.",
+  },
   {
     id: "gambling",
     matches: (q) => /\b(?:recommend(?:ation|ations|ed)?|suggest(?:ion|ions|ed)?|books?\s+(?:about|on|for)|what should i read)\b/i.test(q)
@@ -126,8 +145,7 @@ export async function handleCanonicalTopicTurn(
   const unique = dedupe(books).slice(0, 4);
   if (unique.length < topic.minVerified) return null;
 
-  const opener = OPENERS[companion] ?? OPENERS.Gojo;
-  const lines = [`${opener} ${topic.intro}`];
+  const lines = [topic.intro];
   const reasonBySeed = new Map(
     topic.seeds.map((seed, index) => [normalize(seed.title), topic.reasons[index]] as const),
   );

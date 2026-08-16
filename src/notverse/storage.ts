@@ -117,9 +117,9 @@ export const starterNotebooks: NotebookRecord[] = [
 ];
 
 export const starterInbox: InboxThread[] = [
-  { id: "thread-manga-muse", name: "MangaMuse", preview: "That panel is exactly what I meant.", time: "5:42", unread: 2 },
-  { id: "thread-notebook", name: "One Piece Notebook", preview: "You were invited to the Chapter 1120 discussion.", time: "Yesterday", unread: 1 },
-  { id: "thread-reading", name: "Reading Room", preview: "Kashi shared a Note with you.", time: "Mon", unread: 0 },
+  { id: "thread-manga-muse", name: "MangaMuse", preview: "That panel is exactly what I meant.", time: "5:42", unread: 2, kind: "person", presence: "offline" },
+  { id: "thread-notebook", name: "One Piece Notebook", preview: "You were invited to the Chapter 1120 discussion.", time: "Yesterday", unread: 1, kind: "group" },
+  { id: "thread-reading", name: "Reading Room", preview: "Kashi shared a Note with you.", time: "Mon", unread: 0, kind: "group" },
 ];
 
 export function usePersistentState<T>(key: string, initial: T) {
