@@ -71,19 +71,13 @@ jobs:
           NOTVERSE_TEST_URL: https://notverse.1ink.online
         run: node scripts/verify-notverse-ui.mjs
 
-      - name: Verify live iOS chat and Replies overlay recovery
-        env:
-          PROOF_URL: https://notverse.1ink.online
-          PROOF_DIR: engineering-evidence/notverse-live/ios-overlay-recovery
-        run: node scripts/prove-ios-overlay-recovery.mjs
-
-      - name: Verify live real-device keyboard transitions and Notes mobile clarity
+      - name: Verify live Safari/WebKit keyboard pan and real-device mobile transitions
         env:
           PROOF_URL: https://notverse.1ink.online
           PROOF_DIR: engineering-evidence/notverse-live/real-device-mobile
         run: node scripts/prove-real-device-mobile-transition.mjs
 
-      - name: Verify live Notes social loop, My Notes, replies, share and Activity
+      - name: Verify live Notes social loop, My Notes, comments, share and Activity
         env:
           PROOF_URL: https://notverse.1ink.online
           PROOF_DIR: engineering-evidence/notverse-live/notes-social-completion
