@@ -35,6 +35,24 @@ async function prove(browserType, browserName, width, height) {
     await prepare(page);
     await page.getByRole("button", { name: "Notes", exact: true }).last().click();
 
+    const notePosition = page.locator(".note-position strong");
+    const noteBefore = await notePosition.textContent();
+    await page.locator(".notes-experience").evaluate((element) => {
+      element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, clientY: 560 }));
+      element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, clientY: 300 }));
+    });
+    await page.waitForTimeout(520);
+    const noteAfter = await notePosition.textContent();
+    assert(noteBefore !== noteAfter, `${browserName}/${width}: vertical Note swipe did not flip the Note`);
+    const notesState = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      documentHeight: document.documentElement.scrollHeight,
+      touchAction: getComputedStyle(document.querySelector(".notes-experience")).touchAction,
+    }));
+    assert(notesState.documentWidth <= width + 2, `${browserName}/${width}: Notes creates horizontal overflow (${notesState.documentWidth})`);
+    assert(notesState.documentHeight <= height + 2, `${browserName}/${width}: Notes creates document scrolling (${notesState.documentHeight})`);
+    assert(notesState.touchAction === "none", `${browserName}/${width}: Notes does not reserve vertical flip gestures`);
+
     const actions = page.locator(".note-social-actions > button");
     await actions.first().waitFor();
     const metrics = await actions.evaluateAll((nodes) => nodes.map((node) => {
@@ -74,9 +92,44 @@ async function prove(browserType, browserName, width, height) {
     assert(inputBox.height >= 46, `${browserName}/${width}: Comment field visually too short (${inputBox.height})`);
     assert(sendBox.height >= 46, `${browserName}/${width}: Comment Send control visually too short (${sendBox.height})`);
     assert(formBox.bottom <= height + 2, `${browserName}/${width}: Comment composer starts below the viewport (${formBox.bottom} vs ${height})`);
-
     await page.screenshot({ path: `${out}/${browserName}-${width}-notes-comments.png`, fullPage: false });
-    report.cases.push({ browserName, width, height, metrics, activityWidth: activityBox.width, inputHeight: inputBox.height, sendHeight: sendBox.height });
+
+    await page.getByRole("button", { name: "Back to Notes" }).click();
+    await page.getByRole("button", { name: "Search", exact: true }).last().click();
+    await page.locator(".search-action-grid").waitFor();
+    const searchState = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll(".search-action-grid > button")];
+      const rects = cards.map((card) => {
+        const box = card.getBoundingClientRect();
+        return { top: box.top, left: box.left, right: box.right, bottom: box.bottom };
+      });
+      const descriptions = cards.map((card) => {
+        const node = card.querySelector("small");
+        if (!(node instanceof HTMLElement)) return null;
+        return { whiteSpace: getComputedStyle(node).whiteSpace, text: node.textContent || "" };
+      }).filter(Boolean);
+      return { documentWidth: document.documentElement.scrollWidth, rects, descriptions };
+    });
+    assert(searchState.documentWidth <= width + 2, `${browserName}/${width}: Search creates horizontal overflow (${searchState.documentWidth})`);
+    if (height <= 700 && searchState.rects.length >= 3) {
+      assert(Math.abs(searchState.rects[0].top - searchState.rects[1].top) <= 2, `${browserName}/${width}: first two Search actions do not share a row`);
+      assert(searchState.rects[2].top > searchState.rects[0].top + 2, `${browserName}/${width}: short-phone Search squeezes three actions into one row`);
+      assert(searchState.descriptions.every((item) => item.whiteSpace !== "nowrap"), `${browserName}/${width}: Search descriptions are single-line clipped`);
+    }
+    await page.screenshot({ path: `${out}/${browserName}-${width}-search.png`, fullPage: false });
+
+    report.cases.push({
+      browserName,
+      width,
+      height,
+      noteBefore,
+      noteAfter,
+      metrics,
+      activityWidth: activityBox.width,
+      inputHeight: inputBox.height,
+      sendHeight: sendBox.height,
+      searchState,
+    });
   } finally {
     await context.close();
     await browser.close();
@@ -101,4 +154,4 @@ if (!report.ok) {
   console.error(report.errors.join("\n"));
   process.exit(1);
 }
-console.log(`Mobile touch-target proof passed (${report.cases.length} cases).`);
+console.log(`Mobile touch/Notes/Search proof passed (${report.cases.length} cases).`);
