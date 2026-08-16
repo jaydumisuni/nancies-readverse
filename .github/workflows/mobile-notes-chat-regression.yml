@@ -12,8 +12,8 @@ on:
       - "worker/**"
       - "scripts/prove-mobile-notes-chat.mjs"
       - "scripts/prove-mobile-polish-visual.mjs"
-      - "scripts/prove-ios-overlay-recovery.mjs"
-      - "scripts/prove-real-device-mobile-transition.mjs"
+      - "scripts/prove-mobile-native-screens.mjs"
+      - "scripts/prove-mobile-touch-targets.mjs"
       - "scripts/prove-notes-social-loop.mjs"
       - "scripts/prove-companion-runtime.mjs"
       - "package.json"
@@ -61,13 +61,13 @@ jobs:
       - name: Prove mobile chat drafts, Inbox clearance and Search visually
         run: node scripts/prove-mobile-polish-visual.mjs
 
-      - name: Prove iOS keyboard chat and Replies navigation clearance
-        run: node scripts/prove-ios-overlay-recovery.mjs
+      - name: Prove current native Chat, Comments and Inbox screens
+        run: node scripts/prove-mobile-native-screens.mjs
 
-      - name: Prove real-device keyboard transition and Notes mobile clarity
-        run: node scripts/prove-real-device-mobile-transition.mjs
+      - name: Prove visible mobile Note and Comment controls
+        run: node scripts/prove-mobile-touch-targets.mjs
 
-      - name: Prove Notes social loop, activity, share and real replies
+      - name: Prove Notes social loop, activity, share and real comments
         run: node scripts/prove-notes-social-loop.mjs
 
       - name: Start exact generated Worker entry
@@ -98,8 +98,8 @@ jobs:
           name: mobile-notes-chat-exact-proof
           path: |
             engineering-evidence/mobile-notes-chat
-            engineering-evidence/ios-overlay-recovery
-            engineering-evidence/real-device-mobile
+            engineering-evidence/mobile-native-screens
+            engineering-evidence/mobile-touch-targets
             engineering-evidence/notes-social-completion
           if-no-files-found: error
           retention-days: 14
