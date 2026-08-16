@@ -71,11 +71,17 @@ jobs:
           NOTVERSE_TEST_URL: https://notverse.1ink.online
         run: node scripts/verify-notverse-ui.mjs
 
-      - name: Verify live Safari/WebKit keyboard pan and real-device mobile transitions
+      - name: Verify current mobile-native Chat, Comments and Inbox screens
         env:
           PROOF_URL: https://notverse.1ink.online
-          PROOF_DIR: engineering-evidence/notverse-live/real-device-mobile
-        run: node scripts/prove-real-device-mobile-transition.mjs
+          PROOF_DIR: engineering-evidence/notverse-live/mobile-native-screens
+        run: node scripts/prove-mobile-native-screens.mjs
+
+      - name: Verify visible mobile Note and Comment controls
+        env:
+          PROOF_URL: https://notverse.1ink.online
+          PROOF_DIR: engineering-evidence/notverse-live/mobile-touch-targets
+        run: node scripts/prove-mobile-touch-targets.mjs
 
       - name: Verify live Notes social loop, My Notes, comments, share and Activity
         env:
