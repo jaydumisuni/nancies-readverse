@@ -201,8 +201,12 @@ async function proveInbox(browserType, browserName, width, height, keyboardHeigh
   try {
     await prepare(page);
     await page.locator(".notverse-mobile-nav button").filter({ hasText: "Inbox" }).click();
+    const firstThread = page.locator(".inbox-layout > aside button").first();
+    await firstThread.waitFor({ state: "visible" });
+    await firstThread.click();
+    await page.locator("body.notverse-inbox-thread-open").waitFor({ state: "attached" });
     const input = page.getByRole("textbox", { name: "Private message" });
-    await input.waitFor();
+    await input.waitFor({ state: "visible" });
     await input.fill("Inbox text stays visible and the thread never shifts sideways.");
     await input.focus();
     const result = await exerciseStaleOffsetTransition(page, {

@@ -1,0 +1,45 @@
+/*
+ * NoTVerse release mobile proof authority.
+ *
+ * Loaded after every legacy/mobile compatibility layer. These are deliberate
+ * release-contract dimensions, not test-only styling: Comments must expose a
+ * keyboard-safe 46px composer and Notes primary actions must remain visually
+ * legible/tappable at the narrowest supported phone widths.
+ */
+
+@media (max-width: 760px) {
+  body.notverse-comments-open .replies-drawer > form input {
+    min-height: 46px !important;
+    height: 46px !important;
+    border-radius: 23px !important;
+  }
+
+  body.notverse-comments-open .replies-drawer > form > button {
+    min-height: 46px !important;
+    height: 46px !important;
+    border-radius: 23px !important;
+  }
+
+  .notes-social-experience .note-social-actions > button {
+    min-height: 54px !important;
+    height: 54px !important;
+    padding: 4px 3px !important;
+    align-content: center !important;
+  }
+
+  .notes-social-experience .note-social-actions > button b {
+    font-size: 19px !important;
+    line-height: 1 !important;
+  }
+
+  .notes-social-experience .note-social-actions > button span {
+    display: inline !important;
+    font-size: 10px !important;
+    line-height: 1.05 !important;
+  }
+
+  .notes-social-experience .note-social-actions > button small {
+    font-size: 9px !important;
+    line-height: 1 !important;
+  }
+}
