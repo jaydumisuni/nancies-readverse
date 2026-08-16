@@ -10,8 +10,6 @@ on:
     paths:
       - "src/**"
       - "worker/**"
-      - "scripts/prove-mobile-notes-chat.mjs"
-      - "scripts/prove-mobile-polish-visual.mjs"
       - "scripts/prove-mobile-native-screens.mjs"
       - "scripts/prove-mobile-touch-targets.mjs"
       - "scripts/prove-notes-social-loop.mjs"
@@ -55,16 +53,10 @@ jobs:
           cat /tmp/notverse-preview.log
           exit 1
 
-      - name: Prove short-phone and tall-phone Notes/chat geometry
-        run: node scripts/prove-mobile-notes-chat.mjs
-
-      - name: Prove mobile chat drafts, Inbox clearance and Search visually
-        run: node scripts/prove-mobile-polish-visual.mjs
-
       - name: Prove current native Chat, Comments and Inbox screens
         run: node scripts/prove-mobile-native-screens.mjs
 
-      - name: Prove visible mobile Note and Comment controls
+      - name: Prove visible mobile controls, Notes gestures and Search
         run: node scripts/prove-mobile-touch-targets.mjs
 
       - name: Prove Notes social loop, activity, share and real comments
