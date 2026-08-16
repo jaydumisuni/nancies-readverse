@@ -1,0 +1,104 @@
+import { chromium, webkit } from "playwright";
+import { mkdir, writeFile } from "node:fs/promises";
+
+const url = process.env.PROOF_URL || "http://127.0.0.1:4173";
+const out = process.env.PROOF_DIR || "engineering-evidence/mobile-touch-targets";
+await mkdir(out, { recursive: true });
+
+const report = { ok: true, cases: [], errors: [] };
+const assert = (value, message) => { if (!value) throw new Error(message); };
+
+async function prepare(page) {
+  await page.goto(url, { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    localStorage.setItem("notverse.preferences", JSON.stringify({
+      setupComplete: true,
+      noteFont: "handwritten",
+      readingInterests: ["Manga", "Novels", "PDFs"],
+      discoveryMethods: ["title", "memory", "link"],
+    }));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+}
+
+async function prove(browserType, browserName, width, height) {
+  const browser = await browserType.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await prepare(page);
+    await page.getByRole("button", { name: "Notes", exact: true }).last().click();
+
+    const actions = page.locator(".note-social-actions > button");
+    await actions.first().waitFor();
+    const metrics = await actions.evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      const icon = node.querySelector("b");
+      const label = node.querySelector("span");
+      return {
+        width: box.width,
+        height: box.height,
+        iconSize: icon ? parseFloat(getComputedStyle(icon).fontSize) : 0,
+        label: label?.textContent?.trim() || "",
+      };
+    }));
+
+    assert(metrics.length === 4, `${browserName}/${width}: expected four Note actions`);
+    const expectedLabels = ["Like", "Comment", "Save", "Share"];
+    metrics.forEach((metric, index) => {
+      assert(metric.height >= 54, `${browserName}/${width}: Note action ${index} visually too short (${metric.height})`);
+      assert(metric.iconSize >= 19, `${browserName}/${width}: Note action ${index} icon too small (${metric.iconSize})`);
+      assert(metric.label === expectedLabels[index], `${browserName}/${width}: Note action ${index} label is ${JSON.stringify(metric.label)}`);
+    });
+
+    const activity = page.locator(".notes-activity-button");
+    const activityBox = await activity.evaluate((node) => node.getBoundingClientRect().toJSON());
+    const activityLabel = await activity.evaluate((node) => getComputedStyle(node, "::after").content);
+    assert(activityBox.width >= 74, `${browserName}/${width}: Activity control too narrow (${activityBox.width})`);
+    assert(activityLabel.includes("Activity"), `${browserName}/${width}: Activity control has no visible label`);
+
+    await actions.nth(1).click();
+    const input = page.getByRole("textbox", { name: "Write a comment" });
+    await input.waitFor();
+    const inputBox = await input.evaluate((node) => node.getBoundingClientRect().toJSON());
+    const send = page.getByRole("button", { name: "Send", exact: true });
+    const sendBox = await send.evaluate((node) => node.getBoundingClientRect().toJSON());
+    const formBox = await page.locator(".replies-drawer > form").evaluate((node) => node.getBoundingClientRect().toJSON());
+
+    assert(inputBox.height >= 46, `${browserName}/${width}: Comment field visually too short (${inputBox.height})`);
+    assert(sendBox.height >= 46, `${browserName}/${width}: Comment Send control visually too short (${sendBox.height})`);
+    assert(formBox.bottom <= height + 2, `${browserName}/${width}: Comment composer starts below the viewport (${formBox.bottom} vs ${height})`);
+
+    await page.screenshot({ path: `${out}/${browserName}-${width}-notes-comments.png`, fullPage: false });
+    report.cases.push({ browserName, width, height, metrics, activityWidth: activityBox.width, inputHeight: inputBox.height, sendHeight: sendBox.height });
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+const enabledBrowsers = new Set((process.env.PROOF_BROWSERS || "chromium,webkit").split(",").map((value) => value.trim()).filter(Boolean));
+for (const [browserName, browserType] of [["chromium", chromium], ["webkit", webkit]]) {
+  if (!enabledBrowsers.has(browserName)) continue;
+  for (const [width, height] of [[360, 640], [390, 844]]) {
+    try {
+      await prove(browserType, browserName, width, height);
+    } catch (error) {
+      report.ok = false;
+      report.errors.push(`${browserName}/${width}: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+    }
+  }
+}
+
+await writeFile(`${out}/mobile-touch-targets-report.json`, `${JSON.stringify(report, null, 2)}\n`);
+if (!report.ok) {
+  console.error(report.errors.join("\n"));
+  process.exit(1);
+}
+console.log(`Mobile touch-target proof passed (${report.cases.length} cases).`);
