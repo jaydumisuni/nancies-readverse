@@ -7,7 +7,7 @@ if (!workerName) {
   throw new Error("wrangler.jsonc does not define a Worker name");
 }
 
-const generatedConfig = resolve("dist", workerName, "wrangler.json");
+const generatedConfig = resolve("dist", workerName.replaceAll("-", "_"), "wrangler.json");
 const redirectFile = resolve(".wrangler/deploy/config.json");
 
 await access(generatedConfig);

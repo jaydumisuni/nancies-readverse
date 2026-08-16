@@ -1,11 +1,14 @@
 import { chromium, webkit } from "playwright";
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const url = process.env.PROOF_URL || "http://127.0.0.1:4173";
 const out = process.env.PROOF_DIR || "engineering-evidence/mobile-native-screens";
 await mkdir(out, { recursive: true });
 const report = { ok: true, cases: [], errors: [] };
+const commentsSource = await readFile("src/notverse/NotesSocialExperience.tsx", "utf8");
+assert.match(commentsSource, /function replyTo\(author: string\)[\s\S]*?input\?\.focus\(\);\s*setDraft\(`/u, "Reply must synchronously focus before updating the mention draft");
+assert.doesNotMatch(commentsSource, /requestAnimationFrame\(\(\) => inputRef\.current\?\.focus\(\)\)/u, "Reply focus must not be deferred out of the user gesture");
 
 function preferences() {
   localStorage.setItem("notverse.preferences", JSON.stringify({
@@ -83,7 +86,24 @@ async function proveComments(browserType, browserName) {
     await surface(page, ".replies-backdrop", 390, 844, `${browserName} comments screen`);
     await surface(page, ".replies-drawer", 390, 844, `${browserName} comments drawer`);
     assert.equal(await page.getByRole("button", { name: "Back to Notes" }).count(), 1, `${browserName}: comments back action missing`);
+    const mobileNav = page.locator(".mobile-nav.notverse-mobile-nav");
+    assert.equal(await mobileNav.getAttribute("inert"), "", `${browserName}: hidden mobile nav is not inert under Comments`);
+    assert.equal(await mobileNav.getAttribute("aria-hidden"), "true", `${browserName}: hidden mobile nav still owns accessibility/touch state`);
+    assert.equal(await mobileNav.evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: mobile nav remains painted under Comments`);
+    const activeNavBefore = await mobileNav.locator("button.active").textContent();
+    await page.touchscreen.tap(24, 820);
+    await page.waitForTimeout(60);
+    assert.equal(await page.locator("body.notverse-comments-open").count(), 1, `${browserName}: tapping old nav coordinates escaped Comments`);
+    assert.equal(await mobileNav.locator("button.active").textContent(), activeNavBefore, `${browserName}: invisible mobile nav accepted a tap under Comments`);
+
     const input = page.getByRole("textbox", { name: "Write a comment" });
+    const firstComment = page.locator(".replies-list article").first();
+    assert.equal(await firstComment.count(), 1, `${browserName}: starter comment missing for Reply focus proof`);
+    const replyAuthor = (await firstComment.locator("b").innerText()).replace(/You$/u, "").trim();
+    await firstComment.getByRole("button", { name: "Reply", exact: true }).tap();
+    await page.waitForTimeout(20);
+    assert.equal(await input.inputValue(), `@${replyAuthor} `, `${browserName}: Reply did not populate the expected mention`);
+    assert.equal(await input.evaluate((n) => document.activeElement === n), true, `${browserName}: Reply did not focus the comment composer in the tap gesture`);
     await input.fill("scroll stability");
     await input.focus();
     await page.setViewportSize({ width: 390, height: 520 });

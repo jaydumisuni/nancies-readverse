@@ -43,7 +43,7 @@ globalThis.fetch = async (input, init) => {
 };
 
 try {
-  const module = await import(`${pathToFileURL("dist/notverse/index.js").href}?ratings=${Date.now()}`);
+  const module = await import(`${pathToFileURL("dist/nancies_readverse/index.js").href}?ratings=${Date.now()}`);
   const handler = module.default;
   const response = await handler.fetch(new Request("https://notverse.test/api/discovery/search", {
     method: "POST",

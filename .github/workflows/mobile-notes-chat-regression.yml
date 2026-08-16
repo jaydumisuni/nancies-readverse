@@ -72,7 +72,7 @@ jobs:
 
       - name: Start exact generated Worker entry
         run: |
-          npx wrangler dev --local --port 8790 --config dist/notverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
+          npx wrangler dev --local --port 8790 --config dist/nancies_readverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
           for attempt in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:8790/api/health >/dev/null; then exit 0; fi
             sleep 1

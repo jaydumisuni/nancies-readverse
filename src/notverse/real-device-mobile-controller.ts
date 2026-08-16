@@ -65,6 +65,18 @@ function publishViewport() {
   root.style.setProperty("--notverse-mobile-vv-height", `${height}px`);
 }
 
+function setMobileNavBlocked(blocked: boolean) {
+  const nav = document.querySelector<HTMLElement>(".mobile-nav.notverse-mobile-nav");
+  if (!nav) return;
+  if (blocked) {
+    nav.setAttribute("inert", "");
+    nav.setAttribute("aria-hidden", "true");
+    return;
+  }
+  nav.removeAttribute("inert");
+  nav.removeAttribute("aria-hidden");
+}
+
 function syncSurfaceState() {
   if (!mobileViewport.matches) {
     for (const className of [
@@ -74,6 +86,7 @@ function syncSurfaceState() {
       "notverse-activity-open",
       "notverse-mobile-surface-open",
     ]) body.classList.remove(className);
+    setMobileNavBlocked(false);
     publishViewport();
     return;
   }
@@ -86,13 +99,16 @@ function syncSurfaceState() {
   const chatOpen = Boolean(chat);
   const commentsOpen = Boolean(commentsBackdrop && comments);
   const activityOpen = Boolean(activity);
+  const inboxThreadOpen = body.classList.contains("notverse-inbox-thread-open");
+  const mobileSurfaceOpen = chatOpen || commentsOpen || activityOpen || inboxThreadOpen;
 
   body.classList.toggle("notverse-chat-open", chatOpen);
   body.classList.toggle("notverse-comments-open", commentsOpen);
   // Kept only for compatibility with older selectors while user-facing copy is Comment.
   body.classList.toggle("notverse-replies-open", commentsOpen);
   body.classList.toggle("notverse-activity-open", activityOpen);
-  body.classList.toggle("notverse-mobile-surface-open", chatOpen || commentsOpen || activityOpen);
+  body.classList.toggle("notverse-mobile-surface-open", mobileSurfaceOpen);
+  setMobileNavBlocked(mobileSurfaceOpen);
 
   clearLegacyInlineGeometry(chat);
   clearLegacyInlineGeometry(commentsBackdrop);

@@ -48,7 +48,7 @@ for (const [condition, message] of checks) assert(condition, message);
 
 const workerName = JSON.parse(wrangler).name;
 assert(workerName, "wrangler.jsonc does not define the Worker name");
-const builtWorker = `dist/${workerName}/index.js`;
+const builtWorker = `dist/${workerName.replaceAll("-", "_")}/index.js`;
 await stat(builtWorker);
 const module = await import(`${pathToFileURL(builtWorker).href}?finish=${Date.now()}`);
 const handler = module.default;

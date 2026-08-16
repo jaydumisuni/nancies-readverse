@@ -196,8 +196,15 @@ function RepliesDrawer({ note, replies, displayName, avatar, onClose, onSend }: 
   }
 
   function replyTo(author: string) {
+    const input = inputRef.current;
+    input?.focus();
     setDraft(`@${author} `);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      const current = inputRef.current;
+      if (!current) return;
+      const end = current.value.length;
+      current.setSelectionRange(end, end);
+    });
   }
 
   return <div className="note-modal-backdrop replies-backdrop">
