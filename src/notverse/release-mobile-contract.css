@@ -3,8 +3,9 @@
  *
  * Loaded after every legacy/mobile compatibility layer. These are deliberate
  * release-contract dimensions, not test-only styling: Comments must expose a
- * keyboard-safe 46px composer and Notes primary actions must remain visually
- * legible/tappable at the narrowest supported phone widths.
+ * keyboard-safe 46px composer, Notes primary actions must remain visually
+ * legible/tappable, and Safari must never destroy/recreate the fixed mobile
+ * navigation compositor layer while a transient phone screen is open.
  */
 
 @media (max-width: 760px) {
@@ -70,5 +71,42 @@
 
   .notes-social-experience .notes-header-actions > .notes-activity-button > b {
     font-size: 10px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  /*
+   * iOS/WebKit can keep the hit-test tree for a fixed backdrop-filter element
+   * while dropping its painted compositor layer after display:none -> grid.
+   * Never tear the mobile navigation layer down. Portal screens already cover
+   * it with a much higher z-index and the controller marks it inert/aria-hidden.
+   */
+  .mobile-nav.notverse-mobile-nav {
+    display: grid !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    will-change: opacity, transform;
+  }
+
+  body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
+  body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
+  body.notverse-activity-open .mobile-nav.notverse-mobile-nav {
+    display: grid !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+
+  /* Inbox conversation is not a portal above the nav, so keep its compositor
+     alive but make the layer transparent until Back restores the list screen. */
+  body.notverse-inbox-thread-open .mobile-nav.notverse-mobile-nav {
+    display: grid !important;
+    opacity: 0 !important;
+    visibility: visible !important;
+    pointer-events: none !important;
   }
 }
