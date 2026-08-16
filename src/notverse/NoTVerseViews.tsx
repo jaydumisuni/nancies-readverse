@@ -151,6 +151,38 @@ function InboxView({ displayName }: { displayName: string }) {
   const active = threads.find((thread) => thread.id === selected);
   const activeMessages = active ? messagesByThread[active.id] || [] : [];
 
+  function threadKind(thread: InboxThread) {
+    if (thread.kind) return thread.kind;
+    return thread.id === "thread-notebook" || thread.id === "thread-reading" ? "group" : "person";
+  }
+
+  function presenceLabel(thread: InboxThread) {
+    if (threadKind(thread) !== "person") return "";
+    if (thread.presence === "online") return "Active now";
+    return thread.lastActive ? `Last active ${thread.lastActive}` : "Last active unavailable";
+  }
+
+  function identityMark(thread: InboxThread) {
+    if (threadKind(thread) === "group") return "▦";
+    if (threadKind(thread) === "system") return "•";
+    return thread.name.slice(0, 1);
+  }
+
+  useEffect(() => {
+    setThreads((current) => {
+      let changed = false;
+      const next = current.map((thread) => {
+        const kind = thread.kind || (thread.id === "thread-notebook" || thread.id === "thread-reading" ? "group" : "person");
+        const presence = kind === "person" ? (thread.presence || "offline") : undefined;
+        const lastActive = kind === "person" ? thread.lastActive : undefined;
+        if (thread.kind === kind && thread.presence === presence && thread.lastActive === lastActive) return thread;
+        changed = true;
+        return { ...thread, kind, presence, lastActive };
+      });
+      return changed ? next : current;
+    });
+  }, [setThreads]);
+
   useEffect(() => {
     document.body.classList.add("notverse-inbox-active");
     return () => {
@@ -210,8 +242,8 @@ function InboxView({ displayName }: { displayName: string }) {
         <aside>
           {threads.map((thread) => (
             <button type="button" className={selected === thread.id ? "active" : ""} key={thread.id} onClick={() => selectThread(thread.id)}>
-              <span>{thread.name.slice(0, 1)}</span>
-              <div><strong>{thread.name}</strong><small>{thread.preview}</small></div>
+              <span className={`inbox-thread-identity ${threadKind(thread)}`}>{thread.avatar && threadKind(thread) === "person" ? <img src={thread.avatar} alt="" /> : identityMark(thread)}{threadKind(thread) === "person" && <i className={`inbox-presence-dot ${thread.presence === "online" ? "online" : "offline"}`} aria-label={presenceLabel(thread)} />}</span>
+              <div><strong>{thread.name}</strong><small>{thread.preview}</small>{threadKind(thread) === "person" && <em className="inbox-presence-label">{presenceLabel(thread)}</em>}</div>
               <time>{thread.time}</time>
               {thread.unread > 0 && <b>{thread.unread}</b>}
             </button>
@@ -222,8 +254,8 @@ function InboxView({ displayName }: { displayName: string }) {
             <>
               <header>
                 <button type="button" className="inbox-back" aria-label="Back to conversations" onClick={() => setThreadOpen(false)}>‹</button>
-                <span>{active.name.slice(0, 1)}</span>
-                <div><strong>{active.name}</strong><small>Private conversation with {displayName}</small></div>
+                <span className={`inbox-thread-identity ${threadKind(active)}`}>{active.avatar && threadKind(active) === "person" ? <img src={active.avatar} alt="" /> : identityMark(active)}{threadKind(active) === "person" && <i className={`inbox-presence-dot ${active.presence === "online" ? "online" : "offline"}`} aria-label={presenceLabel(active)} />}</span>
+                <div><strong>{active.name}</strong><small>{threadKind(active) === "person" ? presenceLabel(active) : `Conversation · ${displayName}`}</small></div>
                 <button type="button" aria-label="Conversation options">•••</button>
               </header>
               <div className="message-thread" ref={threadRef} aria-live="polite">

@@ -138,6 +138,7 @@ window.addEventListener("resize", scheduleSync, { passive: true });
 window.addEventListener("orientationchange", scheduleSync, { passive: true });
 window.addEventListener("focusin", scheduleSync, true);
 window.addEventListener("focusout", scheduleSync, true);
+window.addEventListener("notverse:surface-state-changed", syncSurfaceState);
 mobileViewport.addEventListener("change", scheduleSync);
 window.visualViewport?.addEventListener("resize", scheduleSync, { passive: true });
 window.visualViewport?.addEventListener("scroll", scheduleSync, { passive: true });

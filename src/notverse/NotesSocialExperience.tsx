@@ -7,7 +7,7 @@ import {
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { starterNotes, usePersistentState } from "./storage";
 import type { NoTVerseNote, NoteType, NoteVisibility } from "./types";
 
@@ -136,6 +136,10 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
   function addToNotebook(target: NoTVerseNote) { updateNote(target.id, (item) => ({ ...item, notebook: "My Notebook" })); addActivity(target.id, "notebook", "Added to My Notebook", "This Note is now filed in My Notebook.", false); setOptionsOpen(false); showToast("Added to My Notebook."); }
   function hideNote(target: NoTVerseNote) { setHiddenIds((current) => current.includes(target.id) ? current : [...current, target.id]); setOptionsOpen(false); setIndex(0); showToast("Note hidden from your feed."); }
   function reportNote(target: NoTVerseNote) { setReportedIds((current) => current.includes(target.id) ? current : [...current, target.id]); setOptionsOpen(false); showToast("Report recorded locally. Moderation service is not connected yet."); }
+  function closeComments() {
+    flushSync(() => setRepliesOpen(false));
+    window.dispatchEvent(new Event("notverse:surface-state-changed"));
+  }
   function openActivity() { setActivityOpen(true); setActivities((current) => current.map((item) => ({ ...item, unread: false }))); window.history.replaceState(null, "", "#activity"); }
   function openActivityNote(noteId: string) { const target = notes.find((item) => item.id === noteId); if (!target) return; setActivityOpen(false); setTab(target.mine ? "mine" : "for-you"); setRequestedNoteId(noteId); window.location.hash = `note=${encodeURIComponent(noteId)}`; }
 
@@ -148,7 +152,7 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
     {composerOpen && <NoteComposer displayName={displayName} avatar={avatar} libraryTitles={libraryTitles} noteFont={noteFont} onClose={() => setComposerOpen(false)} onPublish={publish} />}
     {filtersOpen && <NoteFilters typeFilter={typeFilter} showSpoilers={showSpoilers} onType={setTypeFilter} onSpoilers={setShowSpoilers} onClose={() => setFiltersOpen(false)} />}
     {optionsOpen && note && <NoteOptions note={note} reported={reportedIds.includes(note.id)} onClose={() => setOptionsOpen(false)} onShare={() => void share(note)} onCopy={() => void copyLink(note)} onSave={toggleSaved} onNotebook={() => addToNotebook(note)} onHide={() => hideNote(note)} onReport={() => reportNote(note)} />}
-    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={() => setRepliesOpen(false)} onSend={submitReply} />, document.body)}
+    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={closeComments} onSend={submitReply} />, document.body)}
     {activityOpen && createPortal(<ActivityPanel activities={activities} notes={notes} onClose={() => { setActivityOpen(false); window.history.replaceState(null, "", "#my-notes"); }} onOpenNote={openActivityNote} onMarkRead={() => setActivities((current) => current.map((item) => ({ ...item, unread: false })))} />, document.body)}
     {imageOpen && note?.image && <div className="note-image-viewer" onClick={() => setImageOpen(false)}><button type="button">×</button><img src={note.image.dataUrl} alt={note.image.name} /></div>}{toast && <div className="note-toast" role="status">{toast}</div>}
   </section>;

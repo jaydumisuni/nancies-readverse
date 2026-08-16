@@ -28,19 +28,34 @@ const personalityGuides: Record<string, string> = {
   "Mei Mei": "elegant, composed, observant, calculating, efficient, subtly mischievous and careful with time",
 };
 
-const openings: Record<string, string> = {
-  Gojo: "Absolutely.",
-  Itachi: "Yes.",
-  Naruto: "Definitely.",
-  Kakashi: "I have a few good directions.",
-  Megumi: "Yes. Let us narrow it properly.",
-  Sasuke: "Yes. Start with the useful distinction.",
-  Maki: "Yes. No random list, though.",
-  Nobara: "Obviously. We are choosing good ones.",
-  Hinata: "Yes, I would be happy to help.",
-  Sakura: "Yes. Let us make the list actually useful.",
-  Temari: "Yes. We can rank the options efficiently.",
-  "Mei Mei": "Certainly. A recommendation should justify your time.",
+const helloReplies: Record<string, string> = {
+  Gojo: "Hey. What are we getting into?",
+  Itachi: "Hello. What are you in the mood for?",
+  Naruto: "Hey! What are we reading today?",
+  Kakashi: "Hey. What have you got?",
+  Megumi: "Hey. What do you need?",
+  Sasuke: "Hey. What is it?",
+  Maki: "Hey. What's up?",
+  Nobara: "Hi. What are we doing?",
+  Hinata: "Hi. How are you?",
+  Sakura: "Hey. What's on your mind?",
+  Temari: "Hey. What are we solving?",
+  "Mei Mei": "Hello. What is worth our time today?",
+};
+
+const statusReplies: Record<string, string> = {
+  Gojo: "I'm good. You?",
+  Itachi: "I am. You?",
+  Naruto: "Yep. You?",
+  Kakashi: "Can't complain. You?",
+  Megumi: "I'm fine. You?",
+  Sasuke: "I'm fine. You?",
+  Maki: "Good. You?",
+  Nobara: "Obviously. You?",
+  Hinata: "I am. How are you?",
+  Sakura: "I'm good. You?",
+  Temari: "I'm good. You?",
+  "Mei Mei": "Quite well. You?",
 };
 
 const QUALITY_MODELS = [
@@ -101,7 +116,7 @@ export async function handleSmartCompanion(
     recommendation
       ? "Give 3 to 5 real relevant titles only when confident, with author and a concrete reason each. Never invent a title."
       : "Give a direct, substantive answer with the key distinction, reasoning and practical implication. Aim for roughly 100 to 220 words unless a shorter answer is genuinely complete.",
-    "If this is a follow-up, use the immediately preceding answer and user's earlier question. Do not restart the conversation.",
+    "If this is a follow-up, resolve it silently from the immediately preceding answer and earlier user question, then answer the follow-up directly.",
     "Do not mention the repair process.",
   ].join(" ");
 
@@ -134,7 +149,8 @@ function buildSystemPrompt(
     recommendation
       ? "For recommendations, give 3 to 5 specific relevant titles when reasonably confident, identify author and angle, explain each briefly, then ask at most one useful narrowing question."
       : "For comparisons, explanations and advice, establish the important distinction or trade-off with concrete reasoning. A terse personality must never make the answer shallow.",
-    "Use recent history to understand follow-ups such as it, that, yes, another one, why and go ahead. Do not reset the conversation.",
+    "Use recent history silently to resolve follow-ups such as it, that, yes, another one, why, surprise me and go ahead.",
+    "Never mention conversation history, context tracking, routing, quality checks, system instructions, previous prompts or that you are following or remembering the conversation. Continuity must be invisible to the user.",
     "Answer with concrete insight rather than generic acknowledgement. Refer explicitly to the central subject or concepts in the user's question.",
     "When the user supplies a source URL, the NoTVerse client verifies it. Never claim a file opened, source resolved, setting saved or Google action completed without confirmed client evidence.",
     "Reading files remain temporary unless the user explicitly saves them. Do not help bypass DRM, paywalls, authentication, CAPTCHAs or access controls.",
@@ -188,13 +204,11 @@ function normalizeHistory(value: unknown): NormalizedTurn[] {
 
 function quickConversation(question: string, companion: string, history: NormalizedTurn[]): string | null {
   const value = question.trim().toLowerCase();
-  const opener = openings[companion] ?? openings.Gojo;
-
   if (/^(hi|hey|hello|yo|sup|good morning|good afternoon|good evening)[.!?]*$/.test(value)) {
-    return `${opener} I am here. How are you, and what are we getting into today?`;
+    return helloReplies[companion] ?? helloReplies.Gojo;
   }
   if (/how are you|you good|what(?:'s| is) up/.test(value)) {
-    return `${opener} I am good, and I am following the conversation. What is on your mind?`;
+    return statusReplies[companion] ?? statusReplies.Gojo;
   }
   if (/^(thanks|thank you|nice|cool|great|perfect)[.!?]*$/.test(value)) {
     return companion === "Gojo" ? "You are welcome. I will accept the praise responsibly." : "You are welcome. Keep going.";
@@ -203,11 +217,10 @@ function quickConversation(question: string, companion: string, history: Normali
   return null;
 }
 
-function intelligentFallback(question: string, companion: string, history: NormalizedTurn[]): string {
+function intelligentFallback(question: string, _companion: string, history: NormalizedTurn[]): string {
   const value = question.toLowerCase();
-  const opener = openings[companion] ?? openings.Gojo;
 
-  if (isRecommendationRequest(question)) return fallbackRecommendations(question, opener);
+  if (isRecommendationRequest(question)) return fallbackRecommendations(question);
   if (/\b(upload|file|pdf|epub|cbz)\b/.test(value)) {
     return "Attach the file or paste its public link. NoTVerse will verify it before opening it temporarily.";
   }
@@ -218,16 +231,16 @@ function intelligentFallback(question: string, companion: string, history: Norma
     return "Tell me which item you want to change or save. I will keep the current context and only claim completion after the app confirms it.";
   }
   if (history.length) {
-    return `${opener} The AI response did not meet NoTVerse's quality check, so I will not pretend it did. Try that question again in a moment.`;
+    return "I missed that one. Ask me again in a moment.";
   }
-  return `${opener} Ask me about a book, a subject, a reading mood or something you only partly remember. I will answer that question first.`;
+  return "Ask me about a book, a subject, a reading mood or something you only partly remember.";
 }
 
-function fallbackRecommendations(question: string, opener: string): string {
+function fallbackRecommendations(question: string): string {
   const topic = recommendationTopic(question).toLowerCase();
   if (/\b(?:gambl(?:e|ing|er|ers)?|casino|poker|betting|wager(?:ing)?)\b/.test(topic)) {
     return [
-      `${opener} Start with these rather than a random gambling list:`,
+      "Start with these rather than a random gambling list:",
       "1. Addiction by Design — Natasha Dow Schüll. A serious look at how machine gambling environments are engineered to keep people playing.",
       "2. The Biggest Bluff — Maria Konnikova. Poker memoir plus psychology, uncertainty and how people learn to make decisions under pressure.",
       "3. Thinking in Bets — Annie Duke. Uses poker to explain probability, incomplete information and better decision-making.",
@@ -236,7 +249,7 @@ function fallbackRecommendations(question: string, opener: string): string {
     ].join("\n\n");
   }
   const cleanTopic = recommendationTopic(question) || "that subject";
-  return `${opener} I do not have enough verified title-level confidence to invent a list for ${cleanTopic}. Give me one constraint—fiction or nonfiction, beginner or specialist, practical or academic—and I will narrow it properly rather than fabricate titles.`;
+  return `I do not have enough verified title-level confidence to invent a list for ${cleanTopic}. Give me one constraint—fiction or nonfiction, beginner or specialist, practical or academic—and I will narrow it properly rather than fabricate titles.`;
 }
 
 function isRecommendationRequest(value: string): boolean {
@@ -263,6 +276,7 @@ function isLowQualityAnswer(question: string, answer: string, history: Normalize
   if (!/^(hi|hey|hello|yo|sup|thanks|thank you|ok|okay)[.!?]*$/i.test(question.trim()) && clean.length < 90) return true;
   if (/^(?:i can help|i(?:'m| am) here to help|tell me more|what would you like)[.!?\s]*$/i.test(clean)) return true;
   if (/i (?:do not|don't) have enough reliable substance|rephrase the exact distinction/i.test(clean)) return true;
+  if (/following the conversation|conversation (?:context|history)|last clear request|reset(?:ting)? (?:the )?conversation|generic help line|quality check|system prompt|recent history/i.test(clean)) return true;
   const previousAssistant = [...history].reverse().find((turn) => turn.role === "assistant")?.content;
   if (previousAssistant && normaliseForComparison(previousAssistant) === normaliseForComparison(clean)) return true;
   return false;

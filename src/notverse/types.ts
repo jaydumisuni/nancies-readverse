@@ -91,6 +91,9 @@ export type InboxThread = {
   time: string;
   unread: number;
   avatar?: string;
+  kind?: "person" | "group" | "system";
+  presence?: "online" | "offline";
+  lastActive?: string;
 };
 
 export type PresenceReader = {

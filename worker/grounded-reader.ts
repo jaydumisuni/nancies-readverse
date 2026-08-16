@@ -1,4 +1,4 @@
-import { HEADERS, OPENERS, jsonResponse as response, normalize, parseYear } from "./grounded-shared";
+import { HEADERS, jsonResponse as response, normalize, parseYear } from "./grounded-shared";
 
 type ChatTurn = { role?: unknown; text?: unknown };
 type Body = { question?: unknown; companion?: unknown; history?: unknown };
@@ -52,6 +52,17 @@ export async function handleGroundedReaderTurn(
   const previous = extractPreviousGrounded(history);
   const follow = classifyFollowUp(question, previous);
   const detected = detectIntent(question);
+  if (detected === "recommend" && isGenericRecommendation(question) && !previous) return null;
+  if (follow === "surprise" && previous?.intent === "recommend") {
+    return response({
+      ok: true,
+      answer: surprisePrevious(previous),
+      mode: "catalogue-grounded-followup",
+      model: "verified-public-catalogue",
+      companion,
+      evidence: { type: "public-catalogue-history", books: previous.books },
+    });
+  }
   const clearlyReferentialExplain = follow === "explain"
     && /\b(?:strongest fit|best fit|first (?:one|choice|recommendation|conclusion)|why that|why this)\b/i.test(question);
   if (follow === "explain" && previous && (!detected || clearlyReferentialExplain)) {
@@ -129,6 +140,10 @@ export async function handleGroundedReaderTurn(
       books: chosen.map(stripInternal),
     },
   });
+}
+
+function isGenericRecommendation(question: string): boolean {
+  return /^(?:what books? (?:would|do) you recommend|recommend (?:me )?(?:some )?books?|any (?:good )?book recommendations?|what should i read)[?!.]*$/i.test(question.trim());
 }
 
 function detectIntent(question: string): Intent | null {
@@ -475,11 +490,10 @@ function scoreBook(book: Book, question: string, intent: Intent): number {
   return score;
 }
 
-function render(companion: string, question: string, intent: Intent, books: Book[]): string {
-  const opener = OPENERS[companion] ?? OPENERS.Gojo;
+function render(_companion: string, question: string, intent: Intent, books: Book[]): string {
   const lines = [intent === "identify"
-    ? `${opener} I checked your clues against live public book catalogues instead of guessing.`
-    : `${opener} I checked the titles against live public book catalogues first, then ranked only those verified records for your request.`];
+    ? "I checked your clues against live public book catalogues instead of guessing."
+    : "I checked the titles against live public book catalogues first, then ranked only those verified records for your request."];
 
   books.forEach((book, index) => {
     const author = book.authors.length ? book.authors.join(", ") : "author not listed in the catalogue result";
@@ -505,9 +519,10 @@ function reason(book: Book, question: string, strongest: boolean): string {
   return `${lead}${providers} verified the title and author; I am not adding claims beyond the catalogue evidence.`;
 }
 
-function classifyFollowUp(question: string, previous: ReturnType<typeof extractPreviousGrounded>): "explain" | "more" | null {
+function classifyFollowUp(question: string, previous: ReturnType<typeof extractPreviousGrounded>): "explain" | "more" | "surprise" | null {
   if (!previous) return null;
   if (/\b(?:why|strongest fit|best fit|first (?:one|choice|recommendation|conclusion)|why that|why this)\b/i.test(question)) return "explain";
+  if (/\b(?:surprise me|pick (?:one )?for me|your choice|choose (?:one )?for me|go wild)\b/i.test(question)) return "surprise";
   if (/\b(?:another|more|different|not this|not it|show more|something else|other one)\b/i.test(question)) return "more";
   return null;
 }
@@ -526,19 +541,23 @@ function extractPreviousGrounded(history: Turn[]): { intent: Intent; books: Arra
   return { intent, books };
 }
 
-function explainPrevious(previous: NonNullable<ReturnType<typeof extractPreviousGrounded>>, companion: string): string {
+function explainPrevious(previous: NonNullable<ReturnType<typeof extractPreviousGrounded>>, _companion: string): string {
   const first = previous.books[0];
-  const opener = OPENERS[companion] ?? OPENERS.Gojo;
   const why = lowerFirst(first.reason || "it best matched the constraints you gave");
-  return `${opener} **${first.title}** by ${first.author} stays first because ${why} I am keeping this follow-up inside the verified list we already discussed instead of introducing a new title.`;
+  return `**${first.title}** by ${first.author} stays first because ${why}`;
 }
 
-function noMatch(companion: string, question: string, intent: Intent): string {
-  const opener = OPENERS[companion] ?? OPENERS.Gojo;
+function surprisePrevious(previous: NonNullable<ReturnType<typeof extractPreviousGrounded>>): string {
+  const pick = previous.books[0];
+  const why = lowerFirst(pick.reason || "it was the strongest fit in the verified shortlist");
+  return `Go with **${pick.title}** by ${pick.author}. ${why} Start there and let the book do the rest.`;
+}
+
+function noMatch(_companion: string, question: string, intent: Intent): string {
   const topic = topicTokens(question).slice(0, 10).join(" ") || "that subject";
   return intent === "identify"
-    ? `${opener} I checked the live public catalogues for ${topic}, but I could not verify a strong candidate. Give me one more clue and I will narrow it instead of inventing a title.`
-    : `${opener} I could not verify enough public-catalogue matches for ${topic} to give you a trustworthy list. Give me one tighter or slightly broader constraint and I will search again instead of fabricating titles.`;
+    ? `I checked the live public catalogues for ${topic}, but I could not verify a strong candidate. Give me one more clue and I will narrow it instead of inventing a title.`
+    : `I could not verify enough public-catalogue matches for ${topic} to give you a trustworthy list. Give me one tighter or slightly broader constraint and I will search again instead of fabricating titles.`;
 }
 
 function normalizeHistory(value: unknown): Turn[] {
