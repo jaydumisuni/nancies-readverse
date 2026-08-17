@@ -66,20 +66,22 @@
   .notes-social-experience .notes-header-actions > .notes-activity-button > b {
     font-size: 10px !important;
   }
+
+  /* One mobile visual contract on every browser: Note paper is true white.
+     Preserve the ruled-paper texture and existing ink/shadow treatment. */
+  .notes-social-experience .note-paper {
+    background:
+      linear-gradient(rgba(74,57,48,.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.3), transparent 8%, transparent 91%, rgba(68,49,42,.07)),
+      #fff !important;
+    background-size: 100% 31px, 100% 100%, 100% 100% !important;
+  }
 }
 
-/* iPhone/iPad browsers expose WebKit touch-callout support. Keep these fixes
-   CSS-native so they do not depend on a fresh JavaScript device marker. */
+/* iPhone/iPad browsers share WebKit. This is compatibility behavior only;
+   the visual design above remains identical across mobile browsers. */
 @media (max-width: 760px) {
   @supports (-webkit-touch-callout: none) {
-    .notes-social-experience .note-paper {
-      background:
-        linear-gradient(rgba(74,57,48,.09) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.3), transparent 8%, transparent 91%, rgba(68,49,42,.07)),
-        #fff !important;
-      background-size: 100% 31px, 100% 100%, 100% 100% !important;
-    }
-
     /* Safari can fail to repaint a fixed nav after the keyboard if the nav was
        display:none while Comments owned the viewport. Keep it painted beneath
        the opaque Comments surface; inert/aria-hidden still block interaction. */
