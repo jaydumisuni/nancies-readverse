@@ -90,3 +90,5 @@ window.addEventListener("pagehide", restorePortalContainer, { passive: true });
 window.addEventListener("notverse:surface-state-changed", scheduleHost);
 
 scheduleHost();
+
+/* Production deploy marker: 2026-08-17 structural Inbox parity. */
