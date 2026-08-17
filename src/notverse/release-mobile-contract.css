@@ -173,3 +173,5 @@
     pointer-events: none !important;
   }
 }
+
+/* Production deploy marker: 2026-08-17 iOS Comments keyboard paint retention. */
