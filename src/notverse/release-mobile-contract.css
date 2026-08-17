@@ -66,25 +66,28 @@
   .notes-social-experience .notes-header-actions > .notes-activity-button > b {
     font-size: 10px !important;
   }
+}
 
-  /* iPhone displays the warm #f4eee5 base noticeably cream. Preserve the
-     ruled-paper artwork and ink, but make the actual sheet white. */
-  html.notverse-ios .notes-social-experience .note-paper {
-    background:
-      linear-gradient(rgba(74,57,48,.09) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.3), transparent 8%, transparent 91%, rgba(68,49,42,.07)),
-      #fff !important;
-    background-size: 100% 31px, 100% 100%, 100% 100% !important;
-  }
+/* iPhone/iPad browsers expose WebKit touch-callout support. Keep these fixes
+   CSS-native so they do not depend on a fresh JavaScript device marker. */
+@media (max-width: 760px) {
+  @supports (-webkit-touch-callout: none) {
+    .notes-social-experience .note-paper {
+      background:
+        linear-gradient(rgba(74,57,48,.09) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.3), transparent 8%, transparent 91%, rgba(68,49,42,.07)),
+        #fff !important;
+      background-size: 100% 31px, 100% 100%, 100% 100% !important;
+    }
 
-  /* iOS Safari can fail to repaint a fixed nav after the keyboard if the nav
-     was display:none while Comments owned the viewport. Keep the existing nav
-     painted underneath the opaque Comments screen; inert/aria-hidden already
-     block interaction. Other platforms keep the original mobile contract. */
-  html.notverse-ios body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
-    display: grid !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: none !important;
+    /* Safari can fail to repaint a fixed nav after the keyboard if the nav was
+       display:none while Comments owned the viewport. Keep it painted beneath
+       the opaque Comments surface; inert/aria-hidden still block interaction. */
+    body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
+      display: grid !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: none !important;
+    }
   }
 }
