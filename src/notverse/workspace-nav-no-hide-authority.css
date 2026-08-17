@@ -1,18 +1,29 @@
 /*
  * Final NoTVerse iPhone navigation paint authority.
  *
- * Visually proven in the mobile workspace at 360x640 and 390x844.
- * Comments may cover the navigation and disable interaction, but it must never
- * change the navigation layer's paint state. Safari therefore has nothing to
- * restore after a comment input/keyboard cycle.
+ * The nav stays painted through the Comments keyboard cycle, but it must also
+ * stay in a simple paint layer. iOS Safari can drop a fixed backdrop-filter
+ * compositor after keyboard viewport changes while leaving hit-testing alive.
+ * Comments therefore covers a normal opaque fixed nav and only disables input.
  */
 
 @media (max-width: 720px) {
+  .mobile-nav.notverse-mobile-nav,
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     position: fixed !important;
     opacity: 1 !important;
     visibility: visible !important;
+    background: #08070a !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    filter: none !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
     pointer-events: none !important;
   }
 }
