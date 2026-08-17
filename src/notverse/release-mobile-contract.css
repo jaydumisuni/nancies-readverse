@@ -43,8 +43,7 @@
     line-height: 1 !important;
   }
 
-  /* Activity is the same compact circular header action as New Note/Filter.
-     The unread <b> badge remains owned by notes-social-completion.css. */
+  /* Activity uses the same compact circular header treatment on every phone. */
   .notes-social-experience .notes-header-actions > .notes-activity-button {
     min-width: 44px !important;
     width: 44px !important;
@@ -67,29 +66,28 @@
     font-size: 10px !important;
   }
 
-  /* One mobile visual contract on every browser: Note paper is true white.
-     Preserve the ruled-paper texture and existing ink/shadow treatment. */
+  /* One visual paper contract on every mobile engine. Keep a real white sheet
+     and neutral ruled-paper shading so wide-gamut iPhone displays do not turn
+     the paper warm/cream while Android renders it white. */
   .notes-social-experience .note-paper {
     background:
-      linear-gradient(rgba(74,57,48,.09) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.3), transparent 8%, transparent 91%, rgba(68,49,42,.07)),
+      linear-gradient(rgba(0,0,0,.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.28), transparent 8%, transparent 92%, rgba(0,0,0,.045)),
       #fff !important;
     background-size: 100% 31px, 100% 100%, 100% 100% !important;
   }
-}
 
-/* iPhone/iPad browsers share WebKit. This is compatibility behavior only;
-   the visual design above remains identical across mobile browsers. */
-@media (max-width: 760px) {
-  @supports (-webkit-touch-callout: none) {
-    /* Safari can fail to repaint a fixed nav after the keyboard if the nav was
-       display:none while Comments owned the viewport. Keep it painted beneath
-       the opaque Comments surface; inert/aria-hidden still block interaction. */
-    body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
-      display: grid !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      pointer-events: none !important;
-    }
+  /* Universal WebKit-safe surface lifecycle.
+     The native mobile layer historically removes this fixed nav with
+     display:none while Comments owns the viewport. Keep the same nav mounted
+     and painted on every phone instead. Comments is an opaque full-screen layer
+     above it, while inert/aria-hidden and pointer-events:none block interaction.
+     Back therefore reveals the already-painted nav instead of asking the browser
+     to reconstruct a fixed layer after the software keyboard closes. */
+  body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
   }
 }
