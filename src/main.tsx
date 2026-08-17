@@ -18,6 +18,7 @@ import "./notverse/replies-enter-submit";
 import "./notverse/real-device-mobile-final.css";
 import "./notverse/mobile-native-screens.css";
 import "./notverse/real-device-mobile-controller";
+import "./notverse/ios-keyboard-comments-return";
 import "./notverse/release-mobile-contract.css";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
