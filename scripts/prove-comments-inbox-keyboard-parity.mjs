@@ -27,10 +27,11 @@ async function settle(page) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-async function surfaceState(page) {
+async function state(page) {
   return page.evaluate(() => {
     const shell = document.querySelector(".main-shell.notverse-shell");
     const nav = document.querySelector(".mobile-nav.notverse-mobile-nav");
+    const comments = document.querySelector(".replies-backdrop");
     if (!(shell instanceof HTMLElement) || !(nav instanceof HTMLElement)) throw new Error("mobile shell/nav missing");
     const shellStyle = getComputedStyle(shell);
     const navStyle = getComputedStyle(nav);
@@ -44,7 +45,6 @@ async function surfaceState(page) {
         width: shellBox.width,
         height: shellBox.height,
         visibility: shellStyle.visibility,
-        pointerEvents: shellStyle.pointerEvents,
       },
       nav: {
         display: navStyle.display,
@@ -56,79 +56,125 @@ async function surfaceState(page) {
         width: navBox.width,
         height: navBox.height,
       },
+      comments: comments instanceof HTMLElement ? {
+        parentIsShell: comments.parentElement === shell,
+        mobileHost: comments.dataset.notverseMobileHost || "",
+        position: getComputedStyle(comments).position,
+        width: comments.getBoundingClientRect().width,
+        height: comments.getBoundingClientRect().height,
+      } : null,
       bodyClasses: [...document.body.classList],
     };
   });
 }
 
-function assertKeyboardOwner(state, width, keyboardHeight, label) {
-  assert.equal(state.shell.position, "fixed", `${label}: shell is not fixed`);
-  assert(Math.abs(state.shell.top) <= 1, `${label}: shell top moved (${state.shell.top})`);
-  assert(Math.abs(state.shell.left) <= 1, `${label}: shell left moved (${state.shell.left})`);
-  assert(Math.abs(state.shell.width - width) <= 1, `${label}: shell width ${state.shell.width}/${width}`);
-  assert(Math.abs(state.shell.height - keyboardHeight) <= 2, `${label}: shell height ${state.shell.height}/${keyboardHeight}`);
-  assert.equal(state.shell.visibility, "visible", `${label}: shell hidden`);
-  assert.equal(state.nav.display, "grid", `${label}: nav destroyed`);
-  assert.equal(state.nav.visibility, "visible", `${label}: nav visibility hidden`);
-  assert(state.nav.opacity <= .01, `${label}: nav should be transparent while keyboard screen owns viewport`);
-  assert.equal(state.nav.pointerEvents, "none", `${label}: nav accepts input under keyboard screen`);
-  assert.equal(state.nav.inert, true, `${label}: nav is not inert`);
-  assert.equal(state.nav.ariaHidden, "true", `${label}: nav is not aria-hidden`);
+function assertKeyboardOwner(value, width, keyboardHeight, label) {
+  assert.equal(value.shell.position, "fixed", `${label}: shell position=${value.shell.position}`);
+  assert(Math.abs(value.shell.top) <= 1, `${label}: shell top=${value.shell.top}`);
+  assert(Math.abs(value.shell.left) <= 1, `${label}: shell left=${value.shell.left}`);
+  assert(Math.abs(value.shell.width - width) <= 1, `${label}: shell width ${value.shell.width}/${width}`);
+  assert(Math.abs(value.shell.height - keyboardHeight) <= 2, `${label}: shell height ${value.shell.height}/${keyboardHeight}`);
+  assert.equal(value.shell.visibility, "visible", `${label}: shell hidden`);
+  assert.equal(value.nav.display, "grid", `${label}: nav destroyed`);
+  assert.equal(value.nav.visibility, "visible", `${label}: nav hidden`);
+  assert(value.nav.opacity <= .01, `${label}: nav opacity=${value.nav.opacity}`);
+  assert.equal(value.nav.pointerEvents, "none", `${label}: nav accepts input`);
+  assert.equal(value.nav.inert, true, `${label}: nav is not inert`);
+  assert.equal(value.nav.ariaHidden, "true", `${label}: nav is not aria-hidden`);
 }
 
-function assertRestoredNav(state, width, label) {
-  assert.equal(state.nav.display, "grid", `${label}: nav display=${state.nav.display}`);
-  assert.equal(state.nav.visibility, "visible", `${label}: nav visibility=${state.nav.visibility}`);
-  assert(state.nav.opacity >= .99, `${label}: nav opacity=${state.nav.opacity}`);
-  assert.equal(state.nav.pointerEvents, "auto", `${label}: nav pointer-events=${state.nav.pointerEvents}`);
-  assert.equal(state.nav.inert, false, `${label}: nav remained inert`);
-  assert(state.nav.width >= width - 24, `${label}: nav width collapsed (${state.nav.width})`);
+function assertRestoredNav(value, width, label) {
+  assert.equal(value.nav.display, "grid", `${label}: nav display=${value.nav.display}`);
+  assert.equal(value.nav.visibility, "visible", `${label}: nav visibility=${value.nav.visibility}`);
+  assert(value.nav.opacity >= .99, `${label}: nav opacity=${value.nav.opacity}`);
+  assert.equal(value.nav.pointerEvents, "auto", `${label}: nav pointer-events=${value.nav.pointerEvents}`);
+  assert.equal(value.nav.inert, false, `${label}: nav remained inert`);
+  assert(value.nav.width >= width - 24, `${label}: nav width=${value.nav.width}`);
 }
 
-async function proveComments(page, width, height, keyboardHeight) {
+async function proveComments(page, width, height, keyboardHeight, browserName) {
   await page.getByRole("button", { name: "Notes", exact: true }).last().click();
   await page.getByRole("button", { name: "Comment on Note", exact: true }).click();
+
+  const reply = page.locator(".replies-list article").first().getByRole("button", { name: "Reply", exact: true });
+  await reply.tap();
   const input = page.getByRole("textbox", { name: "Write a comment" });
-  await input.tap();
-  await input.fill("Inbox parity keyboard proof");
+  await input.waitFor({ state: "visible" });
+  await page.waitForFunction(() => {
+    const node = document.querySelector('input[aria-label="Write a comment"]');
+    return node instanceof HTMLInputElement && node.value.startsWith("@");
+  });
+  await input.fill(`${await input.inputValue()} Inbox parity reply`);
+
   await page.setViewportSize({ width, height: keyboardHeight });
   await settle(page);
 
-  const focused = await surfaceState(page);
-  assertKeyboardOwner(focused, width, keyboardHeight, "Comments keyboard");
+  const keyboard = await state(page);
+  assertKeyboardOwner(keyboard, width, keyboardHeight, `${browserName}/${width}: Comments keyboard`);
+  assert(keyboard.comments, `${browserName}/${width}: Comments root missing`);
+  assert.equal(keyboard.comments.parentIsShell, true, `${browserName}/${width}: Comments is still hosted outside main shell`);
+  assert.equal(keyboard.comments.mobileHost, "main-shell", `${browserName}/${width}: Comments host marker missing`);
+  assert.equal(keyboard.comments.position, "absolute", `${browserName}/${width}: Comments child is not shell-relative`);
+  assert(Math.abs(keyboard.comments.width - width) <= 1, `${browserName}/${width}: Comments width mismatch`);
+  assert(Math.abs(keyboard.comments.height - keyboardHeight) <= 2, `${browserName}/${width}: Comments height mismatch`);
 
-  /* Inbox closes its thread normally; Comments must do the same. No delayed
-     capture/replay handler is allowed to keep the old surface mounted. */
-  await page.getByRole("button", { name: "Back to Notes", exact: true }).click();
-  await page.waitForFunction(() => !document.body.classList.contains("notverse-comments-open"));
+  const before = await page.locator(".replies-list article").count();
+  await page.getByRole("button", { name: "Send", exact: true }).tap();
+  await page.waitForFunction((count) => document.querySelectorAll(".replies-list article").length > count, before);
+
+  /* Exact phone sequence: the reply is sent, the keyboard goes down, then the
+     Comments back arrow is pressed. */
+  await page.evaluate(() => {
+    const node = document.querySelector('input[aria-label="Write a comment"]');
+    if (node instanceof HTMLInputElement) node.blur();
+  });
   await page.setViewportSize({ width, height });
   await settle(page);
 
-  const restored = await surfaceState(page);
-  assertRestoredNav(restored, width, "Comments -> Notes");
-  return { focused, restored };
+  const beforeBack = await state(page);
+  assert(beforeBack.comments?.parentIsShell, `${browserName}/${width}: Comments left shell before Back`);
+
+  await page.getByRole("button", { name: "Back to Notes", exact: true }).click();
+  await page.waitForFunction(() => !document.body.classList.contains("notverse-comments-open"));
+  await settle(page);
+
+  const restored = await state(page);
+  assert.equal(restored.comments, null, `${browserName}/${width}: Comments root survived Back`);
+  assertRestoredNav(restored, width, `${browserName}/${width}: Comments -> Notes`);
+
+  /* The first remembered-location tap must navigate immediately. */
+  await page.locator(".notverse-mobile-nav button").filter({ hasText: "Search" }).click();
+  await page.locator(".search-view").waitFor({ state: "visible" });
+  const afterFirstTap = await state(page);
+  assertRestoredNav(afterFirstTap, width, `${browserName}/${width}: first nav tap`);
+
+  return { keyboard, beforeBack, restored, afterFirstTap };
 }
 
-async function proveInbox(page, width, height, keyboardHeight) {
+async function proveInbox(page, width, height, keyboardHeight, browserName) {
   await page.locator(".notverse-mobile-nav button").filter({ hasText: "Inbox" }).click();
-  const firstThread = page.locator(".inbox-layout > aside button").first();
-  await firstThread.click();
+  await page.locator(".inbox-layout > aside button").first().click();
   const input = page.getByRole("textbox", { name: "Private message" });
   await input.tap();
   await input.fill("Inbox control keyboard proof");
   await page.setViewportSize({ width, height: keyboardHeight });
   await settle(page);
 
-  const focused = await surfaceState(page);
-  assertKeyboardOwner(focused, width, keyboardHeight, "Inbox keyboard");
+  const keyboard = await state(page);
+  assertKeyboardOwner(keyboard, width, keyboardHeight, `${browserName}/${width}: Inbox keyboard`);
 
-  await page.getByRole("button", { name: "Back to conversations", exact: true }).click();
+  await page.evaluate(() => {
+    const node = document.querySelector('input[aria-label="Private message"]');
+    if (node instanceof HTMLInputElement) node.blur();
+  });
   await page.setViewportSize({ width, height });
   await settle(page);
+  await page.getByRole("button", { name: "Back to conversations", exact: true }).click();
+  await settle(page);
 
-  const restored = await surfaceState(page);
-  assertRestoredNav(restored, width, "Inbox -> list");
-  return { focused, restored };
+  const restored = await state(page);
+  assertRestoredNav(restored, width, `${browserName}/${width}: Inbox -> list`);
+  return { keyboard, restored };
 }
 
 async function runCase(browserType, browserName, width, height, keyboardHeight) {
@@ -137,19 +183,17 @@ async function runCase(browserType, browserName, width, height, keyboardHeight) 
   const page = await context.newPage();
   try {
     await prepare(page);
-    const comments = await proveComments(page, width, height, keyboardHeight);
+    const comments = await proveComments(page, width, height, keyboardHeight, browserName);
 
     await prepare(page);
-    const inbox = await proveInbox(page, width, height, keyboardHeight);
+    const inbox = await proveInbox(page, width, height, keyboardHeight, browserName);
 
-    for (const key of ["position", "visibility", "pointerEvents"]) {
-      assert.equal(comments.focused.shell[key], inbox.focused.shell[key], `${browserName}/${width}: Comments/Inbox shell ${key} differs`);
-    }
-    assert(Math.abs(comments.focused.shell.height - inbox.focused.shell.height) <= 2, `${browserName}/${width}: keyboard shell heights differ`);
-    assert.equal(comments.focused.nav.display, inbox.focused.nav.display, `${browserName}/${width}: nav display lifecycle differs`);
-    assert.equal(comments.focused.nav.opacity, inbox.focused.nav.opacity, `${browserName}/${width}: nav opacity lifecycle differs`);
+    assert.equal(comments.keyboard.shell.position, inbox.keyboard.shell.position, `${browserName}/${width}: shell position lifecycle differs`);
+    assert(Math.abs(comments.keyboard.shell.height - inbox.keyboard.shell.height) <= 2, `${browserName}/${width}: keyboard shell heights differ`);
+    assert.equal(comments.keyboard.nav.display, inbox.keyboard.nav.display, `${browserName}/${width}: nav display lifecycle differs`);
+    assert.equal(comments.keyboard.nav.opacity, inbox.keyboard.nav.opacity, `${browserName}/${width}: nav opacity lifecycle differs`);
 
-    await page.screenshot({ path: `${out}/${browserName}-${width}-inbox-parity-restored.png`, fullPage: false });
+    await page.screenshot({ path: `${out}/${browserName}-${width}-inbox-control-restored.png`, fullPage: false });
     report.cases.push({ browserName, width, height, keyboardHeight, comments, inbox });
   } finally {
     await context.close();
@@ -173,4 +217,4 @@ if (!report.ok) {
   console.error(report.errors.join("\n"));
   process.exit(1);
 }
-console.log(`Comments/Inbox keyboard parity proof passed (${report.cases.length} cases).`);
+console.log(`Comments/Inbox DOM + keyboard parity proof passed (${report.cases.length} cases).`);
