@@ -11,8 +11,8 @@ export {};
  *
  * The old Comments Send pointer-down handler deliberately prevented focus from
  * leaving the input. Inbox does not do that. Stop only that pointer-down React
- * handler; the normal click still submits the reply, allowing WebKit to perform
- * the same focus lifecycle it uses for Inbox Send.
+ * handler at the Send button itself; the normal click still submits the reply
+ * and the browser keeps its native focus/keyboard behavior.
  */
 
 const mobile = window.matchMedia("(max-width: 760px)");
@@ -26,11 +26,28 @@ function notesHost(): HTMLElement | null {
   return document.querySelector<HTMLElement>(".main-shell.notverse-shell");
 }
 
+function neutraliseSendPointerDown(root: HTMLElement): void {
+  const button = root.querySelector<HTMLButtonElement>(".replies-drawer > form > button");
+  if (!button || button.dataset.notverseInboxParity === "true") return;
+
+  button.dataset.notverseInboxParity = "true";
+  button.addEventListener("pointerdown", (event) => {
+    /* Do not preventDefault: native focus/keyboard behavior must match Inbox.
+       Stop propagation so React's delegated onPointerDown submit handler does
+       not run. The existing onClick still performs the single submit. */
+    event.stopPropagation();
+  }, true);
+}
+
 function hostCommentsInsideApp(): void {
   if (!mobile.matches) return;
   const root = commentsRoot();
   const host = notesHost();
-  if (!root || !host || root.parentElement === host) return;
+  if (!root || !host) return;
+
+  neutraliseSendPointerDown(root);
+
+  if (root.parentElement === host) return;
   host.appendChild(root);
   root.dataset.notverseMobileHost = "main-shell";
   window.dispatchEvent(new Event("notverse:surface-state-changed"));
@@ -59,18 +76,6 @@ document.addEventListener("click", (event) => {
   if (!(target instanceof Element)) return;
   if (!target.closest(".mobile-comments-back, .comments-close-desktop")) return;
   restorePortalContainer();
-}, true);
-
-/* Inbox uses ordinary form submission. Prevent the Comments-only pointer-down
- * React handler from running, but do not prevent the browser's default pointer
- * behavior and do not block the subsequent click handler. */
-document.addEventListener("pointerdown", (event) => {
-  if (!mobile.matches) return;
-  const target = event.target;
-  if (!(target instanceof Element)) return;
-  const button = target.closest<HTMLButtonElement>(".replies-drawer > form > button");
-  if (!button) return;
-  event.stopPropagation();
 }, true);
 
 const observer = new MutationObserver(scheduleHost);
