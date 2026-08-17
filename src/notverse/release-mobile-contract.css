@@ -139,9 +139,9 @@
   }
 
   /*
-   * Match Inbox structurally while Comments is active. The existing main shell
-   * becomes the single visualViewport screen, and the mobile Comments portal is
-   * physically rehosted as its child by ios-keyboard-comments-return.ts.
+   * Comments now mirrors Inbox structurally: it is rendered inside the existing
+   * application tree, the same main shell owns visualViewport geometry, and no
+   * body portal or DOM reparenting participates in the keyboard lifecycle.
    */
   body.notverse-comments-open .main-shell.notverse-shell {
     position: fixed !important;
@@ -157,12 +157,26 @@
     padding: 0 !important;
     overflow: hidden !important;
     visibility: visible !important;
-    pointer-events: none !important;
+    pointer-events: auto !important;
     transform: none !important;
     background: #08080a !important;
   }
 
-  body.notverse-comments-open .main-shell.notverse-shell > .replies-backdrop[data-notverse-mobile-host="main-shell"] {
+  body.notverse-comments-open .notes-experience {
+    position: absolute !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-comments-open .main-shell.notverse-shell .replies-backdrop {
     position: absolute !important;
     inset: 0 !important;
     top: 0 !important;
@@ -196,7 +210,7 @@
     pointer-events: none !important;
   }
 
-  /* Comments and Inbox now share the same mounted, transparent, inert nav state
+  /* Comments and Inbox share the same mounted, transparent, inert nav state
      while the keyboard-capable screen owns the shell. */
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
   body.notverse-inbox-thread-open .mobile-nav.notverse-mobile-nav {
@@ -207,4 +221,4 @@
   }
 }
 
-/* Production deploy marker: 2026-08-17 Comments/Inbox DOM parity. */
+/* Production deploy marker: 2026-08-17 native in-tree Comments/Inbox parity. */
