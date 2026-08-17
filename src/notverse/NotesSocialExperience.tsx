@@ -152,7 +152,7 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
     {composerOpen && <NoteComposer displayName={displayName} avatar={avatar} libraryTitles={libraryTitles} noteFont={noteFont} onClose={() => setComposerOpen(false)} onPublish={publish} />}
     {filtersOpen && <NoteFilters typeFilter={typeFilter} showSpoilers={showSpoilers} onType={setTypeFilter} onSpoilers={setShowSpoilers} onClose={() => setFiltersOpen(false)} />}
     {optionsOpen && note && <NoteOptions note={note} reported={reportedIds.includes(note.id)} onClose={() => setOptionsOpen(false)} onShare={() => void share(note)} onCopy={() => void copyLink(note)} onSave={toggleSaved} onNotebook={() => addToNotebook(note)} onHide={() => hideNote(note)} onReport={() => reportNote(note)} />}
-    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={closeComments} onSend={submitReply} />, document.body)}
+    {repliesOpen && note && <RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={closeComments} onSend={submitReply} />}
     {activityOpen && createPortal(<ActivityPanel activities={activities} notes={notes} onClose={() => { setActivityOpen(false); window.history.replaceState(null, "", "#my-notes"); }} onOpenNote={openActivityNote} onMarkRead={() => setActivities((current) => current.map((item) => ({ ...item, unread: false })))} />, document.body)}
     {imageOpen && note?.image && <div className="note-image-viewer" onClick={() => setImageOpen(false)}><button type="button">×</button><img src={note.image.dataUrl} alt={note.image.name} /></div>}{toast && <div className="note-toast" role="status">{toast}</div>}
   </section>;
@@ -231,7 +231,7 @@ function RepliesDrawer({ note, replies, displayName, avatar, onClose, onSend }: 
       <form onSubmit={submit}>
         <span className="comment-composer-avatar">{avatar ? <img src={avatar} alt="" /> : (displayName || "R").slice(0, 1)}</span>
         <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a comment…" aria-label="Write a comment" />
-        <button type="button" onPointerDown={(event) => { event.preventDefault(); sendDraft(); }} onClick={sendDraft} disabled={!draft.trim()}>Send</button>
+        <button type="submit" disabled={!draft.trim()}>Send</button>
       </form>
     </section>
   </div>;
