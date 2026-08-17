@@ -77,9 +77,8 @@
 @media (max-width: 720px) {
   /*
    * Notes is a normal application screen, not a keyboard-following portal.
-   * Keep the entire Notes tree at a stable 100dvh while Comments owns the
-   * visual viewport. This removes the old --notverse-viewport-height/fixed
-   * coupling that Safari can leave in a stale state while the keyboard closes.
+   * Keep the entire Notes tree at a stable 100dvh until an interactive phone
+   * screen (Comments) takes ownership of the visual viewport.
    */
   body.notverse-notes-open #root,
   body.notverse-notes-open .readverse-app.notverse-app {
@@ -119,8 +118,7 @@
     transform: none !important;
   }
 
-  /* The Notes nav is part of that same stable screen. Do not hand it to
-     iOS' position:fixed bottom anchoring after a software-keyboard cycle. */
+  /* The normal Notes nav belongs to that stable app screen. */
   body.notverse-notes-open .mobile-nav.notverse-mobile-nav {
     position: absolute !important;
     top: auto !important;
@@ -131,22 +129,31 @@
   }
 
   /*
-   * Critical iOS keyboard rule: Comments is already an opaque, top-level phone
-   * surface. Never hide the underlying Notes shell with visibility:hidden.
-   * WebKit can restore hit-testing for that hidden subtree after keyboard focus
-   * without repainting its bottom navigation. Keep Notes and its nav painted
-   * behind Comments and disable interaction instead. When Comments closes there
-   * is therefore no hidden compositor subtree for Safari to reconstruct.
+   * Inbox is the proven iPhone keyboard path. Comments now copies its viewport
+   * ownership: while the keyboard-capable screen is open, the existing app
+   * shell follows visualViewport instead of leaving a stable Notes shell under
+   * an independently moving portal. This gives WebKit one application viewport
+   * transition to restore when Back closes the screen.
    */
-  body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell {
+  body.notverse-comments-open .main-shell.notverse-shell {
+    position: fixed !important;
+    top: var(--notverse-mobile-screen-top, 0px) !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    height: var(--notverse-mobile-screen-height, 100dvh) !important;
+    min-height: 0 !important;
+    max-height: var(--notverse-mobile-screen-height, 100dvh) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
     visibility: visible !important;
     pointer-events: none !important;
+    transform: none !important;
+    background: #08080a !important;
   }
 
-  /*
-   * Other mobile screens may still use the fixed navigation contract. Keep the
-   * layer mounted under portal screens, but never let it accept input there.
-   */
   .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     opacity: 1 !important;
@@ -156,7 +163,6 @@
   }
 
   body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
-  body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
   body.notverse-activity-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     opacity: 1 !important;
@@ -164,8 +170,10 @@
     pointer-events: none !important;
   }
 
-  /* Inbox conversation is not a portal above the nav, so keep its compositor
-     alive but make the layer transparent until Back restores the list screen. */
+  /* Comments and Inbox use the same nav compositor state while their keyboard
+     screens are active: mounted + transparent + inert. Back restores opacity
+     without destroying/recreating the nav layer. */
+  body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
   body.notverse-inbox-thread-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     opacity: 0 !important;
@@ -174,4 +182,4 @@
   }
 }
 
-/* Production deploy marker: 2026-08-17 iOS Comments keyboard paint retention. */
+/* Production deploy marker: Inbox-parity mobile keyboard ownership. */
