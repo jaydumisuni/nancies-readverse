@@ -1,0 +1,18 @@
+/*
+ * Final NoTVerse iPhone navigation paint authority.
+ *
+ * Visually proven in the mobile workspace at 360x640 and 390x844.
+ * Comments may cover the navigation and disable interaction, but it must never
+ * change the navigation layer's paint state. Safari therefore has nothing to
+ * restore after a comment input/keyboard cycle.
+ */
+
+@media (max-width: 720px) {
+  body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
+    display: grid !important;
+    position: fixed !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+}
