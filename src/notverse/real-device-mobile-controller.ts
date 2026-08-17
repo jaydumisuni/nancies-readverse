@@ -16,6 +16,9 @@ export {};
 const mobileViewport = window.matchMedia("(max-width: 760px)");
 const root = document.documentElement;
 const body = document.body;
+const iosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+root.classList.toggle("notverse-ios", iosDevice);
 
 const SURFACE_SELECTOR = [
   ".companion-panel.open",
