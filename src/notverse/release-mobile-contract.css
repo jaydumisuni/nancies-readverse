@@ -131,6 +131,19 @@
   }
 
   /*
+   * Critical iOS keyboard rule: Comments is already an opaque, top-level phone
+   * surface. Never hide the underlying Notes shell with visibility:hidden.
+   * WebKit can restore hit-testing for that hidden subtree after keyboard focus
+   * without repainting its bottom navigation. Keep Notes and its nav painted
+   * behind Comments and disable interaction instead. When Comments closes there
+   * is therefore no hidden compositor subtree for Safari to reconstruct.
+   */
+  body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell {
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+
+  /*
    * Other mobile screens may still use the fixed navigation contract. Keep the
    * layer mounted under portal screens, but never let it accept input there.
    */
