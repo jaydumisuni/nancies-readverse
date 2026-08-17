@@ -9,10 +9,11 @@ export {};
  * portal unmounts from its canonical container. This removes the separate body
  * compositor tree from the iOS keyboard cycle without changing desktop layout.
  *
- * The old Comments Send pointer-down handler deliberately prevented focus from
- * leaving the input. Inbox does not do that. Stop only that pointer-down React
- * handler at the Send button itself; the normal click still submits the reply
- * and the browser keeps its native focus/keyboard behavior.
+ * Comments also had a React onPointerDown handler that prevented the Send
+ * button from taking normal browser focus and submitted before the click.
+ * Inbox does not use that lifecycle. Intercept only that pointerdown at the
+ * document capture boundary, before React's delegated root listener sees it,
+ * without preventDefault. The native button focus/click then proceeds normally.
  */
 
 const mobile = window.matchMedia("(max-width: 760px)");
@@ -26,26 +27,11 @@ function notesHost(): HTMLElement | null {
   return document.querySelector<HTMLElement>(".main-shell.notverse-shell");
 }
 
-function neutraliseSendPointerDown(root: HTMLElement): void {
-  const button = root.querySelector<HTMLButtonElement>(".replies-drawer > form > button");
-  if (!button || button.dataset.notverseInboxParity === "true") return;
-
-  button.dataset.notverseInboxParity = "true";
-  button.addEventListener("pointerdown", (event) => {
-    /* Do not preventDefault: native focus/keyboard behavior must match Inbox.
-       Stop propagation so React's delegated onPointerDown submit handler does
-       not run. The existing onClick still performs the single submit. */
-    event.stopPropagation();
-  }, true);
-}
-
 function hostCommentsInsideApp(): void {
   if (!mobile.matches) return;
   const root = commentsRoot();
   const host = notesHost();
   if (!root || !host) return;
-
-  neutraliseSendPointerDown(root);
 
   if (root.parentElement === host) return;
   host.appendChild(root);
@@ -67,6 +53,17 @@ function scheduleHost(): void {
     hostCommentsInsideApp();
   });
 }
+
+/* React delegates pointer capture to the app root. Document capture runs first,
+ * so this blocks only the Comments-specific onPointerDown submit path while
+ * preserving the browser default that moves focus away from the text field. */
+document.addEventListener("pointerdown", (event) => {
+  if (!mobile.matches) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest(".replies-drawer > form > button")) return;
+  event.stopPropagation();
+}, true);
 
 /* Restore the portal to its React container synchronously before the existing
  * React onClick closes it. No wait/replay/visualViewport interception. */
@@ -91,4 +88,4 @@ window.addEventListener("notverse:surface-state-changed", scheduleHost);
 
 scheduleHost();
 
-/* Production deploy marker: 2026-08-17 structural Inbox parity. */
+/* Production deploy marker: 2026-08-17 Inbox Send/focus parity. */
