@@ -20,6 +20,7 @@ import "./notverse/mobile-native-screens.css";
 import "./notverse/real-device-mobile-controller";
 import "./notverse/ios-keyboard-comments-return";
 import "./notverse/release-mobile-contract.css";
+import "./notverse/workspace-mobile-visual-authority.css";
 import { registerReadVerseServiceWorker } from "./platform/storage";
 
 const root = document.getElementById("root");
