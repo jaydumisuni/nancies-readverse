@@ -4,8 +4,8 @@
  * Loaded after every legacy/mobile compatibility layer. These are deliberate
  * release-contract dimensions, not test-only styling: Comments must expose a
  * keyboard-safe 46px composer, Notes primary actions must remain visually
- * legible/tappable, and Safari must never destroy/recreate the fixed mobile
- * navigation compositor layer while a transient phone screen is open.
+ * legible/tappable, and normal Notes/navigation must not depend on Safari's
+ * keyboard-sensitive fixed-bottom viewport anchoring.
  */
 
 @media (max-width: 760px) {
@@ -76,20 +76,70 @@
 
 @media (max-width: 720px) {
   /*
-   * iOS/WebKit can keep the hit-test tree for a fixed backdrop-filter element
-   * while dropping its painted compositor layer after display:none -> grid.
-   * Never tear the mobile navigation layer down. Portal screens already cover
-   * it with a much higher z-index and the controller marks it inert/aria-hidden.
+   * Notes is a normal application screen, not a keyboard-following portal.
+   * Keep the entire Notes tree at a stable 100dvh while Comments owns the
+   * visual viewport. This removes the old --notverse-viewport-height/fixed
+   * coupling that Safari can leave in a stale state while the keyboard closes.
+   */
+  body.notverse-notes-open #root,
+  body.notverse-notes-open .readverse-app.notverse-app {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  body.notverse-notes-open .readverse-app.notverse-app {
+    position: relative !important;
+  }
+
+  body.notverse-notes-open .main-shell.notverse-shell {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  body.notverse-notes-open .notes-experience {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    transform: none !important;
+  }
+
+  /* The Notes nav is part of that same stable screen. Do not hand it to
+     iOS' position:fixed bottom anchoring after a software-keyboard cycle. */
+  body.notverse-notes-open .mobile-nav.notverse-mobile-nav {
+    position: absolute !important;
+    top: auto !important;
+    bottom: max(7px, env(safe-area-inset-bottom)) !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  /*
+   * Other mobile screens may still use the fixed navigation contract. Keep the
+   * layer mounted under portal screens, but never let it accept input there.
    */
   .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     opacity: 1 !important;
     visibility: visible !important;
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    transform: translate3d(0, 0, 0) !important;
     -webkit-backface-visibility: hidden !important;
     backface-visibility: hidden !important;
-    will-change: opacity, transform;
   }
 
   body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
