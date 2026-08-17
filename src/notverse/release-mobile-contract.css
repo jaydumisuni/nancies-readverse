@@ -76,10 +76,21 @@
 
 @media (max-width: 720px) {
   /*
-   * Notes is a normal application screen, not a keyboard-following portal.
-   * Keep the entire Notes tree at a stable 100dvh until an interactive phone
-   * screen (Comments) takes ownership of the visual viewport.
+   * Inbox never turns the document body into a fixed keyboard surface. Remove
+   * that legacy Notes behaviour here too. Notes remains a stable app screen;
+   * the active keyboard-capable child screen owns visualViewport geometry.
    */
+  body.notverse-notes-open:not(.notverse-chat-open) {
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
   body.notverse-notes-open #root,
   body.notverse-notes-open .readverse-app.notverse-app {
     width: 100% !important;
@@ -118,7 +129,6 @@
     transform: none !important;
   }
 
-  /* The normal Notes nav belongs to that stable app screen. */
   body.notverse-notes-open .mobile-nav.notverse-mobile-nav {
     position: absolute !important;
     top: auto !important;
@@ -129,11 +139,9 @@
   }
 
   /*
-   * Inbox is the proven iPhone keyboard path. Comments now copies its viewport
-   * ownership: while the keyboard-capable screen is open, the existing app
-   * shell follows visualViewport instead of leaving a stable Notes shell under
-   * an independently moving portal. This gives WebKit one application viewport
-   * transition to restore when Back closes the screen.
+   * Match Inbox structurally while Comments is active. The existing main shell
+   * becomes the single visualViewport screen, and the mobile Comments portal is
+   * physically rehosted as its child by ios-keyboard-comments-return.ts.
    */
   body.notverse-comments-open .main-shell.notverse-shell {
     position: fixed !important;
@@ -154,6 +162,24 @@
     background: #08080a !important;
   }
 
+  body.notverse-comments-open .main-shell.notverse-shell > .replies-backdrop[data-notverse-mobile-host="main-shell"] {
+    position: absolute !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    pointer-events: auto !important;
+    transform: none !important;
+  }
+
   .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     opacity: 1 !important;
@@ -170,9 +196,8 @@
     pointer-events: none !important;
   }
 
-  /* Comments and Inbox use the same nav compositor state while their keyboard
-     screens are active: mounted + transparent + inert. Back restores opacity
-     without destroying/recreating the nav layer. */
+  /* Comments and Inbox now share the same mounted, transparent, inert nav state
+     while the keyboard-capable screen owns the shell. */
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
   body.notverse-inbox-thread-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
@@ -182,4 +207,4 @@
   }
 }
 
-/* Production deploy marker: 2026-08-17 Comments/Inbox keyboard parity. */
+/* Production deploy marker: 2026-08-17 Comments/Inbox DOM parity. */
