@@ -40,11 +40,17 @@ function updateRestingViewportHeight(): void {
   if (!viewport || !mobile.matches) return;
   const input = commentsInput();
   const textControlFocused = Boolean(activeTextControl());
+
+  /* Keyboard recovery is not monotonic on iOS: WebKit may publish one or more
+     intermediate heights before the visual viewport returns to its real resting
+     size. Never lower the baseline during that animation. A smaller value could
+     make Back release the Comments portal several paint frames too early. */
   if (!input && !textControlFocused) {
     restingViewportHeight = Math.max(restingViewportHeight, viewport.height);
     return;
   }
-  if (!keyboardLikelyVisible() && !textControlFocused) {
+
+  if (!textControlFocused && viewport.height > restingViewportHeight) {
     restingViewportHeight = viewport.height;
   }
 }
