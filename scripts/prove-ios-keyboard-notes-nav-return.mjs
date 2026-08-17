@@ -87,16 +87,20 @@ async function runCase(browserType, browserName, width, height, keyboardHeight) 
     await page.waitForFunction((count) => document.querySelectorAll(".replies-list article").length > count, beforeCount);
     assert.equal(await input.evaluate((node) => document.activeElement === node), true, `${browserName}/${width}: Send unexpectedly removed focus; proof no longer models iPhone path`);
 
-    /* Model the user's exact sequence: the keyboard is dismissed, then Back is
-       pressed as the visual viewport returns to full height. */
-    await input.evaluate((node) => node.blur());
-    await page.setViewportSize({ width, height });
+    /* Exact phone failure sequence: Back is tapped while the software keyboard
+       is still visible. The old implementation revealed Notes immediately and
+       let Safari finish keyboard recovery over the Notes/fixed-nav layers. */
     await page.getByRole("button", { name: "Back to Notes", exact: true }).click();
+    await page.waitForTimeout(70);
+    assert.equal(await page.locator("body.notverse-comments-open").count(), 1, `${browserName}/${width}: Comments closed before keyboard viewport recovered`);
+    assert.equal(await input.evaluate((node) => document.activeElement === node), false, `${browserName}/${width}: Back did not release comment input focus`);
+
+    /* Model the keyboard finishing its close animation only after the Back tap. */
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(() => !document.body.classList.contains("notverse-comments-open"), null, { timeout: 1200 });
     await settle(page);
 
-    assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}/${width}: Comments state survived Back`);
-    assert.equal(await page.locator("body.notverse-notes-open").count(), 1, `${browserName}/${width}: Notes state missing after Back`);
-
+    assert.equal(await page.locator("body.notverse-notes-open").count(), 1, `${browserName}/${width}: Notes state missing after recovered Back`);
     const restored = await navState(nav);
     assert.equal(restored.position, "absolute", `${browserName}/${width}: restored Notes nav fell back to position:fixed`);
     assertPainted(restored, width, height, `${browserName}/${width}: keyboard -> Back`);
