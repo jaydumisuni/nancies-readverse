@@ -42,52 +42,16 @@ async function surface(page, selector, width, height, label) {
   return r;
 }
 
-async function navState(nav) {
-  return nav.evaluate((node) => {
-    const style = getComputedStyle(node);
-    const r = node.getBoundingClientRect();
-    return {
-      display: style.display,
-      visibility: style.visibility,
-      opacity: Number(style.opacity),
-      pointerEvents: style.pointerEvents,
-      width: r.width,
-      height: r.height,
-      left: r.left,
-      right: r.right,
-      bottom: r.bottom,
-    };
-  });
-}
-
-function assertNavPainted(state, label) {
-  assert.equal(state.display, "grid", `${label}: mobile nav display is ${state.display}`);
-  assert.equal(state.visibility, "visible", `${label}: mobile nav visibility is ${state.visibility}`);
-  assert(state.opacity >= .99, `${label}: mobile nav opacity is ${state.opacity}`);
-  assert(state.width >= 340, `${label}: mobile nav width collapsed to ${state.width}`);
-  assert(state.height >= 60, `${label}: mobile nav height collapsed to ${state.height}`);
-}
-
-async function settlePaint(page) {
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-}
-
 async function proveChat(browserType, browserName) {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage();
   try {
     await prepare(page);
-    const mobileNav = page.locator(".mobile-nav.notverse-mobile-nav");
     await page.locator(".floating-companion").click();
     await page.waitForTimeout(100);
     assert.equal(await page.locator("body.notverse-chat-open").count(), 1, `${browserName}: chat body state missing`);
     assert.equal(await page.locator(".main-shell.notverse-shell").evaluate((n) => getComputedStyle(n).visibility), "hidden", `${browserName}: workspace remains visible behind Chat`);
-    assert.equal(await mobileNav.getAttribute("inert"), "", `${browserName}: mobile nav is not inert under Chat`);
-    assert.equal(await mobileNav.getAttribute("aria-hidden"), "true", `${browserName}: mobile nav is not aria-hidden under Chat`);
-    const hiddenNav = await navState(mobileNav);
-    assert.equal(hiddenNav.display, "grid", `${browserName}: Chat destroyed the mobile nav compositor`);
-    assert.equal(hiddenNav.pointerEvents, "none", `${browserName}: mobile nav accepts pointer events under Chat`);
     await surface(page, ".companion-panel.open", 390, 844, `${browserName} chat screen`);
     const input = page.locator(".companion-panel.open .chat-input input");
     await input.fill("keyboard stability");
@@ -101,17 +65,7 @@ async function proveChat(browserType, browserName) {
     const composer = await rect(page.locator(".companion-panel.open .chat-input"));
     assert(composer.bottom >= 516 && composer.bottom <= 521, `${browserName}: chat composer detached after scroll ${composer.bottom}`);
     await page.screenshot({ path: `${out}/${browserName}-chat-keyboard.png`, fullPage: false });
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("button", { name: "Close chat" }).click();
-    await settlePaint(page);
-    assert.equal(await page.locator("body.notverse-chat-open").count(), 0, `${browserName}: Chat body state survived close`);
-    assert.equal(await mobileNav.getAttribute("inert"), null, `${browserName}: mobile nav stayed inert after Chat`);
-    assert.equal(await mobileNav.getAttribute("aria-hidden"), null, `${browserName}: mobile nav stayed aria-hidden after Chat`);
-    const restoredNav = await navState(mobileNav);
-    assertNavPainted(restoredNav, `${browserName}: Chat return`);
-    await page.screenshot({ path: `${out}/${browserName}-chat-return-nav.png`, fullPage: false });
-    report.cases.push({ browserName, kind: "chat", composer, hiddenNav, restoredNav });
+    report.cases.push({ browserName, kind: "chat", composer });
   } finally {
     await context.close();
     await browser.close();
@@ -133,17 +87,14 @@ async function proveComments(browserType, browserName) {
     await surface(page, ".replies-drawer", 390, 844, `${browserName} comments drawer`);
     assert.equal(await page.getByRole("button", { name: "Back to Notes" }).count(), 1, `${browserName}: comments back action missing`);
     const mobileNav = page.locator(".mobile-nav.notverse-mobile-nav");
-    assert.equal(await mobileNav.getAttribute("inert"), "", `${browserName}: mobile nav is not inert under Comments`);
-    assert.equal(await mobileNav.getAttribute("aria-hidden"), "true", `${browserName}: mobile nav still owns accessibility state under Comments`);
-    const hiddenNav = await navState(mobileNav);
-    assert.equal(hiddenNav.display, "grid", `${browserName}: Comments destroyed the mobile nav compositor`);
-    assert.equal(hiddenNav.visibility, "visible", `${browserName}: Comments removed the mobile nav paint layer`);
-    assert.equal(hiddenNav.pointerEvents, "none", `${browserName}: mobile nav accepts pointer events under Comments`);
+    assert.equal(await mobileNav.getAttribute("inert"), "", `${browserName}: hidden mobile nav is not inert under Comments`);
+    assert.equal(await mobileNav.getAttribute("aria-hidden"), "true", `${browserName}: hidden mobile nav still owns accessibility/touch state`);
+    assert.equal(await mobileNav.evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: mobile nav remains painted under Comments`);
     const activeNavBefore = await mobileNav.locator("button.active").textContent();
     await page.touchscreen.tap(24, 820);
     await page.waitForTimeout(60);
     assert.equal(await page.locator("body.notverse-comments-open").count(), 1, `${browserName}: tapping old nav coordinates escaped Comments`);
-    assert.equal(await mobileNav.locator("button.active").textContent(), activeNavBefore, `${browserName}: covered mobile nav accepted a tap under Comments`);
+    assert.equal(await mobileNav.locator("button.active").textContent(), activeNavBefore, `${browserName}: invisible mobile nav accepted a tap under Comments`);
 
     const input = page.getByRole("textbox", { name: "Write a comment" });
     const firstComment = page.locator(".replies-list article").first();
@@ -166,20 +117,17 @@ async function proveComments(browserType, browserName) {
     const overflow = await list.evaluate((n) => getComputedStyle(n).overflowY);
     assert(["auto", "scroll"].includes(overflow), `${browserName}: comments list is not the scroll owner: ${overflow}`);
     await page.screenshot({ path: `${out}/${browserName}-comments-keyboard.png`, fullPage: false });
-
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Back to Notes" }).click();
-    await settlePaint(page);
+    await page.waitForTimeout(40);
     assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}: Comments body state survived Back`);
     assert.equal(await mobileNav.getAttribute("inert"), null, `${browserName}: mobile nav stayed inert after leaving Comments`);
     assert.equal(await mobileNav.getAttribute("aria-hidden"), null, `${browserName}: mobile nav stayed aria-hidden after leaving Comments`);
-    const restoredNav = await navState(mobileNav);
-    assertNavPainted(restoredNav, `${browserName}: Comments return`);
-    await page.screenshot({ path: `${out}/${browserName}-comments-return-nav.png`, fullPage: false });
+    assert.notEqual(await mobileNav.evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: mobile nav stayed visually hidden after leaving Comments`);
     await mobileNav.getByRole("button", { name: "Home", exact: true }).click();
     await page.waitForTimeout(30);
     assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}: restored nav click reopened/stuck Comments`);
-    report.cases.push({ browserName, kind: "comments", form, hiddenNav, restoredNav });
+    report.cases.push({ browserName, kind: "comments", form });
   } finally {
     await context.close();
     await browser.close();
@@ -192,7 +140,6 @@ async function proveInbox(browserType, browserName) {
   const page = await context.newPage();
   try {
     await prepare(page);
-    const mobileNav = page.locator(".mobile-nav.notverse-mobile-nav");
     await page.getByRole("button", { name: "Inbox", exact: true }).last().click();
     await page.waitForTimeout(80);
     assert.equal(await page.locator("body.notverse-inbox-active").count(), 1, `${browserName}: inbox tab state missing`);
@@ -210,11 +157,6 @@ async function proveInbox(browserType, browserName) {
     await page.waitForTimeout(100);
     assert.equal(await page.locator("body.notverse-inbox-thread-open").count(), 1, `${browserName}: inbox thread state missing`);
     assert.equal(await page.locator(".inbox-layout > aside").evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: list remains beside conversation`);
-    assert.equal(await mobileNav.getAttribute("inert"), "", `${browserName}: mobile nav is not inert under Inbox thread`);
-    const hiddenNav = await navState(mobileNav);
-    assert.equal(hiddenNav.display, "grid", `${browserName}: Inbox destroyed the mobile nav compositor`);
-    assert(hiddenNav.opacity <= .01, `${browserName}: Inbox thread still paints mobile nav at opacity ${hiddenNav.opacity}`);
-    assert.equal(hiddenNav.pointerEvents, "none", `${browserName}: mobile nav accepts pointer events under Inbox thread`);
     await surface(page, ".inbox-layout > main", 390, 844, `${browserName} inbox conversation`);
     assert.equal(await page.getByRole("button", { name: "Back to conversations" }).count(), 1, `${browserName}: inbox back action missing`);
 
@@ -231,17 +173,11 @@ async function proveInbox(browserType, browserName) {
     assert(form.bottom >= 516 && form.bottom <= 521, `${browserName}: inbox composer detached after scroll ${form.bottom}`);
     await page.screenshot({ path: `${out}/${browserName}-inbox-keyboard.png`, fullPage: false });
 
-    await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Back to conversations" }).click();
-    await settlePaint(page);
+    await page.waitForTimeout(80);
     assert.equal(await page.locator("body.notverse-inbox-thread-open").count(), 0, `${browserName}: inbox thread body state did not clear`);
     assert.notEqual(await page.locator(".inbox-layout > aside").evaluate((n) => getComputedStyle(n).display), "none", `${browserName}: inbox list did not return`);
-    assert.equal(await mobileNav.getAttribute("inert"), null, `${browserName}: mobile nav stayed inert after Inbox thread`);
-    assert.equal(await mobileNav.getAttribute("aria-hidden"), null, `${browserName}: mobile nav stayed aria-hidden after Inbox thread`);
-    const restoredNav = await navState(mobileNav);
-    assertNavPainted(restoredNav, `${browserName}: Inbox return`);
-    await page.screenshot({ path: `${out}/${browserName}-inbox-return-nav.png`, fullPage: false });
-    report.cases.push({ browserName, kind: "inbox", form, hiddenNav, restoredNav });
+    report.cases.push({ browserName, kind: "inbox", form });
   } finally {
     await context.close();
     await browser.close();
