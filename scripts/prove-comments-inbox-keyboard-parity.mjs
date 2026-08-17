@@ -32,6 +32,7 @@ async function state(page) {
     const shell = document.querySelector(".main-shell.notverse-shell");
     const nav = document.querySelector(".mobile-nav.notverse-mobile-nav");
     const comments = document.querySelector(".replies-backdrop");
+    const send = document.querySelector(".replies-drawer > form > button");
     if (!(shell instanceof HTMLElement) || !(nav instanceof HTMLElement)) throw new Error("mobile shell/nav missing");
     const shellStyle = getComputedStyle(shell);
     const navStyle = getComputedStyle(nav);
@@ -57,12 +58,14 @@ async function state(page) {
         height: navBox.height,
       },
       comments: comments instanceof HTMLElement ? {
-        parentIsShell: comments.parentElement === shell,
+        insideShell: shell.contains(comments),
+        parentIsBody: comments.parentElement === document.body,
         mobileHost: comments.dataset.notverseMobileHost || "",
         position: getComputedStyle(comments).position,
         width: comments.getBoundingClientRect().width,
         height: comments.getBoundingClientRect().height,
       } : null,
+      sendType: send instanceof HTMLButtonElement ? send.type : "",
       bodyClasses: [...document.body.classList],
     };
   });
@@ -112,18 +115,19 @@ async function proveComments(page, width, height, keyboardHeight, browserName) {
   const keyboard = await state(page);
   assertKeyboardOwner(keyboard, width, keyboardHeight, `${browserName}/${width}: Comments keyboard`);
   assert(keyboard.comments, `${browserName}/${width}: Comments root missing`);
-  assert.equal(keyboard.comments.parentIsShell, true, `${browserName}/${width}: Comments is still hosted outside main shell`);
-  assert.equal(keyboard.comments.mobileHost, "main-shell", `${browserName}/${width}: Comments host marker missing`);
+  assert.equal(keyboard.comments.insideShell, true, `${browserName}/${width}: Comments is outside the main app shell`);
+  assert.equal(keyboard.comments.parentIsBody, false, `${browserName}/${width}: Comments regressed to a body portal`);
+  assert.equal(keyboard.comments.mobileHost, "", `${browserName}/${width}: obsolete DOM rehost marker returned`);
   assert.equal(keyboard.comments.position, "absolute", `${browserName}/${width}: Comments child is not shell-relative`);
   assert(Math.abs(keyboard.comments.width - width) <= 1, `${browserName}/${width}: Comments width mismatch`);
   assert(Math.abs(keyboard.comments.height - keyboardHeight) <= 2, `${browserName}/${width}: Comments height mismatch`);
+  assert.equal(keyboard.sendType, "submit", `${browserName}/${width}: Comments Send is not native form submission`);
 
   const before = await page.locator(".replies-list article").count();
   await page.getByRole("button", { name: "Send", exact: true }).tap();
   await page.waitForFunction((count) => document.querySelectorAll(".replies-list article").length > count, before);
 
-  /* Exact phone sequence: the reply is sent, the keyboard goes down, then the
-     Comments back arrow is pressed. */
+  /* Exact phone sequence: reply is sent, keyboard goes down, then Back. */
   await page.evaluate(() => {
     const node = document.querySelector('input[aria-label="Write a comment"]');
     if (node instanceof HTMLInputElement) node.blur();
@@ -132,7 +136,7 @@ async function proveComments(page, width, height, keyboardHeight, browserName) {
   await settle(page);
 
   const beforeBack = await state(page);
-  assert(beforeBack.comments?.parentIsShell, `${browserName}/${width}: Comments left shell before Back`);
+  assert(beforeBack.comments?.insideShell, `${browserName}/${width}: Comments left app tree before Back`);
 
   await page.getByRole("button", { name: "Back to Notes", exact: true }).click();
   await page.waitForFunction(() => !document.body.classList.contains("notverse-comments-open"));
@@ -217,4 +221,4 @@ if (!report.ok) {
   console.error(report.errors.join("\n"));
   process.exit(1);
 }
-console.log(`Comments/Inbox DOM + keyboard parity proof passed (${report.cases.length} cases).`);
+console.log(`Comments/Inbox native DOM + keyboard parity proof passed (${report.cases.length} cases).`);
