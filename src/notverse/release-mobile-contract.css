@@ -4,8 +4,8 @@
  * Loaded after every legacy/mobile compatibility layer. These are deliberate
  * release-contract dimensions, not test-only styling: Comments must expose a
  * keyboard-safe 46px composer, Notes primary actions must remain visually
- * legible/tappable, and normal Notes/navigation must not depend on Safari's
- * keyboard-sensitive fixed-bottom viewport anchoring.
+ * legible/tappable, and Notes must keep the same fixed mobile-navigation
+ * lifecycle already proven by Inbox across keyboard focus and return.
  */
 
 @media (max-width: 760px) {
@@ -129,10 +129,20 @@
     transform: none !important;
   }
 
+  /*
+   * Do not switch the navigation to an absolute child of the Notes app shell.
+   * Inbox keeps this same navigation fixed before, during and after its keyboard
+   * thread lifecycle. Keeping the positioning model constant prevents Safari
+   * from having to reconstruct the nav paint layer after Comments releases the
+   * visual viewport.
+   */
   body.notverse-notes-open .mobile-nav.notverse-mobile-nav {
-    position: absolute !important;
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
     top: auto !important;
     bottom: max(7px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
     -webkit-transform: none !important;
     transform: none !important;
     will-change: auto !important;
@@ -225,4 +235,4 @@
   }
 }
 
-/* Production deploy marker: 2026-08-17 native in-tree Comments/Inbox parity · cascade authority corrected. */
+/* Production deploy marker: 2026-08-17 native Comments/Inbox parity · fixed nav lifecycle. */
