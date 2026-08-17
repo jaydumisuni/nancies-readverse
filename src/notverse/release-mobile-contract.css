@@ -5,6 +5,7 @@
  * release-contract dimensions, not test-only styling: Comments must expose a
  * keyboard-safe 46px composer and Notes primary actions must remain visually
  * legible/tappable at the narrowest supported phone widths.
+ * Universal mobile contract activation: PHARR production source.
  */
 
 @media (max-width: 760px) {
