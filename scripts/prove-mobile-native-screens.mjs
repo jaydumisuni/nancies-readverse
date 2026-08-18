@@ -11,6 +11,8 @@ assert.match(commentsSource, /function replyTo\(author: string\)[\s\S]*?input\?\
 assert.doesNotMatch(commentsSource, /requestAnimationFrame\(\(\) => inputRef\.current\?\.focus\(\)\)/u, "Reply focus must not be deferred out of the user gesture");
 assert.doesNotMatch(commentsSource, /createPortal\s*\(\s*<RepliesDrawer/u, "Comments must stay in the app tree");
 assert.match(commentsSource, /<button\s+type="submit"\s+disabled=\{!draft\.trim\(\)\}>Send<\/button>/u, "Comments Send must be native form submission");
+assert.match(commentsSource, /target\.closest\("button,input,textarea,select,label,a,\.replies-backdrop"\)/u, "Comments pointerdown must be excluded from Notes swipe gestures");
+assert.match(commentsSource, /function pointerUp[\s\S]*?target\.closest\("\.replies-backdrop"\)/u, "Comments pointerup must be excluded from Notes swipe gestures");
 
 function preferences() {
   localStorage.setItem("notverse.preferences", JSON.stringify({
@@ -184,9 +186,11 @@ async function proveComments(browserType, browserName) {
     await page.screenshot({ path: `${out}/${browserName}-comments-return-nav.png`, fullPage: false });
 
     /* The first remembered-location tap must navigate immediately. */
-    await mobileNav.getByRole("button", { name: "Home", exact: true }).click();
+    const homeButton = mobileNav.getByRole("button", { name: "Home", exact: true });
+    await homeButton.click();
     await page.waitForTimeout(30);
     assert.equal(await page.locator("body.notverse-comments-open").count(), 0, `${browserName}: first nav tap reopened/stuck Comments`);
+    assert.equal(await homeButton.evaluate((node) => node.classList.contains("active")), true, `${browserName}: first restored nav tap did not activate Home`);
     report.cases.push({ browserName, kind: "comments", form, coveredNav, beforeBackNav, restoredNav, paperColor, activityButton });
   } finally {
     await context.close();
