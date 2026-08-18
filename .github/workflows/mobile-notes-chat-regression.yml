@@ -16,6 +16,7 @@ on:
       - "scripts/prove-notes-social-loop.mjs"
       - "scripts/prove-companion-runtime.mjs"
       - "scripts/diagnose-webkit-chat-viewport.mjs"
+      - "scripts/prove-live-notverse-deployment.mjs"
       - "package.json"
       - "wrangler.jsonc"
       - ".github/workflows/mobile-notes-chat-regression.yml"
@@ -81,6 +82,9 @@ jobs:
       - name: Prove recommendation request is not misrouted
         run: node scripts/prove-companion-runtime.mjs
 
+      - name: Prove public deployment matches canonical build
+        run: node scripts/prove-live-notverse-deployment.mjs
+
       - name: Preserve logs
         if: always()
         run: |
@@ -100,5 +104,6 @@ jobs:
             engineering-evidence/mobile-touch-targets
             engineering-evidence/notes-social-completion
             engineering-evidence/webkit-chat-diagnose
+            engineering-evidence/live-deployment
           if-no-files-found: error
           retention-days: 14
