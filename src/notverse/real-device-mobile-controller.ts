@@ -1,11 +1,13 @@
 export {};
 
 /*
- * Single mobile viewport/state authority.
+ * Single viewport/state authority.
  *
- * CSS owns geometry. This controller publishes visualViewport metrics and the
- * compatibility state classes consumed by old and new CSS layers. It never
- * transforms surfaces, fixes body scroll position, or chases keyboard offsets.
+ * CSS owns geometry. On phones this controller publishes visualViewport metrics
+ * and all mobile surface classes. Above the phone breakpoint it preserves only
+ * the legacy root Chat/Notes compatibility classes that adaptive desktop CSS
+ * consumes; body-level mobile locks are always cleared. It never transforms
+ * surfaces, fixes body scroll position, or chases keyboard offsets.
  * Conversation scroll ownership lives in conversation-scroll.ts.
  */
 
@@ -94,18 +96,30 @@ function toggleState(className: typeof STATE_CLASSES[number], active: boolean) {
   root.classList.toggle(className, active);
 }
 
-function clearState() {
-  for (const className of STATE_CLASSES) {
-    body.classList.remove(className);
-    root.classList.remove(className);
-  }
+function syncDesktopCompatibilityState() {
+  const chatOpen = Boolean(document.querySelector(".companion-panel.open"));
+  const notesOpen = Boolean(document.querySelector(".notes-experience"));
+
+  /* The pre-consolidation runtime left these two compatibility states on the
+     root at desktop widths while the mobile controller removed body locks. Keep
+     that effective contract without retaining two JS state publishers. */
+  for (const className of STATE_CLASSES) body.classList.remove(className);
+  root.classList.toggle("notverse-chat-open", chatOpen);
+  root.classList.toggle("notverse-notes-open", notesOpen);
+  for (const className of [
+    "notverse-comments-open",
+    "notverse-replies-open",
+    "notverse-activity-open",
+    "notverse-mobile-surface-open",
+  ] as const) root.classList.remove(className);
+
+  setMobileNavBlocked(false);
+  clearViewportMetrics();
 }
 
 function syncSurfaceState() {
   if (!mobileViewport.matches) {
-    clearState();
-    setMobileNavBlocked(false);
-    publishViewport();
+    syncDesktopCompatibilityState();
     return;
   }
 
