@@ -1,5 +1,6 @@
-/* Final adaptive geometry overrides. Imported last so approved visual styling is
-   preserved while interaction surfaces fit the real visual viewport. */
+/* Adaptive compatibility geometry.
+   Imported before the native-screen base and real-device finalizer. These rules
+   preserve established Chat/Notes sizing but do not own final mobile geometry. */
 
 html.notverse-chat-open,
 body.notverse-chat-open,
