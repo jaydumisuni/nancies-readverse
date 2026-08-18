@@ -1,4 +1,4 @@
-/* Final presentation safeguards derived from the approved NoTVerse setup and Notes visuals. */
+/* Base presentation safeguards derived from the approved NoTVerse setup and Notes visuals. */
 html:has(.notverse-setup),
 body:has(.notverse-setup) {
   height: 100%;
@@ -96,7 +96,10 @@ body:has(.notverse-setup) {
   overflow: auto;
 }
 
-body:has(.note-modal-backdrop) .notverse-mobile-nav,
+/* Composer/filter/options modals may remove the mobile nav. Comments is
+   deliberately excluded: its fixed nav compositor must remain mounted and is
+   made inert by the single mobile controller instead. */
+body:has(.note-modal-backdrop:not(.replies-backdrop)) .notverse-mobile-nav,
 body:has(.note-modal-backdrop) .floating-companion {
   display: none !important;
 }
