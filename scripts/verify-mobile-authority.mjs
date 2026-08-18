@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 
 const main = await readFile("src/main.tsx", "utf8");
 const notes = await readFile("src/notverse/NotesSocialExperience.tsx", "utf8");
 const release = await readFile("src/notverse/release-mobile-contract.css", "utf8");
 const native = await readFile("src/notverse/mobile-native-screens.css", "utf8");
+const adaptive = await readFile("src/notverse/adaptive-interaction-fix.css", "utf8");
 const finalizer = await readFile("src/notverse/real-device-mobile-final.css", "utf8");
 const controller = await readFile("src/notverse/real-device-mobile-controller.ts", "utf8");
 const runtime = await readFile("src/notverse/runtime-interaction-fix.ts", "utf8");
@@ -19,16 +20,27 @@ function order(source, first, second, label) {
   assert(a < b, `${label}: ${first} must load before ${second}`);
 }
 
+async function assertMissing(path, label) {
+  await assert.rejects(access(path), undefined, `${label}: ${path} must remain removed`);
+}
+
 /* Cascade authority: compatibility/native first, finalizer next, release contract last. */
+order(main, 'import "./notverse/adaptive-interaction-fix.css"', 'import "./notverse/mobile-native-screens.css"', "mobile CSS authority");
 order(main, 'import "./notverse/mobile-native-screens.css"', 'import "./notverse/real-device-mobile-final.css"', "mobile CSS authority");
 order(main, 'import "./notverse/real-device-mobile-final.css"', 'import "./notverse/release-mobile-contract.css"', "mobile CSS authority");
-assert(finalizer.includes("Final mobile surface contract"), "real-device finalizer lost its authority marker");
+assert(adaptive.includes("Adaptive compatibility geometry"), "adaptive layer must identify itself as compatibility geometry");
+assert(finalizer.includes("Real-device mobile finalizer"), "real-device finalizer lost its authority marker");
 assert(native.includes("notverse-comments-open"), "native screen base is missing Comments geometry");
+assert(!main.includes("focused-inbox-viewport"), "dead focused Inbox viewport layer must not be imported");
+assert(!main.includes("ios-visual-viewport-recovery"), "superseded iOS viewport recovery must not be imported");
 
 /* JS ownership: one controller publishes viewport/state, one module owns scroll. */
 assert(controller.includes('root.style.setProperty("--notverse-mobile-vv-height"'), "real-device controller must publish the current viewport metric");
 assert(controller.includes('root.style.setProperty("--notverse-viewport-height"'), "real-device controller must publish the legacy viewport metric from the same measurement");
-assert(controller.includes('toggleState("notverse-notes-open", notesOpen)'), "real-device controller must own Notes compatibility state");
+assert(controller.includes('toggleState("notverse-notes-open", notesOpen)'), "real-device controller must own Notes mobile compatibility state");
+assert(controller.includes("syncDesktopCompatibilityState"), "single controller must preserve desktop compatibility state");
+assert(controller.includes('root.classList.toggle("notverse-chat-open", chatOpen)'), "desktop Chat compatibility must remain root-owned");
+assert(!controller.includes("notverse-scroll-lock"), "single controller must not restore fixed-body scroll locking");
 assert(!runtime.includes("--notverse-viewport-height"), "runtime enhancer must not publish viewport geometry");
 assert(!runtime.includes("notverse-scroll-lock"), "runtime enhancer must not own body scroll locking");
 assert(!runtime.includes("pinConversationEnd"), "runtime enhancer must not duplicate conversation scroll ownership");
@@ -41,6 +53,8 @@ assert(!/createPortal\s*\(\s*<RepliesDrawer/.test(notes), "Comments must not por
 assert(/\{repliesOpen\s*&&\s*note\s*&&\s*<RepliesDrawer/.test(notes), "Comments must render RepliesDrawer in the app tree");
 assert(/<form\s+onSubmit=\{submit\}>[\s\S]*?<button\s+type="submit"[^>]*>Send<\/button>/.test(notes), "Comments Send must use native form submission");
 assert(!/onPointerDown=\{[^}]*sendDraft/.test(notes), "Comments Send must not submit from pointerdown");
+assert(notes.includes('target.closest("button,input,textarea,select,label,a,.replies-backdrop")'), "Comments pointerdown must not reach Notes swipe ownership");
+assert(/function pointerUp[\s\S]*?target\.closest\("\.replies-backdrop"\)/.test(notes), "Comments pointerup must not reach Notes swipe ownership");
 
 /* Single ownership: the native base may size the Comments screen, but it must not
    tear down the app shell or fixed nav that Comments now shares with Notes. */
@@ -54,5 +68,12 @@ assert(/body\.notverse-comments-open \.mobile-nav\.notverse-mobile-nav\s*\{[\s\S
    component color while the document must not globally force dark color-scheme. */
 assert(!/<meta\s+name="color-scheme"\s+content="dark"\s*\/?\s*>/i.test(index), "document-wide dark color-scheme conflicts with white Note paper");
 assert(/\.notes-social-experience \.note-paper\s*\{[\s\S]*?color-scheme:\s*(?:light only|only light)\s*!important;[\s\S]*?background-color:\s*#fff\s*!important;/.test(release), "mobile Note paper must own a light-only white surface");
+
+/* Superseded implementations are history, not alternative runtime owners. */
+await assertMissing("src/notverse/replies-enter-submit.ts", "duplicate Comments submit owner");
+await assertMissing("src/notverse/focused-inbox-viewport.css", "unreachable Inbox keyboard CSS");
+await assertMissing("src/notverse/ios-visual-viewport-recovery.ts", "duplicate viewport controller");
+await assertMissing("src/notverse/ios-visual-viewport-recovery.css", "duplicate viewport CSS");
+await assertMissing("src/notverse/NotesExperience.tsx", "duplicate Notes implementation");
 
 console.log("NoTVerse mobile authority verification passed.");
