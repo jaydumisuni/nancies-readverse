@@ -76,20 +76,27 @@
     background-size: 100% 31px, 100% 100% !important;
   }
 
-  /* Comments is in-tree and owns the opaque screen itself. Keep its root live;
-     there is no shell-visibility counter-patch here because the native base no
-     longer hides the shell for Comments. */
+  /* Comments is in-tree. Raise the shell above the continuously painted nav,
+     then keep the opaque Comments screen above the shell. This preserves the
+     WebKit compositor without allowing the nav to show through the composer. */
+  body.notverse-comments-open .main-shell.notverse-shell {
+    position: relative !important;
+    z-index: 2147483490 !important;
+  }
+
   body.notverse-comments-open .replies-backdrop {
+    z-index: 2147483500 !important;
     pointer-events: auto !important;
   }
 
   /* Never destroy/recreate the fixed navigation compositor for Comments.
-     Keeping this layer painted prevents WebKit from returning a hit-testable
-     but visually missing nav after the software keyboard closes. */
+     It remains fully painted underneath the opaque Comments screen and inert
+     until Back returns to Notes. */
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     visibility: visible !important;
     opacity: 1 !important;
+    z-index: 2147483400 !important;
     pointer-events: none !important;
   }
 }
