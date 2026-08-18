@@ -6,6 +6,9 @@ const notes = await readFile("src/notverse/NotesSocialExperience.tsx", "utf8");
 const release = await readFile("src/notverse/release-mobile-contract.css", "utf8");
 const native = await readFile("src/notverse/mobile-native-screens.css", "utf8");
 const finalizer = await readFile("src/notverse/real-device-mobile-final.css", "utf8");
+const controller = await readFile("src/notverse/real-device-mobile-controller.ts", "utf8");
+const runtime = await readFile("src/notverse/runtime-interaction-fix.ts", "utf8");
+const conversationScroll = await readFile("src/notverse/conversation-scroll.ts", "utf8");
 const index = await readFile("index.html", "utf8");
 
 function order(source, first, second, label) {
@@ -21,6 +24,16 @@ order(main, 'import "./notverse/mobile-native-screens.css"', 'import "./notverse
 order(main, 'import "./notverse/real-device-mobile-final.css"', 'import "./notverse/release-mobile-contract.css"', "mobile CSS authority");
 assert(finalizer.includes("Final mobile surface contract"), "real-device finalizer lost its authority marker");
 assert(native.includes("notverse-comments-open"), "native screen base is missing Comments geometry");
+
+/* JS ownership: one controller publishes viewport/state, one module owns scroll. */
+assert(controller.includes('root.style.setProperty("--notverse-mobile-vv-height"'), "real-device controller must publish the current viewport metric");
+assert(controller.includes('root.style.setProperty("--notverse-viewport-height"'), "real-device controller must publish the legacy viewport metric from the same measurement");
+assert(controller.includes('toggleState("notverse-notes-open", notesOpen)'), "real-device controller must own Notes compatibility state");
+assert(!runtime.includes("--notverse-viewport-height"), "runtime enhancer must not publish viewport geometry");
+assert(!runtime.includes("notverse-scroll-lock"), "runtime enhancer must not own body scroll locking");
+assert(!runtime.includes("pinConversationEnd"), "runtime enhancer must not duplicate conversation scroll ownership");
+assert(!runtime.includes("visualViewport?.addEventListener"), "runtime enhancer must not register a second visualViewport controller");
+assert(conversationScroll.includes("function pinToEnd"), "conversation-scroll.ts must remain the conversation scroll owner");
 
 /* Comments must use the same React/browser lifecycle as the working Inbox. */
 assert(!/createPortal\s*\(\s*<RepliesDrawer/.test(notes), "Comments must not portal RepliesDrawer to document.body");
