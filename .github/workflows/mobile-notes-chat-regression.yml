@@ -15,6 +15,7 @@ on:
       - "scripts/prove-mobile-touch-targets.mjs"
       - "scripts/prove-notes-social-loop.mjs"
       - "scripts/prove-companion-runtime.mjs"
+      - "scripts/diagnose-webkit-chat-viewport.mjs"
       - "package.json"
       - "wrangler.jsonc"
       - ".github/workflows/mobile-notes-chat-regression.yml"
@@ -54,6 +55,9 @@ jobs:
           done
           cat /tmp/notverse-preview.log
           exit 1
+
+      - name: Diagnose WebKit Chat viewport cascade
+        run: node scripts/diagnose-webkit-chat-viewport.mjs
 
       - name: Prove current native Chat, Comments and Inbox screens
         run: node scripts/prove-mobile-native-screens.mjs
@@ -95,5 +99,6 @@ jobs:
             engineering-evidence/mobile-native-screens
             engineering-evidence/mobile-touch-targets
             engineering-evidence/notes-social-completion
+            engineering-evidence/webkit-chat-diagnose
           if-no-files-found: error
           retention-days: 14
