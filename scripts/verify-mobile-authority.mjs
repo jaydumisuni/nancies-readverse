@@ -20,7 +20,7 @@ function order(source, first, second, label) {
 order(main, 'import "./notverse/mobile-native-screens.css"', 'import "./notverse/real-device-mobile-final.css"', "mobile CSS authority");
 order(main, 'import "./notverse/real-device-mobile-final.css"', 'import "./notverse/release-mobile-contract.css"', "mobile CSS authority");
 assert(finalizer.includes("Final mobile surface contract"), "real-device finalizer lost its authority marker");
-assert(native.includes("notverse-comments-open"), "native screen base is missing Comments state");
+assert(native.includes("notverse-comments-open"), "native screen base is missing Comments geometry");
 
 /* Comments must use the same React/browser lifecycle as the working Inbox. */
 assert(!/createPortal\s*\(\s*<RepliesDrawer/.test(notes), "Comments must not portal RepliesDrawer to document.body");
@@ -28,9 +28,12 @@ assert(/\{repliesOpen\s*&&\s*note\s*&&\s*<RepliesDrawer/.test(notes), "Comments 
 assert(/<form\s+onSubmit=\{submit\}>[\s\S]*?<button\s+type="submit"[^>]*>Send<\/button>/.test(notes), "Comments Send must use native form submission");
 assert(!/onPointerDown=\{[^}]*sendDraft/.test(notes), "Comments Send must not submit from pointerdown");
 
-/* Legacy native-screen rules may exist, but the final release contract must keep
-   the in-tree Comments shell and fixed nav painted/interactable correctly. */
-assert(/body\.notverse-comments-open \.readverse-app\.notverse-app > \.main-shell\.notverse-shell\s*\{[\s\S]*?visibility:\s*visible\s*!important;[\s\S]*?pointer-events:\s*auto\s*!important;/.test(release), "release contract must keep Comments app shell visible/interactable");
+/* Single ownership: the native base may size the Comments screen, but it must not
+   tear down the app shell or fixed nav that Comments now shares with Notes. */
+assert(!native.includes("body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell"), "native base must not hide the in-tree Comments shell");
+assert(!native.includes("body.notverse-comments-open .mobile-nav.notverse-mobile-nav,"), "native base must not include Comments in nav display:none teardown");
+assert(!/body\.notverse-comments-open \.mobile-nav\.notverse-mobile-nav\s*\{\s*display:\s*none/i.test(native), "native base must not destroy the Comments nav compositor");
+assert(/body\.notverse-comments-open \.replies-backdrop\s*\{[\s\S]*?pointer-events:\s*auto\s*!important;/.test(release), "release contract must keep the in-tree Comments surface interactive");
 assert(/body\.notverse-comments-open \.mobile-nav\.notverse-mobile-nav\s*\{[\s\S]*?display:\s*grid\s*!important;[\s\S]*?visibility:\s*visible\s*!important;[\s\S]*?opacity:\s*1\s*!important;[\s\S]*?pointer-events:\s*none\s*!important;/.test(release), "release contract must keep Comments nav compositor painted and inert");
 
 /* Theme ownership: app colors are authored by CSS; a white Note owns light-only
