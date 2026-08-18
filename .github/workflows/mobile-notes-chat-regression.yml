@@ -1,4 +1,5 @@
 name: Mobile Notes and companion regression proof
+# Authority sweep proof trigger: run the exact final PR graph through Chromium and WebKit.
 
 on:
   push:
