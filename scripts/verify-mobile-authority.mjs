@@ -3,6 +3,8 @@ import { access, readFile } from "node:fs/promises";
 
 const main = await readFile("src/main.tsx", "utf8");
 const notes = await readFile("src/notverse/NotesSocialExperience.tsx", "utf8");
+const polish = await readFile("src/notverse/notverse-polish.css", "utf8");
+const notesHeader = await readFile("src/notverse/notes-header-touch-targets.css", "utf8");
 const release = await readFile("src/notverse/release-mobile-contract.css", "utf8");
 const native = await readFile("src/notverse/mobile-native-screens.css", "utf8");
 const adaptive = await readFile("src/notverse/adaptive-interaction-fix.css", "utf8");
@@ -29,6 +31,8 @@ async function assertMissing(path, label) {
 order(main, 'import "./notverse/adaptive-interaction-fix.css"', 'import "./notverse/mobile-native-screens.css"', "mobile CSS authority");
 order(main, 'import "./notverse/mobile-native-screens.css"', 'import "./notverse/real-device-mobile-final.css"', "mobile CSS authority");
 order(main, 'import "./notverse/real-device-mobile-final.css"', 'import "./notverse/release-mobile-contract.css"', "mobile CSS authority");
+assert(polish.includes("Base presentation safeguards"), "early Notes polish must identify itself as a base layer");
+assert(notesHeader.includes("Notes header 44px touch-target base"), "Notes header layer must identify itself as a base layer");
 assert(adaptive.includes("Adaptive compatibility geometry"), "adaptive layer must identify itself as compatibility geometry");
 assert(finalizer.includes("Real-device mobile finalizer"), "real-device finalizer lost its authority marker");
 assert(native.includes("notverse-comments-open"), "native screen base is missing Comments geometry");
@@ -63,8 +67,10 @@ assert(!/onPointerDown=\{[^}]*sendDraft/.test(notes), "Comments Send must not su
 assert(notes.includes('target.closest("button,input,textarea,select,label,a,.replies-backdrop")'), "Comments pointerdown must not reach Notes swipe ownership");
 assert(/function pointerUp[\s\S]*?target\.closest\("\.replies-backdrop"\)/.test(notes), "Comments pointerup must not reach Notes swipe ownership");
 
-/* Single ownership: the native base may size the Comments screen, but it must not
-   tear down the app shell or fixed nav that Comments now shares with Notes. */
+/* Single ownership: no early/base layer may tear down the Comments shell/nav.
+   The native base sizes Comments; the release contract keeps its nav painted. */
+assert(polish.includes(".note-modal-backdrop:not(.replies-backdrop)"), "early Notes polish must explicitly exclude Comments from generic nav teardown");
+assert(!/body:has\(\.note-modal-backdrop\)\s+\.notverse-mobile-nav/.test(polish), "early Notes polish must not hide nav for every Note modal including Comments");
 assert(!native.includes("body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell"), "native base must not hide the in-tree Comments shell");
 assert(!native.includes("body.notverse-comments-open .mobile-nav.notverse-mobile-nav,"), "native base must not include Comments in nav display:none teardown");
 assert(!/body\.notverse-comments-open \.mobile-nav\.notverse-mobile-nav\s*\{\s*display:\s*none/i.test(native), "native base must not destroy the Comments nav compositor");
