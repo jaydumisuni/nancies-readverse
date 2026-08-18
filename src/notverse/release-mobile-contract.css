@@ -1,11 +1,9 @@
 /*
  * NoTVerse release mobile contract authority.
  *
- * Loaded after every legacy/mobile compatibility layer. These are deliberate
- * release-contract dimensions, not test-only styling: Comments must expose a
- * keyboard-safe 46px composer and Notes primary actions must remain visually
- * legible/tappable at the narrowest supported phone widths.
- * Universal mobile contract activation: PHARR production source.
+ * This is the final mobile product gate. Legacy/adaptive/native rules may supply
+ * compatibility geometry, but they may not hide/recreate the Notes shell or
+ * bottom navigation during the Comments keyboard lifecycle.
  */
 
 @media (max-width: 760px) {
@@ -67,9 +65,7 @@
     font-size: 10px !important;
   }
 
-  /* A Note is physical light paper inside the dark NoTVerse shell. Explicitly
-     opt this component out of browser/OS dark-color transformations, then keep
-     a true white base with neutral ruled shading on every mobile engine. */
+  /* A Note is physical light paper inside the dark NoTVerse shell. */
   .notes-social-experience .note-paper {
     color-scheme: light only !important;
     color-scheme: only light !important;
@@ -80,17 +76,19 @@
     background-size: 100% 31px, 100% 100% !important;
   }
 
-  /* Universal WebKit-safe surface lifecycle.
-     The native mobile layer historically removes this fixed nav with
-     display:none while Comments owns the viewport. Keep the same nav mounted
-     and painted on every phone instead. Comments is an opaque full-screen layer
-     above it, while inert/aria-hidden and pointer-events:none block interaction.
-     Back therefore reveals the already-painted nav instead of asking the browser
-     to reconstruct a fixed layer after the software keyboard closes. */
+  /* Comments is in-tree and owns its opaque screen. */
+  body.notverse-comments-open .replies-backdrop {
+    pointer-events: auto !important;
+  }
+
+  /* Never destroy/recreate the fixed navigation compositor for Comments.
+     Keep its layer fully alive but place that one layer behind the existing app
+     stack while Comments is open; no shell/Chat stacking context is changed. */
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     visibility: visible !important;
     opacity: 1 !important;
+    z-index: -1 !important;
     pointer-events: none !important;
   }
 }

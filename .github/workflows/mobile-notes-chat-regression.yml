@@ -1,4 +1,5 @@
 name: Mobile Notes and companion regression proof
+# Authority sweep proof trigger: run the exact final PR graph through Chromium and WebKit.
 
 on:
   push:
@@ -25,6 +26,9 @@ jobs:
   exact-browser-and-runtime-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
 
@@ -38,14 +42,12 @@ jobs:
       - name: Strict build
         run: npm run build
 
-      - name: Install Playwright proof browsers
-        run: |
-          npm install --no-save --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium webkit
+      - name: Install proof packages matching the prebuilt browsers
+        run: npm install --no-save --no-audit --no-fund playwright@1.62.0 http-server@14.1.1
 
       - name: Start exact generated production client
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client > /tmp/notverse-preview.log 2>&1 &
+          npx http-server dist/client -a 127.0.0.1 -p 4173 -c-1 > /tmp/notverse-preview.log 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
             sleep 1

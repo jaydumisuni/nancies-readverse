@@ -1,6 +1,7 @@
-/* Runtime viewport and conversation recovery for NoTVerse.
-   This module preserves the approved React structure while adding reliable
-   viewport state classes, mobile composer polish and a catalogue-backed
+/* Runtime companion enhancements for NoTVerse.
+   Mobile viewport/state ownership lives in real-device-mobile-controller.ts and
+   conversation scroll ownership lives in conversation-scroll.ts. This module
+   only enhances the companion composer and preserves the catalogue-backed
    recommendation fallback. */
 
 type CompanionRequestBody = {
@@ -21,33 +22,6 @@ type DiscoveryPayload = {
 };
 
 const nativeFetch = window.fetch.bind(window);
-const rootElement = document.documentElement;
-let lockedScrollY = 0;
-let viewportLocked = false;
-let lastChatMessageCount = 0;
-let lastInboxMessageCount = 0;
-
-function viewportHeight(): number {
-  return Math.max(1, Math.round(window.visualViewport?.height || window.innerHeight));
-}
-
-function applyViewportMetrics(): void {
-  rootElement.style.setProperty("--notverse-viewport-height", `${viewportHeight()}px`);
-  rootElement.style.setProperty("--notverse-viewport-top", "0px");
-}
-
-function setViewportLock(locked: boolean): void {
-  const body = document.body;
-  if (locked && !viewportLocked) {
-    lockedScrollY = window.scrollY;
-    body.style.setProperty("--notverse-scroll-lock", `${-lockedScrollY}px`);
-    viewportLocked = true;
-  } else if (!locked && viewportLocked) {
-    body.style.removeProperty("--notverse-scroll-lock");
-    viewportLocked = false;
-    window.requestAnimationFrame(() => window.scrollTo(0, lockedScrollY));
-  }
-}
 
 function setReactInputValue(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
@@ -127,71 +101,16 @@ function enhanceChatComposer(): void {
   resizeChatEditor(editor);
 }
 
-function pinConversationEnd(element: HTMLElement): void {
-  const pin = () => {
-    element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-  };
-  window.requestAnimationFrame(pin);
-  for (const delay of [70, 180, 420]) {
-    window.setTimeout(pin, delay);
-  }
-}
-
-function keepConversationEndsVisible(): void {
-  const chatBody = document.querySelector<HTMLElement>(".companion-panel.open .chat-body");
-  if (chatBody) {
-    const count = chatBody.querySelectorAll(".message-row").length;
-    if (count !== lastChatMessageCount) {
-      lastChatMessageCount = count;
-      pinConversationEnd(chatBody);
-    }
-  } else {
-    lastChatMessageCount = 0;
-  }
-
-  const inboxThread = document.querySelector<HTMLElement>(".inbox-layout .message-thread");
-  if (inboxThread) {
-    const count = inboxThread.children.length;
-    if (count !== lastInboxMessageCount) {
-      lastInboxMessageCount = count;
-      pinConversationEnd(inboxThread);
-    }
-  } else {
-    lastInboxMessageCount = 0;
-  }
-}
-
-function syncInteractionState(): void {
-  applyViewportMetrics();
-  enhanceChatComposer();
-  keepConversationEndsVisible();
-  const chatOpen = Boolean(document.querySelector(".companion-panel.open"));
-  const notesOpen = Boolean(document.querySelector(".notes-experience"));
-
-  for (const element of [rootElement, document.body]) {
-    element.classList.toggle("notverse-chat-open", chatOpen);
-    element.classList.toggle("notverse-notes-open", notesOpen);
-  }
-
-  setViewportLock(chatOpen || (notesOpen && window.matchMedia("(max-width: 760px)").matches));
-}
-
-function initialiseViewportObserver(): void {
-  applyViewportMetrics();
+function initialiseRuntimeEnhancements(): void {
   const host = document.getElementById("root") || document.body;
-  const observer = new MutationObserver(syncInteractionState);
+  const observer = new MutationObserver(enhanceChatComposer);
   observer.observe(host, {
     attributes: true,
     attributeFilter: ["class"],
     childList: true,
     subtree: true,
   });
-  window.addEventListener("resize", syncInteractionState, { passive: true });
-  window.addEventListener("orientationchange", syncInteractionState, { passive: true });
-  window.addEventListener("scroll", applyViewportMetrics, { passive: true });
-  window.visualViewport?.addEventListener("resize", syncInteractionState, { passive: true });
-  window.visualViewport?.addEventListener("scroll", applyViewportMetrics, { passive: true });
-  syncInteractionState();
+  enhanceChatComposer();
 }
 
 function requestUrl(input: RequestInfo | URL): string {
@@ -338,7 +257,7 @@ window.fetch = async function adaptiveFetch(input: RequestInfo | URL, init?: Req
 };
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initialiseViewportObserver, { once: true });
+  document.addEventListener("DOMContentLoaded", initialiseRuntimeEnhancements, { once: true });
 } else {
-  initialiseViewportObserver();
+  initialiseRuntimeEnhancements();
 }

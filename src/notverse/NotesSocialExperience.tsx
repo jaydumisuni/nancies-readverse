@@ -124,8 +124,8 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
     locked.current = true; setFlip(direction);
     window.setTimeout(() => { setIndex(next); setFlip(null); locked.current = false; }, 430);
   }
-  function pointerDown(event: ReactPointerEvent<HTMLDivElement>) { const target = event.target as HTMLElement; if (target.closest("button,input,textarea,select,label,a")) { pointerStart.current = null; return; } pointerStart.current = event.clientY; }
-  function pointerUp(event: ReactPointerEvent<HTMLDivElement>) { const start = pointerStart.current; pointerStart.current = null; if (start === null) return; const delta = start - event.clientY; if (Math.abs(delta) > 65) move(delta > 0 ? "next" : "previous"); }
+  function pointerDown(event: ReactPointerEvent<HTMLDivElement>) { const target = event.target as HTMLElement; if (target.closest("button,input,textarea,select,label,a,.replies-backdrop")) { pointerStart.current = null; return; } pointerStart.current = event.clientY; }
+  function pointerUp(event: ReactPointerEvent<HTMLDivElement>) { const target = event.target as HTMLElement; if (target.closest(".replies-backdrop")) { pointerStart.current = null; return; } const start = pointerStart.current; pointerStart.current = null; if (start === null) return; const delta = start - event.clientY; if (Math.abs(delta) > 65) move(delta > 0 ? "next" : "previous"); }
   function updateNote(noteId: string, updater: (current: NoTVerseNote) => NoTVerseNote) { setNotes((current) => current.map((item) => item.id === noteId ? updater(item) : item)); }
   function toggleSaved() { if (!note) return; const nextSaved = !note.saved; updateNote(note.id, (item) => ({ ...item, saved: nextSaved })); if (nextSaved) addActivity(note.id, "saved", "Note saved", "You saved this Note for later.", false); showToast(nextSaved ? "Saved to your Notes." : "Removed from Saved."); }
   function react() { if (!note) return; const reacted = reactedIds.includes(note.id); updateNote(note.id, (item) => ({ ...item, reactions: Math.max(0, item.reactions + (reacted ? -1 : 1)) })); setReactedIds((current) => reacted ? current.filter((id) => id !== note.id) : [...current, note.id]); if (!reacted) addActivity(note.id, "reaction", "Reaction recorded", "You reacted to this Note.", false); }
@@ -152,7 +152,7 @@ export default function NotesSocialExperience({ displayName, avatar, libraryTitl
     {composerOpen && <NoteComposer displayName={displayName} avatar={avatar} libraryTitles={libraryTitles} noteFont={noteFont} onClose={() => setComposerOpen(false)} onPublish={publish} />}
     {filtersOpen && <NoteFilters typeFilter={typeFilter} showSpoilers={showSpoilers} onType={setTypeFilter} onSpoilers={setShowSpoilers} onClose={() => setFiltersOpen(false)} />}
     {optionsOpen && note && <NoteOptions note={note} reported={reportedIds.includes(note.id)} onClose={() => setOptionsOpen(false)} onShare={() => void share(note)} onCopy={() => void copyLink(note)} onSave={toggleSaved} onNotebook={() => addToNotebook(note)} onHide={() => hideNote(note)} onReport={() => reportNote(note)} />}
-    {repliesOpen && note && createPortal(<RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={closeComments} onSend={submitReply} />, document.body)}
+    {repliesOpen && note && <RepliesDrawer note={note} replies={repliesByNote[note.id] || []} displayName={displayName} avatar={avatar} onClose={closeComments} onSend={submitReply} />}
     {activityOpen && createPortal(<ActivityPanel activities={activities} notes={notes} onClose={() => { setActivityOpen(false); window.history.replaceState(null, "", "#my-notes"); }} onOpenNote={openActivityNote} onMarkRead={() => setActivities((current) => current.map((item) => ({ ...item, unread: false })))} />, document.body)}
     {imageOpen && note?.image && <div className="note-image-viewer" onClick={() => setImageOpen(false)}><button type="button">×</button><img src={note.image.dataUrl} alt={note.image.name} /></div>}{toast && <div className="note-toast" role="status">{toast}</div>}
   </section>;
@@ -231,7 +231,7 @@ function RepliesDrawer({ note, replies, displayName, avatar, onClose, onSend }: 
       <form onSubmit={submit}>
         <span className="comment-composer-avatar">{avatar ? <img src={avatar} alt="" /> : (displayName || "R").slice(0, 1)}</span>
         <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a comment…" aria-label="Write a comment" />
-        <button type="button" onPointerDown={(event) => { event.preventDefault(); sendDraft(); }} onClick={sendDraft} disabled={!draft.trim()}>Send</button>
+        <button type="submit" disabled={!draft.trim()}>Send</button>
       </form>
     </section>
   </div>;

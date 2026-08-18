@@ -78,8 +78,9 @@ async function prove(browserType, browserName, width, height) {
     const activity = page.locator(".notes-activity-button");
     const activityBox = await activity.evaluate((node) => node.getBoundingClientRect().toJSON());
     const activityLabel = await activity.evaluate((node) => getComputedStyle(node, "::after").content);
-    assert(activityBox.width >= 74, `${browserName}/${width}: Activity control too narrow (${activityBox.width})`);
-    assert(activityLabel.includes("Activity"), `${browserName}/${width}: Activity control has no visible label`);
+    assert(activityBox.width >= 42 && activityBox.width <= 46, `${browserName}/${width}: Activity control width outside compact contract (${activityBox.width})`);
+    assert(activityBox.height >= 42 && activityBox.height <= 46, `${browserName}/${width}: Activity control height outside compact contract (${activityBox.height})`);
+    assert(activityLabel === "none", `${browserName}/${width}: obsolete Activity pseudo-label is still painted (${activityLabel})`);
 
     await actions.nth(1).click();
     const input = page.getByRole("textbox", { name: "Write a comment" });

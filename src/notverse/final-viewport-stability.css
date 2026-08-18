@@ -1,4 +1,6 @@
-/* Last-mile viewport corrections proven against the user's reported sizes. */
+/* Compatibility viewport corrections for reported device sizes.
+   Phone output is finalized later by real-device-mobile-final.css and the
+   release contract; this layer preserves established tablet/mobile fallbacks. */
 
 @media (min-width: 761px) and (max-width: 1100px) {
   .companion-panel {

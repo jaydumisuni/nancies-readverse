@@ -63,7 +63,7 @@ async function openNotes(page) {
   await page.locator(".notes-social-experience").waitFor();
 }
 
-async function journey(browserType, browserName) {
+async function mobileJourney(browserType, browserName) {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage();
@@ -114,6 +114,9 @@ async function journey(browserType, browserName) {
     await page.waitForFunction(() => document.querySelector(".replies-drawer input")?.value === "");
     await page.getByText(tapComment, { exact: true }).waitFor();
 
+    /* The product intentionally suppresses duplicate submit events for 450 ms.
+       Wait beyond that same-event guard before proving a second intentional comment. */
+    await page.waitForTimeout(500);
     const enterComment = `Persistent Enter comment ${browserName}`;
     await commentInput.fill(enterComment);
     await commentInput.press("Enter");
@@ -164,7 +167,50 @@ async function journey(browserType, browserName) {
     await page.getByText(text, { exact: true }).waitFor();
     await page.screenshot({ path: `${out}/${browserName}-390-my-notes.png`, fullPage: false });
 
-    report.cases.push({ browserName, noteId, tapComment, enterComment });
+    report.cases.push({ browserName, viewport: "mobile", noteId, tapComment, enterComment });
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function desktopCommentsJourney(browserType, browserName) {
+  const browser = await browserType.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  try {
+    await prepare(page);
+    await openNotes(page);
+
+    const note = page.locator(".note-paper").first();
+    await note.waitFor();
+    await note.getByRole("button", { name: "Comment on Note" }).click();
+
+    const backdrop = page.locator(".replies-backdrop");
+    const drawer = page.locator(".replies-drawer");
+    const input = page.getByRole("textbox", { name: "Write a comment" });
+    await input.waitFor();
+
+    const backdropPosition = await backdrop.evaluate((node) => getComputedStyle(node).position);
+    assert.equal(backdropPosition, "fixed", `${browserName}: desktop Comments backdrop is not viewport-fixed`);
+    const backdropBox = await rect(backdrop);
+    assert(backdropBox.width >= 1278 && backdropBox.height >= 798, `${browserName}: desktop Comments backdrop does not cover viewport`);
+    const drawerBox = await rect(drawer);
+    assert(drawerBox.width >= 320 && drawerBox.right <= 1281, `${browserName}: desktop Comments drawer escaped viewport horizontally`);
+    assert(drawerBox.height >= 300 && drawerBox.bottom <= 801, `${browserName}: desktop Comments drawer escaped viewport vertically`);
+
+    const text = `Desktop in-tree comment ${browserName} ${Date.now()}`;
+    const before = await page.locator(".replies-list article").count();
+    await input.fill(text);
+    await input.press("Enter");
+    await page.waitForFunction((count) => document.querySelectorAll(".replies-list article").length > count, before);
+    assert.equal(await page.locator(".replies-list article").filter({ hasText: text }).count(), 1, `${browserName}: desktop Enter comment missing or duplicated`);
+    await page.screenshot({ path: `${out}/${browserName}-1280-comments.png`, fullPage: false });
+
+    await page.getByRole("button", { name: "Close comments" }).click();
+    await drawer.waitFor({ state: "detached" });
+    await note.waitFor({ state: "visible" });
+    report.cases.push({ browserName, viewport: "desktop", comment: text });
   } finally {
     await context.close();
     await browser.close();
@@ -172,11 +218,13 @@ async function journey(browserType, browserName) {
 }
 
 for (const [name, engine] of [["chromium", chromium], ["webkit", webkit]]) {
-  try {
-    await journey(engine, name);
-  } catch (error) {
-    report.ok = false;
-    report.errors.push(`${name}: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+  for (const proof of [mobileJourney, desktopCommentsJourney]) {
+    try {
+      await proof(engine, name);
+    } catch (error) {
+      report.ok = false;
+      report.errors.push(`${name}/${proof.name}: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+    }
   }
 }
 

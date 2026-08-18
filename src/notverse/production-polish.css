@@ -30,8 +30,8 @@
 }
 
 /* The React input remains the state bridge so existing behavior/tests stay
-   intact. The visible editor is a wrapping textarea that exposes the whole
-   draft instead of horizontally hiding long text. */
+   intact. The visible editor wraps text while runtime-interaction-fix.ts owns
+   its stable keyboard-edge height and internal overflow. */
 .companion-panel.open .chat-input {
   grid-template-columns: 34px minmax(0, 1fr) 38px;
   min-width: 0;
@@ -127,16 +127,6 @@
   .wanted-list form input {
     min-width: 0;
     max-width: 100%;
-  }
-
-  /* Once a user starts a real draft, open the composer like a proper editor
-     instead of leaving it as an old one-line chat field. This gives enough
-     vertical room to reread and correct the beginning without horizontal
-     scrolling. It collapses again as soon as the draft is sent/cleared. */
-  .companion-panel.open .chat-composer-editor:not(:placeholder-shown) {
-    height: min(260px, 42dvh) !important;
-    max-height: min(260px, 42dvh) !important;
-    overflow-y: auto !important;
   }
 
   .notverse-search-box {

@@ -1,28 +1,28 @@
 export {};
 
 /*
- * Mobile surface authority.
+ * Single viewport/state authority.
  *
- * The previous controller tried to correct Safari focus-pan by repeatedly
- * transforming already-fixed surfaces. On a real iPhone that created a second
- * geometry owner: Safari moved the visual viewport while this controller moved
- * Chat/Comments again, exposing Home and pushing composers off-screen.
- *
- * This controller only publishes the browser's visual viewport dimensions and
- * open-surface state. CSS owns layout. No surface receives an inline transform,
- * top/left correction, or synthetic width from JavaScript.
+ * CSS owns geometry. On phones this controller publishes visualViewport metrics
+ * and all mobile surface classes. Above the phone breakpoint it preserves only
+ * the legacy root Chat/Notes compatibility classes that adaptive desktop CSS
+ * consumes; body-level mobile locks are always cleared. It never transforms
+ * surfaces, fixes body scroll position, or chases keyboard offsets.
+ * Conversation scroll ownership lives in conversation-scroll.ts.
  */
 
 const mobileViewport = window.matchMedia("(max-width: 760px)");
 const root = document.documentElement;
 const body = document.body;
 
-const SURFACE_SELECTOR = [
-  ".companion-panel.open",
-  ".replies-backdrop",
-  ".activity-backdrop",
-  ".note-modal-backdrop",
-].join(",");
+const STATE_CLASSES = [
+  "notverse-chat-open",
+  "notverse-notes-open",
+  "notverse-comments-open",
+  "notverse-replies-open",
+  "notverse-activity-open",
+  "notverse-mobile-surface-open",
+] as const;
 
 function clearLegacyInlineGeometry(node: Element | null) {
   if (!(node instanceof HTMLElement)) return;
@@ -44,12 +44,20 @@ function clearLegacyInlineGeometry(node: Element | null) {
   }
 }
 
+function clearViewportMetrics() {
+  for (const property of [
+    "--notverse-mobile-vv-top",
+    "--notverse-mobile-vv-left",
+    "--notverse-mobile-vv-width",
+    "--notverse-mobile-vv-height",
+    "--notverse-viewport-top",
+    "--notverse-viewport-height",
+  ]) root.style.removeProperty(property);
+}
+
 function publishViewport() {
   if (!mobileViewport.matches) {
-    root.style.removeProperty("--notverse-mobile-vv-top");
-    root.style.removeProperty("--notverse-mobile-vv-left");
-    root.style.removeProperty("--notverse-mobile-vv-width");
-    root.style.removeProperty("--notverse-mobile-vv-height");
+    clearViewportMetrics();
     return;
   }
 
@@ -59,10 +67,16 @@ function publishViewport() {
   const width = Math.max(1, Math.min(viewport?.width ?? window.innerWidth, window.innerWidth));
   const height = Math.max(1, Math.min(viewport?.height ?? window.innerHeight, window.innerHeight));
 
+  /* New real-device contract. */
   root.style.setProperty("--notverse-mobile-vv-top", `${top}px`);
   root.style.setProperty("--notverse-mobile-vv-left", `${left}px`);
   root.style.setProperty("--notverse-mobile-vv-width", `${width}px`);
   root.style.setProperty("--notverse-mobile-vv-height", `${height}px`);
+
+  /* Compatibility metrics for older adaptive CSS. They intentionally resolve
+     from the same browser measurement so there is still only one JS owner. */
+  root.style.setProperty("--notverse-viewport-top", `${top}px`);
+  root.style.setProperty("--notverse-viewport-height", `${height}px`);
 }
 
 function setMobileNavBlocked(blocked: boolean) {
@@ -77,37 +91,58 @@ function setMobileNavBlocked(blocked: boolean) {
   nav.removeAttribute("aria-hidden");
 }
 
+function toggleState(className: typeof STATE_CLASSES[number], active: boolean) {
+  body.classList.toggle(className, active);
+  root.classList.toggle(className, active);
+}
+
+function syncDesktopCompatibilityState() {
+  const chatOpen = Boolean(document.querySelector(".companion-panel.open"));
+  const notesOpen = Boolean(document.querySelector(".notes-experience"));
+
+  /* The pre-consolidation runtime left these two compatibility states on the
+     root at desktop widths while the mobile controller removed body locks. Keep
+     that effective contract without retaining two JS state publishers. */
+  for (const className of STATE_CLASSES) body.classList.remove(className);
+  root.classList.toggle("notverse-chat-open", chatOpen);
+  root.classList.toggle("notverse-notes-open", notesOpen);
+  for (const className of [
+    "notverse-comments-open",
+    "notverse-replies-open",
+    "notverse-activity-open",
+    "notverse-mobile-surface-open",
+  ] as const) root.classList.remove(className);
+
+  setMobileNavBlocked(false);
+  clearViewportMetrics();
+}
+
 function syncSurfaceState() {
   if (!mobileViewport.matches) {
-    for (const className of [
-      "notverse-chat-open",
-      "notverse-comments-open",
-      "notverse-replies-open",
-      "notverse-activity-open",
-      "notverse-mobile-surface-open",
-    ]) body.classList.remove(className);
-    setMobileNavBlocked(false);
-    publishViewport();
+    syncDesktopCompatibilityState();
     return;
   }
 
   const chat = document.querySelector<HTMLElement>(".companion-panel.open");
+  const notes = document.querySelector<HTMLElement>(".notes-experience");
   const commentsBackdrop = document.querySelector<HTMLElement>(".replies-backdrop");
   const comments = document.querySelector<HTMLElement>(".replies-drawer");
   const activity = document.querySelector<HTMLElement>(".activity-backdrop");
 
   const chatOpen = Boolean(chat);
+  const notesOpen = Boolean(notes);
   const commentsOpen = Boolean(commentsBackdrop && comments);
   const activityOpen = Boolean(activity);
   const inboxThreadOpen = body.classList.contains("notverse-inbox-thread-open");
   const mobileSurfaceOpen = chatOpen || commentsOpen || activityOpen || inboxThreadOpen;
 
-  body.classList.toggle("notverse-chat-open", chatOpen);
-  body.classList.toggle("notverse-comments-open", commentsOpen);
-  // Kept only for compatibility with older selectors while user-facing copy is Comment.
-  body.classList.toggle("notverse-replies-open", commentsOpen);
-  body.classList.toggle("notverse-activity-open", activityOpen);
-  body.classList.toggle("notverse-mobile-surface-open", mobileSurfaceOpen);
+  toggleState("notverse-chat-open", chatOpen);
+  toggleState("notverse-notes-open", notesOpen);
+  toggleState("notverse-comments-open", commentsOpen);
+  // Compatibility alias for older selectors while user-facing copy is Comment.
+  toggleState("notverse-replies-open", commentsOpen);
+  toggleState("notverse-activity-open", activityOpen);
+  toggleState("notverse-mobile-surface-open", mobileSurfaceOpen);
   setMobileNavBlocked(mobileSurfaceOpen);
 
   clearLegacyInlineGeometry(chat);

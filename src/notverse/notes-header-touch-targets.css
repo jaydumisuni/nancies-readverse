@@ -1,5 +1,5 @@
-/* Final mobile/desktop touch ownership for the Notes header actions.
-   Legacy Notes styles can cap these buttons below the 44px interaction contract. */
+/* Notes header 44px touch-target base for mobile and desktop.
+   The later mobile release contract may refine individual controls such as Activity. */
 .notes-social-experience .notes-header-actions > button {
   box-sizing: border-box !important;
   display: grid !important;

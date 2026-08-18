@@ -21,16 +21,17 @@
     overscroll-behavior: none !important;
   }
 
-  /* Portal screens replace the workspace on phones instead of floating over it. */
+  /* True portal screens replace the workspace on phones. Comments is rendered
+     in-tree with Notes and therefore must not hide its own application shell. */
   body.notverse-chat-open .readverse-app.notverse-app > .main-shell.notverse-shell,
-  body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell,
   body.notverse-activity-open .readverse-app.notverse-app > .main-shell.notverse-shell {
     visibility: hidden !important;
     pointer-events: none !important;
   }
 
+  /* Comments keeps the fixed navigation compositor mounted and painted under
+     its opaque screen. The controller makes it inert while Comments is open. */
   body.notverse-chat-open .mobile-nav.notverse-mobile-nav,
-  body.notverse-comments-open .mobile-nav.notverse-mobile-nav,
   body.notverse-activity-open .mobile-nav.notverse-mobile-nav,
   body.notverse-inbox-thread-open .mobile-nav.notverse-mobile-nav {
     display: none !important;

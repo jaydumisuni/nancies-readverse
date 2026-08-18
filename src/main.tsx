@@ -10,13 +10,14 @@ import "./notverse/final-viewport-stability.css";
 import "./notverse/production-polish.css";
 import "./notverse/runtime-interaction-fix";
 import "./notverse/conversation-scroll";
-import "./notverse/focused-inbox-viewport.css";
 import "./notverse/notes-social-completion.css";
 import "./notverse/notes-header-touch-targets.css";
 import "./notverse/notes-notification-label";
-import "./notverse/replies-enter-submit";
-import "./notverse/real-device-mobile-final.css";
+/* Native-screen rules are the mobile base. The real-device finalizer must load
+   after them so legacy/native compatibility rules cannot retake viewport or
+   shell ownership. release-mobile-contract.css remains the final product gate. */
 import "./notverse/mobile-native-screens.css";
+import "./notverse/real-device-mobile-final.css";
 import "./notverse/real-device-mobile-controller";
 import "./notverse/release-mobile-contract.css";
 import { registerReadVerseServiceWorker } from "./platform/storage";
