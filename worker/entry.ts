@@ -15,9 +15,19 @@ interface Env {
   TOKEN_ENCRYPTION_KEY?: string;
 }
 
+const PUBLIC_HOST = "notverse.1ink.online";
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    /* The public site must never remain on plaintext HTTP. Keep the rule scoped
+       to the canonical hostname so local Wrangler/CI traffic continues to work. */
+    if (url.protocol === "http:" && url.hostname === PUBLIC_HOST) {
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 308);
+    }
+
     if (url.pathname === "/api/companion/help") {
       try {
         const canonical = await handleCanonicalTopicTurn(request.clone(), env, ctx);
