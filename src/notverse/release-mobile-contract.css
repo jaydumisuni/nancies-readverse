@@ -67,15 +67,17 @@
     font-size: 10px !important;
   }
 
-  /* One visual paper contract on every mobile engine. Keep a real white sheet
-     and neutral ruled-paper shading so wide-gamut iPhone displays do not turn
-     the paper warm/cream while Android renders it white. */
+  /* A Note is physical light paper inside the dark NoTVerse shell. Explicitly
+     opt this component out of browser/OS dark-color transformations, then keep
+     a true white base with neutral ruled shading on every mobile engine. */
   .notes-social-experience .note-paper {
-    background:
+    color-scheme: light only !important;
+    color-scheme: only light !important;
+    background-color: #fff !important;
+    background-image:
       linear-gradient(rgba(0,0,0,.075) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.28), transparent 8%, transparent 92%, rgba(0,0,0,.045)),
-      #fff !important;
-    background-size: 100% 31px, 100% 100%, 100% 100% !important;
+      linear-gradient(90deg, rgba(255,255,255,.28), transparent 8%, transparent 92%, rgba(0,0,0,.045)) !important;
+    background-size: 100% 31px, 100% 100% !important;
   }
 
   /* Universal WebKit-safe surface lifecycle.
