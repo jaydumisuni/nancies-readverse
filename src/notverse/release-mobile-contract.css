@@ -76,15 +76,9 @@
     background-size: 100% 31px, 100% 100% !important;
   }
 
-  /* Comments follows Inbox's stable lifecycle: the React app shell remains
-     mounted/painted and interactive because Comments now lives inside it. The
-     opaque Comments screen owns the viewport above Notes; only the nav is made
-     inert by the controller. */
-  body.notverse-comments-open .readverse-app.notverse-app > .main-shell.notverse-shell {
-    visibility: visible !important;
-    pointer-events: auto !important;
-  }
-
+  /* Comments is in-tree and owns the opaque screen itself. Keep its root live;
+     there is no shell-visibility counter-patch here because the native base no
+     longer hides the shell for Comments. */
   body.notverse-comments-open .replies-backdrop {
     pointer-events: auto !important;
   }
