@@ -1,10 +1,12 @@
 /*
- * Final mobile surface contract. Loaded last.
+ * Real-device mobile finalizer.
  *
- * Older compatibility layers still exist below this file in the import order.
- * They are deliberately neutralised here so only this contract owns mobile
- * Chat/Comments geometry. JavaScript publishes visualViewport variables; CSS
- * performs layout. No transform chasing and no fixed-body Notes lock.
+ * Loaded after the native-screen base and before release-mobile-contract.css.
+ * Older compatibility layers load before this file and are deliberately
+ * neutralised here. This layer owns real-device Chat/Comments geometry;
+ * release-mobile-contract.css owns final product invariants. JavaScript only
+ * publishes visualViewport variables; CSS performs layout. No transform chasing
+ * and no fixed-body Notes lock.
  */
 
 @media (max-width: 760px) {
