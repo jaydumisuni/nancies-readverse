@@ -114,6 +114,9 @@ async function mobileJourney(browserType, browserName) {
     await page.waitForFunction(() => document.querySelector(".replies-drawer input")?.value === "");
     await page.getByText(tapComment, { exact: true }).waitFor();
 
+    /* The product intentionally suppresses duplicate submit events for 450 ms.
+       Wait beyond that same-event guard before proving a second intentional comment. */
+    await page.waitForTimeout(500);
     const enterComment = `Persistent Enter comment ${browserName}`;
     await commentInput.fill(enterComment);
     await commentInput.press("Enter");
