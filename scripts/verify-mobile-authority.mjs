@@ -35,7 +35,8 @@ assert(!runtime.includes("pinConversationEnd"), "runtime enhancer must not dupli
 assert(!runtime.includes("visualViewport?.addEventListener"), "runtime enhancer must not register a second visualViewport controller");
 assert(conversationScroll.includes("function pinToEnd"), "conversation-scroll.ts must remain the conversation scroll owner");
 
-/* Comments must use the same React/browser lifecycle as the working Inbox. */
+/* Comments must use one native submit path, matching the working Inbox lifecycle. */
+assert(!main.includes("replies-enter-submit"), "superseded global Comments Enter shim must not be imported");
 assert(!/createPortal\s*\(\s*<RepliesDrawer/.test(notes), "Comments must not portal RepliesDrawer to document.body");
 assert(/\{repliesOpen\s*&&\s*note\s*&&\s*<RepliesDrawer/.test(notes), "Comments must render RepliesDrawer in the app tree");
 assert(/<form\s+onSubmit=\{submit\}>[\s\S]*?<button\s+type="submit"[^>]*>Send<\/button>/.test(notes), "Comments Send must use native form submission");
