@@ -33,6 +33,15 @@ async function settle(page) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+async function waitForViewportHeight(page, expected) {
+  await page.waitForFunction((height) => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue("--notverse-mobile-vv-height").trim();
+    const published = Number.parseFloat(value);
+    return Number.isFinite(published) && Math.abs(published - height) <= 3;
+  }, expected, { timeout: 2500 });
+  await settle(page);
+}
+
 async function rect(locator) {
   return locator.evaluate((node) => {
     const r = node.getBoundingClientRect();
@@ -59,6 +68,7 @@ async function navState(nav) {
       visibility: style.visibility,
       opacity: Number(style.opacity),
       pointerEvents: style.pointerEvents,
+      zIndex: style.zIndex,
       inert: node.hasAttribute("inert"),
       ariaHidden: node.getAttribute("aria-hidden"),
       width: r.width,
@@ -90,7 +100,7 @@ async function proveChat(browserType, browserName) {
     await input.fill("keyboard stability");
     await input.focus();
     await page.setViewportSize({ width: 390, height: 520 });
-    await page.waitForTimeout(120);
+    await waitForViewportHeight(page, 520);
     await surface(page, ".companion-panel.open", 390, 520, `${browserName} chat keyboard`);
     const body = page.locator(".companion-panel.open .chat-body");
     await body.evaluate((n) => { n.scrollTop = n.scrollHeight; });
@@ -151,7 +161,7 @@ async function proveComments(browserType, browserName) {
     assert.equal(await input.evaluate((n) => document.activeElement === n), true, `${browserName}: Reply did not focus the comment composer in the tap gesture`);
     await input.fill(`@${replyAuthor} mobile authority proof`);
     await page.setViewportSize({ width: 390, height: 520 });
-    await page.waitForTimeout(120);
+    await waitForViewportHeight(page, 520);
     await surface(page, ".replies-backdrop", 390, 520, `${browserName} comments keyboard`);
     const list = page.locator(".replies-list");
     await list.evaluate((n) => { n.scrollTop = n.scrollHeight; });
@@ -169,7 +179,7 @@ async function proveComments(browserType, browserName) {
     /* Exact physical failure sequence: Send, keyboard closes, then Back. */
     await input.evaluate((n) => n.blur());
     await page.setViewportSize({ width: 390, height: 844 });
-    await settle(page);
+    await waitForViewportHeight(page, 844);
     assert.equal(await page.locator("body.notverse-comments-open").count(), 1, `${browserName}: Comments closed before Back`);
     const beforeBackNav = await navState(mobileNav);
     assertNavPainted(beforeBackNav, `${browserName}: after keyboard close before Back`);
@@ -228,7 +238,7 @@ async function proveInbox(browserType, browserName) {
     await input.fill("keyboard stability");
     await input.focus();
     await page.setViewportSize({ width: 390, height: 520 });
-    await page.waitForTimeout(120);
+    await waitForViewportHeight(page, 520);
     await surface(page, ".inbox-layout > main", 390, 520, `${browserName} inbox keyboard`);
     const thread = page.locator(".message-thread");
     await thread.evaluate((n) => { n.scrollTop = n.scrollHeight; });
