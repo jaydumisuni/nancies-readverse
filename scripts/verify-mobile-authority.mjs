@@ -6,6 +6,7 @@ const notes = await readFile("src/notverse/NotesSocialExperience.tsx", "utf8");
 const release = await readFile("src/notverse/release-mobile-contract.css", "utf8");
 const native = await readFile("src/notverse/mobile-native-screens.css", "utf8");
 const adaptive = await readFile("src/notverse/adaptive-interaction-fix.css", "utf8");
+const production = await readFile("src/notverse/production-polish.css", "utf8");
 const finalizer = await readFile("src/notverse/real-device-mobile-final.css", "utf8");
 const controller = await readFile("src/notverse/real-device-mobile-controller.ts", "utf8");
 const runtime = await readFile("src/notverse/runtime-interaction-fix.ts", "utf8");
@@ -46,6 +47,12 @@ assert(!runtime.includes("notverse-scroll-lock"), "runtime enhancer must not own
 assert(!runtime.includes("pinConversationEnd"), "runtime enhancer must not duplicate conversation scroll ownership");
 assert(!runtime.includes("visualViewport?.addEventListener"), "runtime enhancer must not register a second visualViewport controller");
 assert(conversationScroll.includes("function pinToEnd"), "conversation-scroll.ts must remain the conversation scroll owner");
+
+/* Companion composer height has one owner. CSS styles the editor; runtime keeps
+   the keyboard-edge control at 44px and makes long drafts scroll internally. */
+assert(runtime.includes('editor.style.setProperty("height", "44px", "important")'), "runtime enhancer must own the stable chat composer height");
+assert(runtime.includes('editor.style.setProperty("overflow-y", "auto", "important")'), "runtime enhancer must own long-draft internal scrolling");
+assert(!production.includes(".chat-composer-editor:not(:placeholder-shown)"), "production CSS must not reintroduce a competing expanded chat composer height");
 
 /* Comments must use one native submit path, matching the working Inbox lifecycle. */
 assert(!main.includes("replies-enter-submit"), "superseded global Comments Enter shim must not be imported");
