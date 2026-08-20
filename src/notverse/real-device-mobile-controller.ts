@@ -7,7 +7,15 @@ export {};
  * and all mobile surface classes. Above the phone breakpoint it preserves only
  * the legacy root Chat/Notes compatibility classes that adaptive desktop CSS
  * consumes; body-level mobile locks are always cleared. It never transforms
- * surfaces, fixes body scroll position, or chases keyboard offsets.
+ * surfaces or fixes body scroll position.
+ *
+ * Safari note: fixed mobile surfaces stay anchored at the layout-viewport
+ * origin. Their bottom edge follows visualViewport.offsetTop +
+ * visualViewport.height. Safari also animates its keyboard/browser chrome over
+ * several frames, so viewport values are re-sampled briefly after relevant
+ * resize/scroll/focus transitions instead of freezing the first intermediate
+ * measurement.
+ *
  * Conversation scroll ownership lives in conversation-scroll.ts.
  */
 
@@ -62,21 +70,33 @@ function publishViewport() {
   }
 
   const viewport = window.visualViewport;
-  const top = Math.max(0, viewport?.offsetTop ?? 0);
-  const left = Math.max(0, viewport?.offsetLeft ?? 0);
-  const width = Math.max(1, Math.min(viewport?.width ?? window.innerWidth, window.innerWidth));
-  const height = Math.max(1, Math.min(viewport?.height ?? window.innerHeight, window.innerHeight));
+  const layoutWidth = Math.max(1, document.documentElement.clientWidth || window.innerWidth);
+  const layoutHeight = Math.max(1, window.innerHeight);
+  const visualTop = Math.max(
+    0,
+    Math.min(layoutHeight - 1, Math.round(viewport?.offsetTop ?? 0)),
+  );
+  const visualHeight = Math.max(
+    1,
+    Math.min(layoutHeight, Math.round(viewport?.height ?? layoutHeight)),
+  );
+  const visibleBottom = Math.max(
+    1,
+    Math.min(layoutHeight, visualTop + visualHeight),
+  );
 
-  /* New real-device contract. */
-  root.style.setProperty("--notverse-mobile-vv-top", `${top}px`);
-  root.style.setProperty("--notverse-mobile-vv-left", `${left}px`);
-  root.style.setProperty("--notverse-mobile-vv-width", `${width}px`);
-  root.style.setProperty("--notverse-mobile-vv-height", `${height}px`);
+  /* Fixed mobile surfaces remain at layout top:0. Their height is the current
+     visible bottom coordinate. This preserves Safari's native focus pan while
+     keeping the composer above the keyboard/browser chrome. */
+  root.style.setProperty("--notverse-mobile-vv-top", "0px");
+  root.style.setProperty("--notverse-mobile-vv-left", "0px");
+  root.style.setProperty("--notverse-mobile-vv-width", `${layoutWidth}px`);
+  root.style.setProperty("--notverse-mobile-vv-height", `${visibleBottom}px`);
 
-  /* Compatibility metrics for older adaptive CSS. They intentionally resolve
-     from the same browser measurement so there is still only one JS owner. */
-  root.style.setProperty("--notverse-viewport-top", `${top}px`);
-  root.style.setProperty("--notverse-viewport-height", `${height}px`);
+  /* Compatibility metrics for older adaptive CSS resolve from the same single
+     measurement authority. */
+  root.style.setProperty("--notverse-viewport-top", "0px");
+  root.style.setProperty("--notverse-viewport-height", `${visibleBottom}px`);
 }
 
 function setMobileNavBlocked(blocked: boolean) {
@@ -161,6 +181,23 @@ function scheduleSync() {
   });
 }
 
+let settleFrame = 0;
+let settleUntil = 0;
+
+function settleFrameLoop() {
+  settleFrame = 0;
+  syncSurfaceState();
+  if (performance.now() < settleUntil) {
+    settleFrame = window.requestAnimationFrame(settleFrameLoop);
+  }
+}
+
+function settleSync(duration = 520) {
+  syncSurfaceState();
+  settleUntil = Math.max(settleUntil, performance.now() + duration);
+  if (!settleFrame) settleFrame = window.requestAnimationFrame(settleFrameLoop);
+}
+
 const observer = new MutationObserver(scheduleSync);
 observer.observe(document.body, {
   subtree: true,
@@ -169,13 +206,13 @@ observer.observe(document.body, {
   attributeFilter: ["class"],
 });
 
-window.addEventListener("resize", scheduleSync, { passive: true });
-window.addEventListener("orientationchange", scheduleSync, { passive: true });
-window.addEventListener("focusin", scheduleSync, true);
-window.addEventListener("focusout", scheduleSync, true);
-window.addEventListener("notverse:surface-state-changed", syncSurfaceState);
-mobileViewport.addEventListener("change", scheduleSync);
-window.visualViewport?.addEventListener("resize", scheduleSync, { passive: true });
-window.visualViewport?.addEventListener("scroll", scheduleSync, { passive: true });
+window.addEventListener("resize", () => settleSync(520), { passive: true });
+window.addEventListener("orientationchange", () => settleSync(700), { passive: true });
+window.addEventListener("focusin", () => settleSync(900), true);
+window.addEventListener("focusout", () => settleSync(700), true);
+window.addEventListener("notverse:surface-state-changed", () => settleSync(520));
+mobileViewport.addEventListener("change", () => settleSync(520));
+window.visualViewport?.addEventListener("resize", () => settleSync(520), { passive: true });
+window.visualViewport?.addEventListener("scroll", () => settleSync(520), { passive: true });
 
 syncSurfaceState();
