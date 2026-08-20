@@ -10,11 +10,11 @@ export {};
  * surfaces or fixes body scroll position.
  *
  * Safari note: fixed mobile surfaces stay anchored at the layout-viewport
- * origin. Their bottom edge follows visualViewport.offsetTop +
- * visualViewport.height. Safari also animates its keyboard/browser chrome over
- * several frames, so viewport values are re-sampled briefly after relevant
- * resize/scroll/focus transitions instead of freezing the first intermediate
- * measurement.
+ * origin. The visual viewport is used only for a keyboard-sized occlusion.
+ * Safari's collapsing/expanding browser chrome can make visualViewport.height
+ * temporarily shorter even when no keyboard is covering the page; treating
+ * that toolbar delta as the screen height clips the composer above the browser
+ * UI. Browser-chrome-only changes therefore stay on the layout/dynamic viewport.
  *
  * Conversation scroll ownership lives in conversation-scroll.ts.
  */
@@ -63,6 +63,13 @@ function clearViewportMetrics() {
   ]) root.style.removeProperty(property);
 }
 
+function editableHasFocus(): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement
+    || active instanceof HTMLTextAreaElement
+    || (active instanceof HTMLElement && active.isContentEditable);
+}
+
 function publishViewport() {
   if (!mobileViewport.matches) {
     clearViewportMetrics();
@@ -84,19 +91,26 @@ function publishViewport() {
     1,
     Math.min(layoutHeight, visualTop + visualHeight),
   );
+  const visualOcclusion = Math.max(0, layoutHeight - visibleBottom);
 
-  /* Fixed mobile surfaces remain at layout top:0. Their height is the current
-     visible bottom coordinate. This preserves Safari's native focus pan while
-     keeping the composer above the keyboard/browser chrome. */
+  /* Safari browser chrome can shorten visualViewport by roughly one toolbar
+     height after keyboard/browser-UI transitions even though the page itself
+     should still occupy the dynamic viewport. Only treat the visual viewport
+     as the screen bottom when an editable control has focus and the occlusion
+     is large enough to be a software keyboard. If innerHeight itself shrinks
+     for the keyboard, layoutHeight is already the correct value. */
+  const keyboardSizedOcclusion = editableHasFocus() && visualOcclusion > 120;
+  const surfaceHeight = keyboardSizedOcclusion ? visibleBottom : layoutHeight;
+
   root.style.setProperty("--notverse-mobile-vv-top", "0px");
   root.style.setProperty("--notverse-mobile-vv-left", "0px");
   root.style.setProperty("--notverse-mobile-vv-width", `${layoutWidth}px`);
-  root.style.setProperty("--notverse-mobile-vv-height", `${visibleBottom}px`);
+  root.style.setProperty("--notverse-mobile-vv-height", `${surfaceHeight}px`);
 
   /* Compatibility metrics for older adaptive CSS resolve from the same single
      measurement authority. */
   root.style.setProperty("--notverse-viewport-top", "0px");
-  root.style.setProperty("--notverse-viewport-height", `${visibleBottom}px`);
+  root.style.setProperty("--notverse-viewport-height", `${surfaceHeight}px`);
 }
 
 function setMobileNavBlocked(blocked: boolean) {
