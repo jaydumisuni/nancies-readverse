@@ -7,6 +7,46 @@
  */
 
 @media (max-width: 760px) {
+  /* The Comments composer has three direct children: avatar, input and Send.
+     Older Notes layers still define this form as two columns, which lets CSS
+     Grid auto-place Send onto a second row. Own the final geometry here so the
+     composer remains one row regardless of body-class / viewport timing. */
+  .notes-social-experience .replies-drawer > form {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 62px !important;
+    display: grid !important;
+    grid-template-columns: 38px minmax(0, 1fr) auto !important;
+    grid-template-rows: auto !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .notes-social-experience .replies-drawer > form > .comment-composer-avatar {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+  }
+
+  .notes-social-experience .replies-drawer > form > input {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  .notes-social-experience .replies-drawer > form > button {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    width: auto !important;
+    min-width: 64px !important;
+    margin: 0 !important;
+  }
+
   body.notverse-comments-open .replies-drawer > form input {
     min-height: 46px !important;
     height: 46px !important;
