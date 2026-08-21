@@ -63,6 +63,20 @@ async function locatorFor(page, action) {
 async function execute(page, action, device, logs) {
   const a = valueFromSpec(action, device);
   switch (a.type) {
+    case 'freeze-time': {
+      const fixed = Date.parse(String(a.iso));
+      if (!Number.isFinite(fixed)) throw new Error(`invalid freeze-time ISO value: ${a.iso}`);
+      await page.addInitScript((fixedNow) => {
+        const RealDate = Date;
+        class FrozenDate extends RealDate {
+          constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+          static now() { return fixedNow; }
+        }
+        Object.setPrototypeOf(FrozenDate, RealDate);
+        globalThis.Date = FrozenDate;
+      }, fixed);
+      break;
+    }
     case 'goto':
       await page.goto(a.url || target, { waitUntil: a.waitUntil || 'networkidle', timeout: a.timeout || 30000 });
       break;
