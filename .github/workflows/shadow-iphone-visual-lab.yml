@@ -1,0 +1,64 @@
+name: Shadow iPhone Visual Lab Matrix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/shadow-capture-iphone-visual-lab.mjs"
+      - ".github/workflows/shadow-iphone-visual-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-iphone-webkit-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Strict build
+        run: npm run build
+
+      - name: Install proof packages matching prebuilt browsers
+        run: npm install --no-save --no-audit --no-fund playwright@1.62.0 http-server@14.1.1
+
+      - name: Start exact generated production client
+        run: |
+          npx http-server dist/client -a 127.0.0.1 -p 4173 -c-1 > /tmp/notverse-iphone-lab.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/notverse-iphone-lab.log
+          exit 1
+
+      - name: Capture exact WebKit iPhone matrix
+        run: node scripts/shadow-capture-iphone-visual-lab.mjs
+
+      - name: Preserve exact source identity
+        if: always()
+        run: |
+          mkdir -p engineering-evidence/iphone-visual-lab
+          git rev-parse HEAD > engineering-evidence/iphone-visual-lab/verified-commit.txt
+          cp /tmp/notverse-iphone-lab.log engineering-evidence/iphone-visual-lab/preview.log 2>/dev/null || true
+
+      - name: Upload iPhone Visual Lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-visual-lab-webkit-matrix
+          path: engineering-evidence/iphone-visual-lab
+          if-no-files-found: error
+          retention-days: 14
