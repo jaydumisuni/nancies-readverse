@@ -116,17 +116,34 @@
     background-size: 100% 31px, 100% 100% !important;
   }
 
-  /* Comments is in-tree and owns its opaque screen. */
+  /* Comments is in-tree and owns its opaque screen. The older adaptive Notes
+     layer makes .notes-experience position:fixed, which creates a stacking
+     context below the sibling fixed nav. Neutralise only that legacy stacking
+     context while Comments is open so the fixed replies backdrop can compete in
+     the app stacking context at its own z-index instead of forcing the nav into
+     a negative compositor layer. */
+  body.notverse-comments-open .notes-social-experience {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    contain: none !important;
+    transform: none !important;
+  }
+
   body.notverse-comments-open .replies-backdrop {
     pointer-events: auto !important;
   }
 
   /* Keep the bottom navigation in the same compositor layer for its entire
      lifetime. Comments already owns an opaque fixed screen at z-index
-     2147483500, so lowering the nav from its normal z-index 55 to a negative
-     layer is unnecessary and makes Safari repaint the fixed nav only after a
-     later tap on some keyboard/Back transitions. The controller still makes
-     the nav inert and this rule blocks pointer input while Comments is open. */
+     2147483500. The controller makes the nav inert/aria-hidden and this rule
+     blocks pointer input while Comments is open; the nav itself never changes
+     stacking layer, so Safari has no stale negative layer to repaint after Back. */
   body.notverse-comments-open .mobile-nav.notverse-mobile-nav {
     display: grid !important;
     visibility: visible !important;
