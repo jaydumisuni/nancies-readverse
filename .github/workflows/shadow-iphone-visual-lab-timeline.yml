@@ -1,0 +1,60 @@
+name: Shadow iPhone Visual Lab Timeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/iphone-lab-v060/**"
+      - ".github/workflows/shadow-iphone-visual-lab-timeline.yml"
+      - "src/**"
+      - "package.json"
+      - "wrangler.jsonc"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-iphone-webkit-timeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict build
+        run: npm run build
+      - name: Install proof packages matching prebuilt browsers
+        run: npm install --no-save --no-audit --no-fund playwright@1.62.0 http-server@14.1.1
+      - name: Start exact generated production client
+        run: |
+          npx http-server dist/client -a 127.0.0.1 -p 4173 -c-1 > /tmp/notverse-preview.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/notverse-preview.log
+          exit 1
+      - name: Capture exact WebKit iPhone transition timeline
+        run: |
+          node scripts/iphone-lab-v060/capture_timeline.mjs \
+            --engine webkit \
+            --target http://127.0.0.1:4173 \
+            --devices scripts/iphone-lab-v060/devices.json \
+            --adapter scripts/iphone-lab-v060/notverse-timeline-adapter.mjs \
+            --out engineering-evidence/iphone-visual-lab-timeline
+      - name: Preserve exact source identity
+        run: git rev-parse HEAD > engineering-evidence/iphone-visual-lab-timeline/verified-commit.txt
+      - name: Upload iPhone transition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-visual-lab-webkit-timeline
+          path: engineering-evidence/iphone-visual-lab-timeline
+          if-no-files-found: error
+          retention-days: 14
