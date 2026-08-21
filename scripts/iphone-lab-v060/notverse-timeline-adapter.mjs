@@ -18,7 +18,8 @@ export async function captureTimeline({page,device,target,utils}){
 
   await page.getByRole('button',{name:'Comment on Note',exact:true}).click();
   await page.locator('.replies-backdrop').waitFor();
-  assert.equal(await page.locator('body.notverse-comments-open').count(),1,`${device.name}: Comments state missing`);
+  await page.waitForFunction(()=>document.body.classList.contains('notverse-comments-open'));
+  await page.waitForFunction(()=>{const n=document.querySelector('.mobile-nav.notverse-mobile-nav');return n?.hasAttribute('inert')&&n?.getAttribute('aria-hidden')==='true';});
   const navCovered=await navState(page);
   assert.equal(navCovered?.inert,true,`${device.name}: nav not inert under Comments`);
   assert.equal(navCovered?.ariaHidden,'true',`${device.name}: nav not aria-hidden under Comments`);
