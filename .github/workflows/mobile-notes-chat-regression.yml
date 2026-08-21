@@ -12,6 +12,7 @@ on:
       - "src/**"
       - "worker/**"
       - "scripts/prove-mobile-native-screens.mjs"
+      - "scripts/prove-comments-nav-compositor.mjs"
       - "scripts/prove-mobile-touch-targets.mjs"
       - "scripts/prove-notes-social-loop.mjs"
       - "scripts/prove-companion-runtime.mjs"
@@ -58,6 +59,9 @@ jobs:
       - name: Prove current native Chat, Comments and Inbox screens
         run: node scripts/prove-mobile-native-screens.mjs
 
+      - name: Prove Comments covers a stable nav compositor
+        run: node scripts/prove-comments-nav-compositor.mjs
+
       - name: Prove visible mobile controls, Notes gestures and Search
         run: node scripts/prove-mobile-touch-targets.mjs
 
@@ -93,6 +97,7 @@ jobs:
           path: |
             engineering-evidence/mobile-notes-chat
             engineering-evidence/mobile-native-screens
+            engineering-evidence/comments-nav-compositor
             engineering-evidence/mobile-touch-targets
             engineering-evidence/notes-social-completion
           if-no-files-found: error
