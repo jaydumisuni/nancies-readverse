@@ -15,6 +15,7 @@
     {"id":"iphone-16-pro-max","name":"iPhone 16 Pro Max","width":440,"height":956}
   ],
   "prepare": [
+    {"type":"freeze-time","iso":"2026-08-21T11:34:00Z"},
     {"type":"goto","waitUntil":"networkidle"},
     {"type":"set-local-storage","items":{"notverse.preferences":{"setupComplete":true,"noteFont":"handwritten","readingInterests":["Manga","Novels","PDFs"],"discoveryMethods":["title","memory","link"]}}},
     {"type":"reload","waitUntil":"networkidle"}
