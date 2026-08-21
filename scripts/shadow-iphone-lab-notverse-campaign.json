@@ -1,0 +1,80 @@
+{
+  "schema": "ttg.iphone-visual-lab-campaign.v1",
+  "id": "notverse-webkit-mobile-social",
+  "product": "NoTVerse",
+  "engine": "webkit",
+  "target": "http://127.0.0.1:4173",
+  "baseline": "../baselines/notverse-2026-08-21-webkit",
+  "devices": [
+    {"id":"iphone-13-mini","name":"iPhone 13 mini","width":375,"height":812},
+    {"id":"iphone-13-14","name":"iPhone 13 / 14","width":390,"height":844},
+    {"id":"iphone-14-pro-15-15-pro","name":"iPhone 14 Pro / 15 / 15 Pro","width":393,"height":852},
+    {"id":"iphone-16-pro","name":"iPhone 16 Pro","width":402,"height":874},
+    {"id":"iphone-13-pro-max-14-plus","name":"iPhone 13 Pro Max / 14 Plus","width":428,"height":926},
+    {"id":"iphone-15-pro-max","name":"iPhone 15 Pro Max","width":430,"height":932},
+    {"id":"iphone-16-pro-max","name":"iPhone 16 Pro Max","width":440,"height":956}
+  ],
+  "prepare": [
+    {"type":"goto","waitUntil":"networkidle"},
+    {"type":"set-local-storage","items":{"notverse.preferences":{"setupComplete":true,"noteFont":"handwritten","readingInterests":["Manga","Novels","PDFs"],"discoveryMethods":["title","memory","link"]}}},
+    {"type":"reload","waitUntil":"networkidle"}
+  ],
+  "scenes": [
+    {
+      "id":"notes",
+      "file":"webkit-notes.png",
+      "actions":[
+        {"type":"click","role":"button","name":"Notes","exact":true,"nth":-1},
+        {"type":"wait-selector","selector":".notes-social-experience"},
+        {"type":"wait-selector","selector":".notes-social-experience .note-paper"},
+        {"type":"wait-ms","ms":80}
+      ]
+    },
+    {
+      "id":"comments-keyboard",
+      "file":"webkit-comments-keyboard.png",
+      "actions":[
+        {"type":"click","role":"button","name":"Notes","exact":true,"nth":-1},
+        {"type":"click","role":"button","name":"Comment on Note","exact":true,"nth":0},
+        {"type":"wait-selector","selector":".replies-backdrop"},
+        {"type":"fill","role":"textbox","name":"Write a comment","value":"Visual Lab candidate proof"},
+        {"type":"focus","role":"textbox","name":"Write a comment"},
+        {"type":"viewport","width":{"device":"width"},"height":{"device":"height","delta":-324}},
+        {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height","delta":-324},"tolerance":3},
+        {"type":"wait-ms","ms":80}
+      ]
+    },
+    {
+      "id":"comments-return-nav",
+      "file":"webkit-comments-return-nav.png",
+      "actions":[
+        {"type":"click","role":"button","name":"Notes","exact":true,"nth":-1},
+        {"type":"click","role":"button","name":"Comment on Note","exact":true,"nth":0},
+        {"type":"wait-selector","selector":".replies-backdrop"},
+        {"type":"fill","role":"textbox","name":"Write a comment","value":"Visual Lab candidate proof"},
+        {"type":"focus","role":"textbox","name":"Write a comment"},
+        {"type":"viewport","width":{"device":"width"},"height":{"device":"height","delta":-324}},
+        {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height","delta":-324},"tolerance":3},
+        {"type":"blur","role":"textbox","name":"Write a comment"},
+        {"type":"viewport","width":{"device":"width"},"height":{"device":"height"}},
+        {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height"},"tolerance":3},
+        {"type":"click","role":"button","name":"Back to Notes","exact":true},
+        {"type":"wait-selector","selector":".mobile-nav.notverse-mobile-nav"},
+        {"type":"wait-ms","ms":80}
+      ]
+    },
+    {
+      "id":"chat-keyboard",
+      "file":"webkit-chat-keyboard.png",
+      "actions":[
+        {"type":"click","selector":".floating-companion"},
+        {"type":"wait-selector","selector":".companion-panel.open"},
+        {"type":"fill","selector":".companion-panel.open .chat-input input","value":"Visual Lab candidate proof"},
+        {"type":"focus","selector":".companion-panel.open .chat-input input"},
+        {"type":"viewport","width":{"device":"width"},"height":{"device":"height","delta":-324}},
+        {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height","delta":-324},"tolerance":3},
+        {"type":"wait-ms","ms":80}
+      ]
+    }
+  ]
+}
