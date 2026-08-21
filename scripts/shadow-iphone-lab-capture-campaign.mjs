@@ -33,7 +33,8 @@ const engine = engines[engineName];
 if (!engine) throw new Error(`unsupported engine: ${engineName}`);
 
 function valueFromSpec(spec, device) {
-  if (typeof spec === 'number' || typeof spec === 'string' || typeof spec === 'boolean' || spec == null) return spec;
+  if (typeof spec === 'string') return spec.replaceAll('{{device.id}}', device.id).replaceAll('{{device.name}}', device.name);
+  if (typeof spec === 'number' || typeof spec === 'boolean' || spec == null) return spec;
   if (Array.isArray(spec)) return spec.map((v) => valueFromSpec(v, device));
   if (spec.device === 'width') return device.width + Number(spec.delta || 0);
   if (spec.device === 'height') return device.height + Number(spec.delta || 0);
@@ -101,6 +102,11 @@ async function execute(page, action, device, logs) {
     case 'wait-ms':
       await page.waitForTimeout(Number(a.ms || 0));
       break;
+    case 'wait-text': {
+      const loc = page.getByText(String(a.text ?? ''), { exact: a.exact !== false });
+      await loc.waitFor({ state: a.state || 'visible', timeout: a.timeout || 5000 });
+      break;
+    }
     case 'viewport':
       await page.setViewportSize({ width: Number(a.width), height: Number(a.height) });
       break;
@@ -111,6 +117,11 @@ async function execute(page, action, device, logs) {
         const value = Number.parseFloat(raw);
         return Number.isFinite(value) && Math.abs(value - expected) <= tolerance;
       }, { name: a.name, expected, tolerance: Number(a.tolerance ?? 3) }, { timeout: a.timeout || 3000 });
+      break;
+    }
+    case 'press': {
+      const loc = await locatorFor(page, a);
+      await loc.press(a.key);
       break;
     }
     default:
