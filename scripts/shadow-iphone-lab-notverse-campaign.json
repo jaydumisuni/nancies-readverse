@@ -37,10 +37,12 @@
         {"type":"click","role":"button","name":"Notes","exact":true,"nth":-1},
         {"type":"click","role":"button","name":"Comment on Note","exact":true,"nth":0},
         {"type":"wait-selector","selector":".replies-backdrop"},
-        {"type":"fill","role":"textbox","name":"Write a comment","value":"Visual Lab candidate proof"},
+        {"type":"fill","role":"textbox","name":"Write a comment","value":"iPhone lab {{device.id}}"},
         {"type":"focus","role":"textbox","name":"Write a comment"},
         {"type":"viewport","width":{"device":"width"},"height":{"device":"height","delta":-324}},
         {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height","delta":-324},"tolerance":3},
+        {"type":"click","role":"button","name":"Send","exact":true,"touch":true},
+        {"type":"wait-text","text":"iPhone lab {{device.id}}","exact":true},
         {"type":"wait-ms","ms":80}
       ]
     },
@@ -69,7 +71,7 @@
       "actions":[
         {"type":"click","selector":".floating-companion"},
         {"type":"wait-selector","selector":".companion-panel.open"},
-        {"type":"fill","selector":".companion-panel.open .chat-input input","value":"Visual Lab candidate proof"},
+        {"type":"fill","selector":".companion-panel.open .chat-input input","value":"iPhone lab keyboard proof"},
         {"type":"focus","selector":".companion-panel.open .chat-input input"},
         {"type":"viewport","width":{"device":"width"},"height":{"device":"height","delta":-324}},
         {"type":"wait-css-var","name":"--notverse-mobile-vv-height","expected":{"device":"height","delta":-324},"tolerance":3},
