@@ -1,0 +1,59 @@
+name: Shadow iPhone Lab Generic Runner v0.5
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/shadow-lab/**"
+      - ".github/workflows/shadow-iphone-lab-generic-v050.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  prove-generic-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+      - name: Strict build
+        run: npm run build
+      - name: Install proof packages
+        run: npm install --no-save --no-audit --no-fund playwright@1.62.0 http-server@14.1.1
+      - name: Start exact generated production client
+        run: |
+          npx http-server dist/client -a 127.0.0.1 -p 4173 -c-1 > /tmp/notverse-iphone-lab-v050.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/notverse-iphone-lab-v050.log
+          exit 1
+      - name: Run generic lab runner with NoTVerse adapter
+        run: |
+          node scripts/shadow-lab/capture_matrix.mjs \
+            --engine webkit \
+            --target http://127.0.0.1:4173 \
+            --devices scripts/shadow-lab/devices.json \
+            --adapter scripts/shadow-lab/notverse-adapter.mjs \
+            --out engineering-evidence/iphone-visual-lab-v050
+      - name: Preserve source identity
+        run: |
+          git rev-parse HEAD > engineering-evidence/iphone-visual-lab-v050/verified-commit.txt
+          cp /tmp/notverse-iphone-lab-v050.log engineering-evidence/iphone-visual-lab-v050/preview.log 2>/dev/null || true
+      - name: Upload generic runner evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-visual-lab-v050-generic-runner
+          path: engineering-evidence/iphone-visual-lab-v050
+          if-no-files-found: error
+          retention-days: 14
