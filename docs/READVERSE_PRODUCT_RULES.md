@@ -68,15 +68,16 @@ This file is the recovery point and source of truth for future **NoTVerse** prod
 3. Gogo naming/routes and superseded Nancy's ReadVerse/READVERSE visible identity are obsolete and must not be reintroduced as current product branding.
 4. Historical repository names, internal identifiers, or migration-era names may remain only where they are still required technical identifiers and do not leak as current product identity.
 5. When a new implementation replaces an old one, the old implementation is removed from the active runtime/authority graph in the same correction.
-6. There must be one canonical frontend, one canonical Worker entry path, and one canonical deployment authority.
+6. There must be one canonical frontend, one canonical Worker entry path, one canonical Worker identity (`notverse`), and one canonical deployment authority.
 7. Temporary diagnostic/shadow machinery is never product authority and must not be required by a clean clone.
 
 ## Web and deployment security
 
-1. Canonical public origin: `https://notverse.1ink.online/`.
-2. Plain HTTP requests for `notverse.1ink.online` permanently redirect to the exact HTTPS destination before application/static handling.
-3. Local/CI HTTP hosts may remain available for deterministic proof and must not be forced through the public-host redirect policy.
-4. A successful repository build is not deployment proof. The live HTTPS asset graph must match the frozen canonical production build.
+1. Canonical public origin: `https://notverse.pharrtechnolgiescoltd.workers.dev/`.
+2. Canonical Cloudflare Worker name: `notverse`; its workers.dev production route is explicitly enabled in `wrangler.jsonc`.
+3. Plain HTTP requests for `notverse.pharrtechnolgiescoltd.workers.dev` permanently redirect to the exact HTTPS destination before application/static handling.
+4. Local/CI HTTP hosts may remain available for deterministic proof and must not be forced through the public-host redirect policy.
+5. A successful repository build is not deployment proof. The live HTTPS asset graph must match the frozen canonical production build.
 
 ## Engineering authority
 
