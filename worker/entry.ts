@@ -15,7 +15,7 @@ interface Env {
   TOKEN_ENCRYPTION_KEY?: string;
 }
 
-const PUBLIC_HOST = "notverse.1ink.online";
+const PUBLIC_HOST = "notverse.pharrtechnolgiescoltd.workers.dev";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
