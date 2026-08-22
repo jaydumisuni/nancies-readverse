@@ -8,6 +8,7 @@ await mkdir(out, { recursive: true });
 
 const report = { ok: true, cases: [], errors: [] };
 
+/** Seed the completed NoTVerse setup required by the mobile compositor proof. */
 function seedPreferences() {
   localStorage.setItem("notverse.preferences", JSON.stringify({
     setupComplete: true,
@@ -17,10 +18,12 @@ function seedPreferences() {
   }));
 }
 
+/** Wait for two animation frames so class, layout and paint state can settle. */
 async function settle(page) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+/** Capture the mobile navigation's compositor, accessibility and hit-test state. */
 async function navState(page) {
   return page.locator(".mobile-nav.notverse-mobile-nav").evaluate((node) => {
     const style = getComputedStyle(node);
@@ -38,6 +41,7 @@ async function navState(page) {
   });
 }
 
+/** Inspect the actual paint stack at the fixed navigation coordinates. */
 async function stackingAtNav(page) {
   return page.evaluate(() => {
     const nav = document.querySelector(".mobile-nav.notverse-mobile-nav");
@@ -72,6 +76,7 @@ async function stackingAtNav(page) {
   });
 }
 
+/** Prove the Comments keyboard/Back compositor lifecycle in one browser engine. */
 async function run(browserType, browserName) {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({
@@ -93,6 +98,7 @@ async function run(browserType, browserName) {
     const openedNav = await navState(page);
     const openedStack = await stackingAtNav(page);
     assert.equal(openedNav.zIndex, "55", `${browserName}: nav changed compositor layer under Comments`);
+    assert.equal(openedNav.pointerEvents, "none", `${browserName}: covered nav accepts pointer input`);
     assert.equal(openedNav.inert, true, `${browserName}: nav not inert under Comments`);
     assert.equal(openedNav.ariaHidden, "true", `${browserName}: nav not aria-hidden under Comments`);
     assert.equal(openedStack.notesPosition, "relative", `${browserName}: legacy fixed Notes stacking context still active`);
@@ -113,6 +119,7 @@ async function run(browserType, browserName) {
     const beforeBackNav = await navState(page);
     const beforeBackStack = await stackingAtNav(page);
     assert.equal(beforeBackNav.zIndex, "55", `${browserName}: nav layer changed before Back`);
+    assert.equal(beforeBackNav.pointerEvents, "none", `${browserName}: nav became interactive before Back`);
     assert.equal(beforeBackStack.topInsideComments, true, `${browserName}: Comments no longer covers nav before Back`);
 
     await page.getByRole("button", { name: "Back to Notes" }).click();
@@ -123,8 +130,15 @@ async function run(browserType, browserName) {
     assert.equal(restoredNav.inert, false, `${browserName}: nav stayed inert after Back`);
     assert.equal(restoredNav.ariaHidden, null, `${browserName}: nav stayed aria-hidden after Back`);
     assert.equal(restoredNav.visibility, "visible", `${browserName}: nav invisible after Back`);
+    assert.equal(restoredNav.pointerEvents, "auto", `${browserName}: restored nav pointer-events=${restoredNav.pointerEvents}`);
     assert(restoredNav.opacity >= .99, `${browserName}: nav opacity=${restoredNav.opacity}`);
     await page.screenshot({ path: `${out}/${browserName}-comments-return-nav.png`, fullPage: false });
+
+    const mobileNav = page.locator(".mobile-nav.notverse-mobile-nav");
+    const homeButton = mobileNav.getByRole("button", { name: "Home", exact: true });
+    await homeButton.tap();
+    await page.waitForTimeout(30);
+    assert.equal(await homeButton.evaluate((node) => node.classList.contains("active")), true, `${browserName}: first restored nav tap did not activate Home`);
 
     report.cases.push({ browserName, openedNav, openedStack, beforeBackNav, beforeBackStack, restoredNav });
   } catch (error) {
