@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-const builtWorker = "dist/nancies_readverse/index.js";
+const PUBLIC_HOST = "notverse.pharrtechnolgiescoltd.workers.dev";
+const wrangler = JSON.parse(await readFile("wrangler.jsonc", "utf8"));
+const workerName = String(wrangler.name || "").trim();
+assert(workerName, "wrangler.jsonc does not define the Worker name");
+const builtWorker = `dist/${workerName.replaceAll("-", "_")}/index.js`;
 const module = await import(`${pathToFileURL(builtWorker).href}?https-proof=${Date.now()}`);
 const handler = module.default;
 assert(handler && typeof handler.fetch === "function", "built NoTVerse Worker is not callable");
@@ -15,14 +20,14 @@ const env = {
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
 const redirected = await handler.fetch(
-  new Request("http://notverse.1ink.online/notes?from=proof"),
+  new Request(`http://${PUBLIC_HOST}/notes?from=proof`),
   env,
   ctx,
 );
 assert.equal(redirected.status, 308, `canonical HTTP returned ${redirected.status}, expected 308`);
 assert.equal(
   redirected.headers.get("location"),
-  "https://notverse.1ink.online/notes?from=proof",
+  `https://${PUBLIC_HOST}/notes?from=proof`,
   "canonical redirect did not preserve path/query on HTTPS",
 );
 
@@ -30,7 +35,7 @@ const local = await handler.fetch(new Request("http://127.0.0.1/"), env, ctx);
 assert.equal(local.status, 200, "localhost HTTP was incorrectly forced through the public-host redirect");
 assert.equal(await local.text(), "asset", "localhost request no longer delegates to the base Worker/assets path");
 
-const secure = await handler.fetch(new Request("https://notverse.1ink.online/"), env, ctx);
+const secure = await handler.fetch(new Request(`https://${PUBLIC_HOST}/`), env, ctx);
 assert.equal(secure.status, 200, "canonical HTTPS request was incorrectly redirected or blocked");
 assert.equal(await secure.text(), "asset", "canonical HTTPS request no longer delegates normally");
 
