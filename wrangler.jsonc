@@ -1,11 +1,13 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "nancies-readverse",
+  "name": "notverse",
   "main": "worker/entry.ts",
   "compatibility_date": "2026-07-24",
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
