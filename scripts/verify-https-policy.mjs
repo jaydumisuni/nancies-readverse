@@ -4,11 +4,13 @@ import { readFile } from "node:fs/promises";
 const PUBLIC_HOST = "notverse.pharrtechnolgiescoltd.workers.dev";
 const PUBLIC_ORIGIN = `https://${PUBLIC_HOST}`;
 const RETIRED_HOST = "notverse.1ink.online";
+const RETIRED_WORKER_OUTPUT = "dist/nancies_readverse";
 
-const [entry, configText, deployWorkflow, readme, verification, productRules, liveVerifier] = await Promise.all([
+const [entry, configText, deployWorkflow, mobileWorkflow, readme, verification, productRules, liveVerifier] = await Promise.all([
   readFile("worker/entry.ts", "utf8"),
   readFile("wrangler.jsonc", "utf8"),
   readFile(".github/workflows/deploy-live.yml", "utf8"),
+  readFile(".github/workflows/mobile-notes-chat-regression.yml", "utf8"),
   readFile("README.md", "utf8"),
   readFile("VERIFICATION.md", "utf8"),
   readFile("docs/READVERSE_PRODUCT_RULES.md", "utf8"),
@@ -38,6 +40,14 @@ for (const [name, content] of [
   assert(content.includes(PUBLIC_ORIGIN), `${name} does not reference the canonical NoTVerse production origin`);
   assert(!content.includes(RETIRED_HOST), `${name} still references the retired 1ink.online production hostname`);
 }
+
+for (const [name, content] of [
+  ["production deployment workflow", deployWorkflow],
+  ["mobile browser/runtime workflow", mobileWorkflow],
+]) {
+  assert(!content.includes(RETIRED_WORKER_OUTPUT), `${name} still hard-codes the retired generated Worker output path`);
+}
+assert(mobileWorkflow.includes('worker_config="dist/${worker_dir}/wrangler.json"'), "mobile runtime proof no longer derives the generated Worker config from wrangler identity");
 assert(!entry.includes(RETIRED_HOST), "Worker HTTPS policy still references the retired 1ink.online hostname");
 
-console.log("NoTVerse canonical HTTPS and production-origin policy verification passed.");
+console.log("NoTVerse canonical HTTPS, production-origin and Worker-output policy verification passed.");
