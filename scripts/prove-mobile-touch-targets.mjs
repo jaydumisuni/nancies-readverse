@@ -21,6 +21,10 @@ async function prepare(page) {
   await page.reload({ waitUntil: "networkidle" });
 }
 
+async function settle(page) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
 async function prove(browserType, browserName, width, height) {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({
@@ -83,6 +87,12 @@ async function prove(browserType, browserName, width, height) {
     assert(activityLabel === "none", `${browserName}/${width}: obsolete Activity pseudo-label is still painted (${activityLabel})`);
 
     await actions.nth(1).click();
+    /* Comments geometry is owned by the mobile state controller. Wait for that
+       canonical state before measuring CSS that is intentionally scoped to it;
+       otherwise a fast live page can be sampled during the pre-rAF transition. */
+    await page.waitForFunction(() => document.body.classList.contains("notverse-comments-open"));
+    await settle(page);
+
     const input = page.getByRole("textbox", { name: "Write a comment" });
     await input.waitFor();
     const inputBox = await input.evaluate((node) => node.getBoundingClientRect().toJSON());
