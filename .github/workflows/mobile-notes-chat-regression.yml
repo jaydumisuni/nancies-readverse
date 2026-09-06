@@ -70,7 +70,11 @@ jobs:
 
       - name: Start exact generated Worker entry
         run: |
-          npx wrangler dev --local --port 8790 --config dist/nancies_readverse/wrangler.json > /tmp/notverse-worker.log 2>&1 &
+          worker_dir="$(node -e 'const fs=require("fs"); const config=JSON.parse(fs.readFileSync("wrangler.jsonc","utf8")); if (!config.name) process.exit(2); process.stdout.write(String(config.name).replaceAll("-", "_"));')"
+          worker_config="dist/${worker_dir}/wrangler.json"
+          test -f "$worker_config"
+          echo "Starting generated Worker from $worker_config"
+          npx wrangler dev --local --port 8790 --config "$worker_config" > /tmp/notverse-worker.log 2>&1 &
           for attempt in $(seq 1 90); do
             if curl --fail --silent http://127.0.0.1:8790/api/health >/dev/null; then exit 0; fi
             sleep 1
