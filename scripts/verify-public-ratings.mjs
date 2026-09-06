@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 function assert(condition, message) {
@@ -43,7 +44,11 @@ globalThis.fetch = async (input, init) => {
 };
 
 try {
-  const module = await import(`${pathToFileURL("dist/nancies_readverse/index.js").href}?ratings=${Date.now()}`);
+  const wrangler = JSON.parse(await readFile("wrangler.jsonc", "utf8"));
+  const workerName = String(wrangler.name || "").trim();
+  assert(workerName, "wrangler.jsonc does not define the Worker name");
+  const builtWorker = `dist/${workerName.replaceAll("-", "_")}/index.js`;
+  const module = await import(`${pathToFileURL(builtWorker).href}?ratings=${Date.now()}`);
   const handler = module.default;
   const response = await handler.fetch(new Request("https://notverse.test/api/discovery/search", {
     method: "POST",

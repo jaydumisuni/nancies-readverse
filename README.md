@@ -50,6 +50,6 @@ Temporary construction or diagnostic machinery is never product authority merely
 
 ## Production
 
-Canonical public site: `https://notverse.1ink.online/`
+Canonical public site: `https://notverse.pharrtechnolgiescoltd.workers.dev/`
 
-The public HTTP hostname must permanently redirect to HTTPS before application/static handling. A release is not complete merely because the repository builds; the frozen candidate must also satisfy the repository verification gates and live-production proof.
+The canonical Cloudflare Worker name is `notverse`; its workers.dev production route and release-preview URLs are explicitly enabled in `wrangler.jsonc`. The public HTTP hostname must permanently redirect to HTTPS before application/static handling. A release is not complete merely because the repository builds; the frozen candidate must also satisfy the repository verification gates and live-production proof.

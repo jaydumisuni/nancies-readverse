@@ -11,6 +11,8 @@ jobs:
   verify-cloudflare-production:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      NOTVERSE_URL: https://notverse.pharrtechnolgiescoltd.workers.dev
     steps:
       - uses: actions/checkout@v4
 
@@ -30,9 +32,7 @@ jobs:
           npm install --no-save playwright
           npx playwright install --with-deps chromium webkit
 
-      - name: Wait until the custom domain serves this exact client bundle
-        env:
-          NOTVERSE_URL: https://notverse.1ink.online
+      - name: Wait until the production Worker serves this exact client bundle
         run: |
           set -euo pipefail
           local_html="$(cat dist/client/index.html)"
@@ -56,47 +56,66 @@ jobs:
             sleep 10
           done
 
-          echo "Cloudflare did not serve the exact built assets at the custom domain within 15 minutes."
+          echo "Cloudflare did not serve the exact built assets at the canonical production Worker within 15 minutes."
           echo "Expected script: $script_asset"
           echo "Expected style: $style_asset"
           exit 1
 
+      - name: Verify live HTTP permanently redirects to HTTPS
+        run: |
+          set -euo pipefail
+          plain_url="${NOTVERSE_URL/https:/http:}/notes?from=production-proof"
+          expected_location="$NOTVERSE_URL/notes?from=production-proof"
+          headers="$(curl -sS -D - -o /dev/null --connect-timeout 20 --max-time 30 "$plain_url")"
+          status="$(printf '%s\n' "$headers" | awk 'NR==1 {print $2}')"
+          location="$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}')"
+          case "$status" in
+            301|308) ;;
+            *) echo "Expected a permanent HTTP redirect, got status $status"; exit 1 ;;
+          esac
+          test "$location" = "$expected_location"
+          printf '%s\n' "$headers" > /tmp/notverse-live-http-redirect.txt
+
       - name: Verify live identity and responsive shell
-        env:
-          NOTVERSE_URL: https://notverse.1ink.online/
         run: node scripts/verify-notverse-live.mjs
 
       - name: Verify live setup, navigation and social workspaces
         env:
-          NOTVERSE_TEST_URL: https://notverse.1ink.online
+          NOTVERSE_TEST_URL: ${{ env.NOTVERSE_URL }}
         run: node scripts/verify-notverse-ui.mjs
 
       - name: Verify current mobile-native Chat, Comments and Inbox screens
         env:
-          PROOF_URL: https://notverse.1ink.online
+          PROOF_URL: ${{ env.NOTVERSE_URL }}
           PROOF_DIR: engineering-evidence/notverse-live/mobile-native-screens
         run: node scripts/prove-mobile-native-screens.mjs
 
+      - name: Verify Comments covers a stable navigation compositor
+        env:
+          PROOF_URL: ${{ env.NOTVERSE_URL }}
+          PROOF_DIR: engineering-evidence/notverse-live/comments-nav-compositor
+        run: node scripts/prove-comments-nav-compositor.mjs
+
       - name: Verify visible mobile Note and Comment controls
         env:
-          PROOF_URL: https://notverse.1ink.online
+          PROOF_URL: ${{ env.NOTVERSE_URL }}
           PROOF_DIR: engineering-evidence/notverse-live/mobile-touch-targets
         run: node scripts/prove-mobile-touch-targets.mjs
 
       - name: Verify live Notes social loop, My Notes, comments, share and Activity
         env:
-          PROOF_URL: https://notverse.1ink.online
+          PROOF_URL: ${{ env.NOTVERSE_URL }}
           PROOF_DIR: engineering-evidence/notverse-live/notes-social-completion
         run: node scripts/prove-notes-social-loop.mjs
 
       - name: Verify live reader, Notes and Library handoff
         env:
-          NOTVERSE_TEST_URL: https://notverse.1ink.online
+          NOTVERSE_TEST_URL: ${{ env.NOTVERSE_URL }}
         run: node scripts/verify-notverse-reader-ui.mjs
 
       - name: Verify live persistent Inbox messaging
         env:
-          NOTVERSE_TEST_URL: https://notverse.1ink.online
+          NOTVERSE_TEST_URL: ${{ env.NOTVERSE_URL }}
         run: node scripts/verify-notverse-inbox-ui.mjs
 
       - name: Preserve exact deployment proof
@@ -107,6 +126,7 @@ jobs:
           cp /tmp/notverse-live-commit.txt engineering-evidence/notverse-live/verified-commit.txt 2>/dev/null || true
           cp /tmp/notverse-live-script.txt engineering-evidence/notverse-live/script-asset.txt 2>/dev/null || true
           cp /tmp/notverse-live-style.txt engineering-evidence/notverse-live/style-asset.txt 2>/dev/null || true
+          cp /tmp/notverse-live-http-redirect.txt engineering-evidence/notverse-live/http-redirect.txt 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4
         if: always()
